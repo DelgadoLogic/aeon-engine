@@ -1,0 +1,68 @@
+# Aeon Browser — .gitignore
+# DelgadoLogic
+
+# Build outputs
+/build/
+/bin/
+/obj/
+/dist/
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.map
+*.ncb
+*.sdf
+*.aps
+*.suo
+*.user
+.vs/
+
+# Rust build
+/router/target/
+Cargo.lock
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+_deps/
+
+# SQLite amalgamation (vendor separately — too large for git)
+/history/sqlite3.c
+/history/sqlite3.h
+
+# WolfSSL (vendor separately)
+/retro/wolfssl/
+/tls/wolfssl/
+
+# Compiled retro tier
+/retro/*.obj
+/retro/*.map
+/retro/AEON16.EXE
+
+# OS / Editor artifacts
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*.orig
+*.bak
+
+# Publish artifacts
+/publish/
+
+# User data (never commit user data)
+*.db
+*.db-wal
+*.db-shm
+settings.json
+session.json
+crash_*.dmp
+AeonCrash*.log
+
+# Logs
+*.log

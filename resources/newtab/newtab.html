@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<!--
+  Aeon Browser — aeon://newtab
+  DelgadoLogic | UI Team
+  
+  This is the New Tab page served when the user opens aeon://newtab.
+  It is a self-contained HTML file — no external CDN, no network requests.
+  All assets are inline (CSS font via @import from bundled font file,
+  icons are inline SVG).
+  
+  The C++ core serves this file from the embedded resources of Aeon.exe.
+  On legacy tiers (XP/Vista) the CSS animations are disabled via
+  a class injected by EraChrome.cpp: <body class="legacy-mode">
+  
+  PRIVACY: Speed Dial thumbnails are cached locally in %APPDATA%\Aeon\thumbnails\.
+  No URLs are sent to any server from this page.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab — Aeon Browser</title>
+  <style>
+    /* =========================================================
+       DESIGN SYSTEM — Aeon Dark Theme
+    ========================================================= */
+    :root {
+      --bg-primary:    #0d0e14;
+      --bg-card:       #16182a;
+      --bg-card-hover: #1e2140;
+      --accent:        #6c63ff;
+      --accent-2:      #a78bfa;
+      --accent-glow:   rgba(108, 99, 255, 0.35);
+      --text-primary:  #e8e8f0;
+      --text-dim:      #8888aa;
+      --text-faint:    #44445a;
+      --border:        rgba(108,99,255,0.18);
+      --radius:        14px;
+      --radius-sm:     8px;
+      --transition:    0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      --font:          'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font);
+      overflow-x: hidden;
+    }
+
+    /* Animated aurora background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(108,99,255,0.14) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(167,139,250,0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 50% 40%, rgba(76,29,149,0.08) 0%, transparent 60%);
+      animation: aurora 18s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: 0;
+    }
+    @keyframes aurora {
+      0%   { transform: scale(1)   rotate(0deg);  opacity: 0.8; }
+      50%  { transform: scale(1.1) rotate(1deg);  opacity: 1;   }
+      100% { transform: scale(1)   rotate(-1deg); opacity: 0.8; }
+    }
+
+    /* Disable animations on legacy tier */
+    body.legacy-mode::before { animation: none; }
+    body.legacy-mode * { transition: none !important; animation: none !important; }
+
+    /* =========================================================
+       LAYOUT
+    ========================================================= */
+    .page {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 0 24px;
+    }
+
+    /* =========================================================
+       HEADER / BRAND
+    ========================================================= */
+    .brand {
+      margin-top: 48px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0.9;
+      animation: fadeUp 0.6s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    .brand-icon {
+      width: 36px; height: 36px;
+      filter: drop-shadow(0 0 10px var(--accent-glow));
+    }
+
+    .brand-name {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    /* =========================================================
+       SEARCH BAR
+    ========================================================= */
+    .search-wrap {
+      margin-top: 44px;
+      width: 100%;
+      max-width: 680px;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+
+    .search-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: 48px;
+      padding: 0 20px;
+      height: 58px;
+      box-shadow:
+        0 0 0 0 var(--accent-glow),
+        0 4px 32px rgba(0,0,0,0.4);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .search-container:focus-within {
+      border-color: var(--accent);
+      box-shadow:
+        0 0 0 4px var(--accent-glow),
+        0 4px 32px rgba(0,0,0,0.4);
+    }
+
+    .search-icon {
+      flex-shrink: 0;
+      width: 20px; height: 20px;
+      fill: var(--text-dim);
+      transition: fill var(--transition);
+    }
+    .search-container:focus-within .search-icon { fill: var(--accent-2); }
+
+    #search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 17px;
+      padding: 0 14px;
+      caret-color: var(--accent-2);
+    }
+    #search-input::placeholder { color: var(--text-faint); }
+
+    .search-engines {
+      display: flex;
+      gap: 6px;
+    }
+
+    .engine-btn {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .engine-btn:hover,
+    .engine-btn.active {
+      border-color: var(--accent);
+      color: var(--accent-2);
+      background: rgba(108,99,255,0.1);
+    }
+
+    /* =========================================================
+       SPEED DIAL
+    ========================================================= */
+    .section-label {
+      margin-top: 52px;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      align-self: flex-start;
+      max-width: 900px;
+      width: 100%;
+      animation: fadeUp 0.7s 0.2s ease both;
+    }
+
+    .speed-dial {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+      max-width: 900px;
+      width: 100%;
+      animation: fadeUp 0.7s 0.25s ease both;
+    }
+
+    .dial-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--text-primary);
+      transition:
+        background var(--transition),
+        border-color var(--transition),
+        transform var(--transition),
+        box-shadow var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .dial-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent-glow), transparent 70%);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .dial-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(108,99,255,0.2);
+    }
+    .dial-card:hover::before { opacity: 1; }
+
+    .dial-favicon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      background: rgba(255,255,255,0.06);
+      position: relative; z-index: 1;
+    }
+
+    .dial-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      position: relative; z-index: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    /* Add new dial button */
+    .dial-add {
+      background: transparent;
+      border: 1.5px dashed var(--text-faint);
+      border-radius: var(--radius);
+      padding: 20px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      color: var(--text-faint);
+      transition: all var(--transition);
+    }
+    .dial-add:hover {
+      border-color: var(--accent);
+      color: var(--accent-2);
+      background: rgba(108,99,255,0.06);
+    }
+
+    /* =========================================================
+       PRIVACY BAR (bottom)
+    ========================================================= */
+    .privacy-bar {
+      margin-top: auto;
+      padding: 20px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      opacity: 0.6;
+      font-size: 12px;
+      color: var(--text-dim);
+      animation: fadeUp 0.8s 0.4s ease both;
+    }
+
+    .privacy-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .privacy-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px rgba(34,197,94,0.7);
+      flex-shrink: 0;
+    }
+    .privacy-dot.off { background: var(--text-faint); box-shadow: none; }
+
+    /* =========================================================
+       TIME / DATE
+    ========================================================= */
+    .clock {
+      margin-top: 32px;
+      text-align: center;
+      animation: fadeUp 0.6s 0.05s ease both;
+    }
+
+    #clock-time {
+      font-size: 72px;
+      font-weight: 200;
+      letter-spacing: -2px;
+      color: var(--text-primary);
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(108,99,255,0.2);
+    }
+
+    #clock-date {
+      font-size: 14px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      letter-spacing: 0.04em;
+    }
+
+    /* =========================================================
+       RESPONSIVE
+    ========================================================= */
+    @media (max-width: 600px) {
+      #clock-time { font-size: 48px; }
+      .speed-dial { grid-template-columns: repeat(3, 1fr); }
+      .brand { margin-top: 28px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Brand header -->
+  <div class="brand">
+    <!-- Inline SVG: Aeon hourglass/infinity icon (placeholder until Aeon.ico is final) -->
+    <svg class="brand-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="a" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#6c63ff"/>
+          <stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- Infinity / figure-8 shape -->
+      <path filter="url(#glow)"
+        d="M8 18 C8 13, 14 9, 18 14 C22 9, 28 13, 28 18 C28 23, 22 27, 18 22 C14 27, 8 23, 8 18 Z"
+        fill="none" stroke="url(#a)" stroke-width="2.2"/>
+      <!-- Center glow dot -->
+      <circle cx="18" cy="18" r="2" fill="url(#a)" opacity="0.9"/>
+    </svg>
+    <span class="brand-name">Aeon</span>
+  </div>
+
+  <!-- Clock -->
+  <div class="clock">
+    <div id="clock-time">--:--</div>
+    <div id="clock-date">Loading...</div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <div class="search-container">
+      <!-- Search icon -->
+      <svg class="search-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+          stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+          fill="none"/>
+      </svg>
+      <input id="search-input" type="text"
+        placeholder="Search or enter address"
+        autocomplete="off" spellcheck="false">
+      <div class="search-engines">
+        <button class="engine-btn active" data-engine="brave"   title="Brave Search">Brave</button>
+        <button class="engine-btn"        data-engine="ddg"     title="DuckDuckGo">DDG</button>
+        <button class="engine-btn"        data-engine="google"  title="Google">Google</button>
+        <button class="engine-btn"        data-engine="onion"   title="Onion/Tor" style="font-size:11px;">🧅 Tor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Speed Dial -->
+  <div class="section-label">Quick Access</div>
+  <div class="speed-dial" id="speed-dial">
+    <!-- Default dials — will be loaded from history/bookmarks via aeon:// protocol -->
+    <a class="dial-card" href="https://search.brave.com" data-aeon-dial>
+      <div class="dial-favicon">🦁</div>
+      <div class="dial-label">Brave Search</div>
+    </a>
+    <a class="dial-card" href="https://github.com" data-aeon-dial>
+      <div class="dial-favicon">🐙</div>
+      <div class="dial-label">GitHub</div>
+    </a>
+    <a class="dial-card" href="https://www.youtube.com" data-aeon-dial>
+      <div class="dial-favicon">▶️</div>
+      <div class="dial-label">YouTube</div>
+    </a>
+    <a class="dial-card" href="https://delgadologic.tech" data-aeon-dial>
+      <div class="dial-favicon">⚡</div>
+      <div class="dial-label">DelgadoLogic</div>
+    </a>
+    <a class="dial-card" href="https://wikipedia.org" data-aeon-dial>
+      <div class="dial-favicon">📖</div>
+      <div class="dial-label">Wikipedia</div>
+    </a>
+    <a class="dial-card" href="http://3g2upl4pq6kufc4m.onion" data-aeon-dial>
+      <div class="dial-favicon">🧅</div>
+      <div class="dial-label">DDG Onion</div>
+    </a>
+    <button class="dial-add" id="dial-add-btn" onclick="aeon.addDial()">
+      <div class="dial-favicon" style="font-size:22px;background:none;">+</div>
+      <div class="dial-label">Add shortcut</div>
+    </button>
+  </div>
+
+  <!-- Privacy status bar -->
+  <div class="privacy-bar">
+    <div class="privacy-item" id="adblock-status">
+      <span class="privacy-dot" id="dot-adblock"></span>
+      <span id="label-adblock">AdBlock ON</span>
+    </div>
+    <div class="privacy-item" id="tor-status">
+      <span class="privacy-dot off" id="dot-tor"></span>
+      <span id="label-tor">Tor OFF</span>
+    </div>
+    <div class="privacy-item" id="https-status">
+      <span class="privacy-dot" id="dot-https"></span>
+      <span id="label-https">HTTPS upgrade</span>
+    </div>
+    <div class="privacy-item" id="fp-status">
+      <span class="privacy-dot" id="dot-fp"></span>
+      <span id="label-fp">FP Guard ON</span>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+// =========================================================
+// CLOCK
+// =========================================================
+function updateClock() {
+  var now  = new Date();
+  var h    = now.getHours().toString().padStart(2, '0');
+  var m    = now.getMinutes().toString().padStart(2, '0');
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var mons = ['January','February','March','April','May','June',
+              'July','August','September','October','November','December'];
+  document.getElementById('clock-time').textContent = h + ':' + m;
+  document.getElementById('clock-date').textContent =
+    days[now.getDay()] + ', ' + mons[now.getMonth()] +
+    ' ' + now.getDate() + ', ' + now.getFullYear();
+}
+updateClock();
+setInterval(updateClock, 10000);
+
+// =========================================================
+// SEARCH
+// =========================================================
+var ENGINES = {
+  brave:  'https://search.brave.com/search?q=',
+  ddg:    'https://duckduckgo.com/?q=',
+  google: 'https://www.google.com/search?q=',
+  onion:  'https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/html/?q='
+};
+var activeEngine = 'brave';
+
+document.querySelectorAll('.engine-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.engine-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    activeEngine = btn.dataset.engine;
+    document.getElementById('search-input').focus();
+  });
+});
+
+document.getElementById('search-input').addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var val = this.value.trim();
+  if (!val) return;
+
+  // Direct URL if it looks like one
+  if (/^https?:\/\//i.test(val) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/|$)/.test(val)) {
+    var url = (/^https?:\/\//i.test(val)) ? val : 'https://' + val;
+    // Pass to Aeon core via the C++ bridge (aeon.navigate is registered by EraChrome)
+    if (window.aeon && window.aeon.navigate) { aeon.navigate(url); }
+    else { location.href = url; }
+  } else {
+    var searchUrl = ENGINES[activeEngine] + encodeURIComponent(val);
+    if (window.aeon && window.aeon.navigate) { aeon.navigate(searchUrl); }
+    else { location.href = searchUrl; }
+  }
+});
+
+// =========================================================
+// PRIVACY STATUS — read from C++ bridge (injected by PulseBridge)
+// aeon.settings is injected by EraChrome as a JSON object:
+// { adblock: true, tor: false, https_upgrade: true, fp_guard: true }
+// =========================================================
+function updatePrivacy() {
+  var s = (window.aeon && window.aeon.settings) ? aeon.settings : {
+    adblock: true, tor: false, https_upgrade: true, fp_guard: true
+  };
+
+  function setDot(id, labelId, active, onText, offText) {
+    var dot = document.getElementById(id);
+    var lbl = document.getElementById(labelId);
+    if (active) {
+      dot.className = 'privacy-dot';
+      lbl.textContent = onText;
+    } else {
+      dot.className = 'privacy-dot off';
+      lbl.textContent = offText;
+    }
+  }
+
+  setDot('dot-adblock', 'label-adblock', s.adblock,       'AdBlock ON',   'AdBlock OFF');
+  setDot('dot-tor',     'label-tor',     s.tor,           'Tor ON',       'Tor OFF');
+  setDot('dot-https',   'label-https',   s.https_upgrade, 'HTTPS upgrade','HTTP only');
+  setDot('dot-fp',      'label-fp',      s.fp_guard,      'FP Guard ON',  'FP Guard OFF');
+}
+updatePrivacy();
+
+// =========================================================
+// LEGACY MODE — applied by EraChrome.cpp before page load
+// document.body.classList.add('legacy-mode')
+// =========================================================
+console.log('[Aeon] New Tab loaded. Bridge: ' + (window.aeon ? 'connected' : 'standalone'));
+</script>
+</body>
+</html>
