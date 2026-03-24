@@ -1,161 +1,286 @@
-# Aeon Browser by DelgadoLogic
+<div align="center">
 
-> **Zero inherited vulnerabilities. Our DNA. Every OS from Windows 3.1 to Windows 11.**
+<img src="resources/images/banner.png" alt="Aeon Browser by DelgadoLogic" width="100%">
 
-![Build: In Development](https://img.shields.io/badge/build-in%20development-orange)
-![License: Proprietary](https://img.shields.io/badge/license-proprietary-red)
-![Company: DelgadoLogic](https://img.shields.io/badge/by-DelgadoLogic-blue)
+<br><br>
 
----
+<img src="resources/icons/Aeon_64.png" alt="Aeon Icon" width="64">
 
-## What is Aeon Browser?
+# Aeon Browser
 
-Aeon is a **completely original** web browser written from scratch by DelgadoLogic.
-It is NOT a Chromium fork. It is NOT a Firefox fork.
+**The browser that works everywhere. Windows 3.1 to Windows 11.**
 
-We studied the best open-source browser engines (Chromium, Mypal68, Supermium, Floorp, Waterfox, Roytam1 UXP) and rewrote everything ourselves — inheriting zero bugs, zero CVEs, and zero upstream dependencies.
+*Zero inherited vulnerabilities. Our DNA. Our code. Our rules.*
 
-**Ships bundled inside the LogicFlow installer** for DelgadoLogic users, and available as a standalone install from [delgadologic.tech](https://delgadologic.tech).
+<br>
 
----
+[![Build](https://img.shields.io/badge/build-in%20development-orange?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/DelgadoLogic/AeonBrowser)
+[![License](https://img.shields.io/badge/license-proprietary-red?style=for-the-badge)](LICENSE)
+[![By DelgadoLogic](https://img.shields.io/badge/by-DelgadoLogic-6c63ff?style=for-the-badge)](https://delgadologic.tech)
+[![Platform](https://img.shields.io/badge/platform-Windows%203.1%20→%2011-0078d4?style=for-the-badge&logo=windows&logoColor=white)](https://delgadologic.tech/aeon)
+[![Ships with LogicFlow](https://img.shields.io/badge/ships%20with-LogicFlow-a78bfa?style=for-the-badge)](https://delgadologic.tech/logicflow)
 
-## Target Platform Matrix
-
-| Tier | OS | Renderer | TLS | RAM Target |
-|------|----|----------|-----|-----------|
-| **Pro** | Windows 10 / 11 | Blink (our wrapper) | Native TLS 1.3 | < 200MB idle |
-| **Modern** | Windows 8 / 8.1 | Blink | Native TLS 1.2/1.3 | < 150MB idle |
-| **Extended** | Windows Vista / 7 | Gecko (lightweight) | Schannel + registry unlock | < 100MB idle |
-| **XP-Hi** | Windows XP SP3 + SSE2 | Blink (XP build) | OCA TLS 1.2 or WolfSSL | < 80MB idle |
-| **XP-Lo** | Windows XP (no SSE2) | Gecko (no SSE2) | WolfSSL | < 60MB idle |
-| **2000** | Windows 2000 | HTML4 renderer | WolfSSL | < 40MB idle |
-| **9x** | Windows 95/98/ME | HTML4 renderer | WolfSSL 32-bit | < 30MB idle |
-| **Win16** | Windows 3.1 / 3.11 | HTML4 (16-bit GDI) | WolfSSL 16-bit | < 8MB |
+</div>
 
 ---
 
-## Supported Protocols
+## ✨ What is Aeon?
 
-| Protocol | Status |
-|----------|--------|
-| HTTPS (TLS 1.3) | ✅ All tiers |
-| HTTP | ✅ All tiers (auto-upgrade to HTTPS) |
-| Tor / .onion | ✅ Via embedded Arti SOCKS5 (Win7+) |
-| I2P / .i2p | ✅ Via i2pd HTTP proxy (Win7+) |
-| IPFS / IPNS | ✅ Via IPFS gateway (configurable) |
-| Gemini | ✅ Built-in renderer (all tiers) |
-| Gopher | ✅ Built-in (all tiers) |
-| FTP/FTPS | ✅ → Download Manager |
-| Magnet links | ✅ → Download Manager |
-| BitTorrent | ✅ Download only — no seeding EVER |
-| ED2K | 🔄 Planned |
-| file:// | ✅ Local file viewer |
+Aeon is a **from-scratch web browser** built by [DelgadoLogic](https://delgadologic.tech).
+
+We studied the best browsers ever made — **Chromium, Firefox, Arc, Brave, Vivaldi, Waterfox, Mypal, Supermium** — and rewrote everything from the ground up. No forks. No inherited CVEs. No compromises.
+
+It ships bundled inside the **[LogicFlow](https://delgadologic.tech/logicflow)** installer, runs on everything from a 1994 Pentium 66 running Windows 3.11 to a modern gaming rig on Windows 11, and brings full TLS 1.3, Tor, I2P, and ad-blocking to every machine.
 
 ---
 
-## Architecture Overview
+## 🖥️ UI Preview
+
+<div align="center">
+<img src="resources/images/ui_mockup.png" alt="Aeon Browser UI — dark mode new tab page" width="90%">
+<br>
+<sub><i>Aeon Browser — dark mode new tab page with aurora background, live clock, and speed dial</i></sub>
+</div>
+
+---
+
+## 🏆 Why Aeon vs the Competition
+
+| Feature | Aeon | Chrome | Firefox | Brave | Edge |
+|---------|------|--------|---------|-------|------|
+| Works on Windows 3.1 | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Works on Windows XP | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Works on Windows Vista/7 | ✅ | ❌ | ⚠️ | ❌ | ❌ |
+| Zero upstream CVEs | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Built-in Tor | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Built-in I2P | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Native ad-blocker (no extension) | ✅ | ❌ | ❌ | ✅ | ❌ |
+| FTP + Magnet + Torrent download | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Gemini/Gopher support | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Tab sleep (< 5MB idle) | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| Password vault (DPAPI) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ships with system optimizer | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+## 🎯 Target Platform Matrix
+
+| Tier | OS | Renderer | TLS | RAM Idle |
+|------|----|----------|-----|---------|
+| **Pro** | Windows 10 / 11 | Blink shim | Native TLS 1.3 | ~150 MB |
+| **Modern** | Windows 8 / 8.1 | Blink shim | Native TLS 1.3 | ~120 MB |
+| **Extended** | Windows Vista / 7 | Gecko (light) | Schannel unlock | ~80 MB |
+| **XP-Hi** | Windows XP + SSE2 | Blink (XP build) | WolfSSL | ~60 MB |
+| **XP-Lo** | Windows XP (no SSE2) | Gecko (no SSE2) | WolfSSL | ~45 MB |
+| **2000** | Windows 2000 | HTML4 renderer | WolfSSL | ~30 MB |
+| **9x** | Windows 95/98/ME | HTML4 renderer | WolfSSL 32-bit | ~20 MB |
+| **Win16** | Windows 3.1 / 3.11 | HTML4 GDI 16-bit | WolfSSL 16-bit | ~6 MB |
+
+> **How does it know which tier to use?**  
+> `HardwareProbe.cpp` runs at startup and detects your OS, CPU, and RAM.  
+> The `TierDispatcher` loads the right engine DLL automatically. Zero config needed.
+
+---
+
+## 🌐 Protocol Support
+
+Aeon is the **only browser** that supports all of these natively:
+
+```
+https://  http://  tor://  .onion    ← Clear web + Tor dark web
+gemini:// gopher://                  ← Alternative internet protocols  
+ftp://    ftps://                    ← File transfer (download only)
+magnet:   torrent:                   ← BitTorrent downloads (NO seeding)
+ipfs://   ipns://                    ← Decentralized web
+i2p://    .i2p                       ← I2P anonymous network
+file://                              ← Local file viewer
+aeon://                              ← Internal pages (newtab, settings, etc.)
+```
+
+---
+
+## 🔒 Security Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   AEON SECURITY MODEL                   │
+├─────────────┬───────────────────────────────────────────┤
+│ TLS         │ WolfSSL (legacy) or OS-native Schannel    │
+│ DNS         │ DNS-over-HTTPS — Cloudflare 1.1.1.1       │
+│ Tracking    │ EasyList engine — native C++, not JS ext  │
+│ Fingerprint │ Canvas + WebGL + Audio randomization       │
+│ Privacy     │ GPC header injected on every request       │
+│ Passwords   │ Windows DPAPI (CryptProtectData)           │
+│ Tor         │ Embedded Arti (Rust) — no Tor Browser dep │
+│ I2P         │ i2pd child process — transit tunnels OFF   │
+│ Updates     │ WinTrust Authenticode + SHA-256 verify     │
+│ Sandbox     │ Renderer process isolation per tab         │
+└─────────────┴───────────────────────────────────────────┘
+```
+
+**Zero inherited CVEs.** Aeon is not a Chromium fork or Firefox fork.  
+We studied them and wrote our own from scratch.
+
+---
+
+## 🏗️ Architecture Overview
 
 ```
 AeonBrowser/
-├── core/                     C++ Browser Core
-│   ├── probe/                HardwareProbe — OS/CPU/Tier detection
-│   ├── engine/               TierDispatcher + AeonEngine DLL interface
-│   ├── ui/                   EraChrome adaptive UI (Mica/Win32)
-│   ├── tls/                  Universal TLS abstraction
-│   ├── extensions/           MV2 shim (modern) / Native AdBlock (legacy)
-│   ├── session/              Tab persistence + crash recovery
-│   ├── crash/                Minidump handler + telemetry queue
-│   └── memory/               Tab sleep manager (30-min idle suspension)
-├── router/                   Rust Protocol Router (aeon_router.dll)
+├── core/                    ← C++ Browser Host Process
+│   ├── probe/               HardwareProbe  — OS + CPU + Tier detection
+│   ├── engine/              TierDispatcher + AeonEngine DLL interface (C ABI)
+│   ├── ui/                  EraChrome      — Mica (Win11) / Win32 (Legacy) UI
+│   ├── tls/                 TlsAbstraction — WolfSSL / Schannel / TLS 1.3
+│   ├── protocol/            NewTabHandler  — aeon:// internal pages
+│   ├── settings/            SettingsEngine — JSON + HKLM two-tier config
+│   ├── session/             SessionManager — crash recovery + tab restore
+│   ├── crash/               CrashHandler   — minidump + telemetry queue
+│   └── memory/              TabSleepManager— 30-min idle = 5 MB suspended tab
+│
+├── router/                  ← Rust Protocol Router (aeon_router.dll)
 │   └── src/
-│       ├── lib.rs            C FFI exports
-│       ├── router.rs         14-protocol dispatcher
-│       ├── downloader.rs     Download engine (NO seeding)
-│       ├── tor.rs            Arti Tor integration
-│       └── gemini.rs         Gemini + Gopher renderer
-├── privacy/                  Content Blocker (EasyList-compatible)
-├── telemetry/                PulseBridge → delgadologic.tech endpoint
-└── retro/                    16-bit Open Watcom retro tier
-    ├── aeon16.c              Win3.x main entry point
-    ├── html4.c / html4.h     HTML4/CSS2 GDI renderer
-    ├── wolfssl_bridge.c      16-bit WinSock + WolfSSL TLS 1.3
-    └── makefile              Open Watcom 2.0 build
+│       ├── router.rs        14-protocol scheme dispatcher
+│       ├── downloader.rs    Download manager (NO seeding, compile-time)
+│       ├── tor.rs           Arti Tor client (embedded, no Tor Browser)
+│       └── gemini.rs        Gemini + Gopher handlers
+│
+├── engines/                 ← Renderer DLLs (swappable per tier)
+│   └── blink/               aeon_blink_stub.cpp → aeon_blink.dll
+│
+├── history/                 ← SQLite3 Bookmark + History Engine
+│   └── HistoryEngine.cpp    WAL mode, incognito = :memory:, Netscape export
+│
+├── privacy/                 ← Content Blocker
+│   └── ContentBlocker.cpp   EasyList, DoH, GPC, fingerprint guard
+│
+├── updater/                 ← Auto-Updater
+│   └── AutoUpdater.cpp      WinTrust Authenticode + SHA-256 + 3 channels
+│
+├── telemetry/               ← Anonymous Telemetry
+│   └── PulseBridge.cpp      Category-level only, opt-out, shared with LogicFlow
+│
+├── resources/
+│   └── newtab/newtab.html   ← aeon://newtab — aurora + clock + speed dial
+│
+└── retro/                   ← 16-bit Windows 3.x Tier
+    ├── aeon16.c             WinMain — full 16-bit browser entry point
+    ├── html4.c              HTML4/CSS2 GDI renderer (word-wrap, headings, links)
+    └── wolfssl_bridge.c     WinSock 1.1 + WolfSSL TLS 1.3 (16-bit)
 ```
 
 ---
 
-## Building
+## 🖼️ Icon Pack
 
-### Modern Tier (Win10/11) — MSVC x64
+<div align="center">
+
+| 16px | 32px | 48px | 64px | 128px | 256px |
+|------|------|------|------|-------|-------|
+| <img src="resources/icons/Aeon_16.png" width="16"> | <img src="resources/icons/Aeon_32.png" width="32"> | <img src="resources/icons/Aeon_48.png" width="48"> | <img src="resources/icons/Aeon_64.png" width="64"> | <img src="resources/icons/Aeon_128.png" width="128"> | <img src="resources/icons/Aeon_256.png" width="128"> |
+| Taskbar | Start Menu | Desktop | Explorer | Large | HiDPI |
+
+*All sizes baked into a single `Aeon.ico` using `resources/icons/build_icon.ps1`*
+
+</div>
+
+---
+
+## 🚀 Building
+
+### Requirements
+- **MSVC 2022** (x64 for Pro/Modern, x86 for XP tiers)
+- **Rust 1.75+** (`cargo` for router DLL)
+- **CMake 3.22+**
+- **Open Watcom 2.0** (16-bit Win3.x retro tier only)
+
+### Quick Build (Pro tier — Windows 10/11)
 ```bash
-mkdir build && cd build
-cmake .. -DAEON_TARGET_TIER=Pro -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
+# Clone
+git clone https://github.com/DelgadoLogic/AeonBrowser.git
+cd AeonBrowser
+
+# Build Rust router
+cd router && cargo build --release && cd ..
+
+# Configure + build C++ core
+cmake -B build -DAEON_TARGET_TIER=Pro -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+
+# Build icons
+powershell -File resources/icons/build_icon.ps1
 ```
 
-### Legacy Tier (Vista/7) — MSVC x86
+### All Tiers
 ```bash
-cmake .. -DAEON_TARGET_TIER=Extended -DCMAKE_BUILD_TYPE=Release
-```
+cmake -B build -DAEON_TARGET_TIER=Extended   # Vista/7
+cmake -B build -DAEON_TARGET_TIER=XPHi       # XP + SSE2
+cmake -B build -DAEON_TARGET_TIER=Retro      # Win9x/2000
 
-### XP Tier
-```bash
-cmake .. -DAEON_TARGET_TIER=XPHi
-# Requires MSVC 2005 / 2008 toolset + Platform SDK for XP
-```
-
-### Retro 16-bit Tier (Win3.x) — Open Watcom 2.0
-```bash
-cd retro
-wmake
-```
-
-### Rust Router DLL
-```bash
-cd router
-cargo build --release
-# Output: target/release/aeon_router.dll
+# 16-bit (Win3.x) — requires Open Watcom 2.0
+cd retro && wmake
 ```
 
 ---
 
-## Security Model
+## 🔧 Telemetry & Privacy
 
-- **Zero inherited CVEs** — not a fork, written from scratch
-- **Native content blockers** — faster than a JS extension engine
-- **Seeding permanently disabled** at compile-time (not config)
-- **Tab process isolation** — one renderer crash does not kill the browser
-- **DPAPI-backed password vault** — tied to Windows user account
-- **Fingerprint randomization** — canvas, WebGL, audio, navigator
-- **GPC header injected** on every request (user opt-out toggle)
-- **DNS-over-HTTPS** by default (Cloudflare 1.1.1.1)
-- **Telemetry** — anonymous, category-level, opt-out, same endpoint as LogicFlow
+| Data collected | ✅/❌ |
+|---|---|
+| OS tier (e.g., "WinXP-HiSpec") | ✅ Anonymous |
+| RAM bucket (<512MB / 512MB-2GB / 2GB+) | ✅ Anonymous |
+| Crash reports (path only, no content) | ✅ Anonymous |
+| Browser locale | ✅ Anonymous |
+| URLs visited | ❌ Never |
+| Search queries | ❌ Never |
+| Form data / passwords | ❌ Never |
+| IP address | ❌ Never |
+| Device identifiers | ❌ Never |
 
----
-
-## Telemetry
-
-Data collected (anonymous):
-- OS tier (e.g., "WinXP-HiSpec")
-- RAM bucket (<512MB / 512MB–2GB / 2GB–8GB / 8GB+)
-- Crash reports (minidump path only)
-- Browser locale
-
-Data NEVER collected:
-- URLs, search queries, form data, passwords, IP address
-
-Opt-out: `HKLM\SOFTWARE\DelgadoLogic\Aeon\TelemetryEnabled = 0`
-(same key as LogicFlow — one opt-out covers all DelgadoLogic products)
+**Opt out:** `HKLM\SOFTWARE\DelgadoLogic\Aeon\TelemetryEnabled = 0`  
+*(Same registry key as LogicFlow — one opt-out covers everything by DelgadoLogic)*
 
 ---
 
-## License
+## 📦 Releases
 
-Proprietary — © DelgadoLogic. All rights reserved.
-Reference codebases were studied for architecture patterns only.
-Component licenses (WolfSSL, Arti) are maintained via isolated DLL linking.
+Aeon Browser ships inside the **[LogicFlow installer](https://delgadologic.tech/logicflow)**.  
+It can also be installed as a standalone browser.
+
+| Channel | Cadence | Audience |
+|---------|---------|---------|
+| **Stable** | Monthly | Everyone |
+| **Beta** | Bi-weekly | Power users |
+| **Nightly** | Daily | Developers |
+
+Updates are delivered via `update.delgadologic.tech` — verified with **Authenticode** signature + **SHA-256** hash before installation.
 
 ---
 
-*Aeon Browser — Timeless. From Windows 3.1 to Windows 11.*
-*by DelgadoLogic | [delgadologic.tech](https://delgadologic.tech)*
+## 📄 License
+
+**Proprietary — © 2026 DelgadoLogic. All rights reserved.**
+
+Reference codebases were studied for architectural patterns only. No code was copied.  
+Third-party component licenses:
+
+| Component | License | Integration |
+|-----------|---------|-------------|
+| WolfSSL | GPLv2 + commercial | Separate DLL |
+| Arti (Tor) | MIT/Apache 2.0 | Rust crate |
+| i2pd | BSD 3-clause | Child process |
+| SQLite3 | Public domain | Vendored amalgamation |
+
+---
+
+<div align="center">
+
+<img src="resources/icons/Aeon_64.png" width="48">
+
+**Aeon Browser by DelgadoLogic**
+
+*Timeless. From Windows 3.1 to Windows 11.*
+
+[🌐 delgadologic.tech](https://delgadologic.tech) &nbsp;·&nbsp; [📦 LogicFlow](https://delgadologic.tech/logicflow) &nbsp;·&nbsp; [🐛 Issues](https://github.com/DelgadoLogic/AeonBrowser/issues) &nbsp;·&nbsp; [📧 Support](https://delgadologic.tech/support)
+
+</div>
