@@ -57,9 +57,10 @@
       position: fixed;
       inset: 0;
       background:
-        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(108,99,255,0.14) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(167,139,250,0.10) 0%, transparent 70%),
-        radial-gradient(ellipse 40% 40% at 50% 40%, rgba(76,29,149,0.08) 0%, transparent 60%);
+        radial-gradient(ellipse 90% 70% at 15% 8%,  rgba(108,99,255,0.22) 0%, transparent 65%),
+        radial-gradient(ellipse 70% 90% at 85% 88%, rgba(167,139,250,0.16) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 50% at 50% 45%, rgba(76,29,149,0.12)  0%, transparent 60%),
+        radial-gradient(ellipse 30% 30% at 30% 80%, rgba(108,99,255,0.08) 0%, transparent 55%);
       animation: aurora 18s ease-in-out infinite alternate;
       pointer-events: none;
       z-index: 0;
@@ -326,18 +327,20 @@
        TIME / DATE
     ========================================================= */
     .clock {
-      margin-top: 32px;
+      margin-top: 48px;
       text-align: center;
       animation: fadeUp 0.6s 0.05s ease both;
     }
 
     #clock-time {
-      font-size: 72px;
+      font-size: clamp(72px, 10vw, 110px);
       font-weight: 200;
-      letter-spacing: -2px;
+      letter-spacing: -4px;
       color: var(--text-primary);
       line-height: 1;
-      text-shadow: 0 0 40px rgba(108,99,255,0.2);
+      text-shadow:
+        0 0 60px rgba(108,99,255,0.25),
+        0 0 120px rgba(108,99,255,0.10);
     }
 
     #clock-date {
@@ -463,6 +466,14 @@
       <span class="privacy-dot" id="dot-fp"></span>
       <span id="label-fp">FP Guard ON</span>
     </div>
+    <div class="privacy-item" id="fw-status" style="display:none">
+      <span class="privacy-dot" id="dot-fw" style="background:#a78bfa;box-shadow:0 0 6px rgba(167,139,250,0.7)"></span>
+      <span id="label-fw">Firewall Mode</span>
+    </div>
+    <div class="privacy-item" id="sentinel-status" style="display:none">
+      <span class="privacy-dot" id="dot-sentinel" style="background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,0.7)"></span>
+      <span id="label-sentinel">Auto Bypass</span>
+    </div>
   </div>
 
 </div><!-- /.page -->
@@ -550,6 +561,17 @@ function updatePrivacy() {
   setDot('dot-tor',     'label-tor',     s.tor,           'Tor ON',       'Tor OFF');
   setDot('dot-https',   'label-https',   s.https_upgrade, 'HTTPS upgrade','HTTP only');
   setDot('dot-fp',      'label-fp',      s.fp_guard,      'FP Guard ON',  'FP Guard OFF');
+
+  // Firewall Mode indicator
+  if (s.firewall_mode) {
+    document.getElementById('fw-status').style.display = 'flex';
+    document.getElementById('label-fw').textContent = '🔥 ' + (s.active_transport || 'Firewall Mode');
+  }
+  // Network Sentinel auto-bypass indicator
+  if (s.sentinel_bypass) {
+    document.getElementById('sentinel-status').style.display = 'flex';
+    document.getElementById('label-sentinel').textContent = '🛡 ' + (s.sentinel_mode || 'Auto Bypass');
+  }
 }
 updatePrivacy();
 
