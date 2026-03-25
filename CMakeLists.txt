@@ -57,6 +57,10 @@ set(CORE_SOURCES
     core/engine/TierDispatcher.cpp
     core/ui/BrowserChrome.cpp
     core/ui/EraChrome.cpp
+    core/ui/AppMenu.cpp
+    core/ui/BookmarkBar.cpp
+    core/ui/BookmarkToast.cpp
+    core/ui/DownloadButton.cpp
     core/network/CircumventionEngine.cpp
     core/network/NetworkSentinel.cpp
     core/settings/SettingsEngine.cpp
