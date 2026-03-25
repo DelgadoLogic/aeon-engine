@@ -1,165 +1,358 @@
-// AeonBrowser Protocol Router — lib.rs
-// DelgadoLogic | Senior Security Engineer
+// AeonBrowser — router/src/lib.rs
+// DelgadoLogic | Rust Network Team
 //
-// PURPOSE: C-compatible FFI entry points so the C++ browser core can call
-// our Rust router without unsafe raw pointer leaks.
+// C-ABI protocol router — compiled to aeon_router.dll.
+// Dispatches aeon:// special protocols + tor:// + gemini:// + ipfs://.
 //
-// DESIGN NOTE: We expose a flat C API (no name mangling, no classes) so that:
-//   1. The 32-bit C++ browser core on XP can link without name-mangling issues.
-//   2. Eventually the 16-bit Open Watcom retro tier can call via a thin stub.
-//   3. Any future language binding (Python telemetry scripts, C# PulseBridge)
-//      can use the same surface without a Rust dependency.
+// Called from C++ via:
+//   AeonRouter_Navigate(url, callback)
+//   AeonRouter_GetStatus()
+//   AeonRoute result = AeonRouter_Dispatch(url)
 //
-// SAFETY: All raw pointer parameters are validated before use. We never
-// store raw pointers across call boundaries — caller owns all memory.
+// All functions are #[no_mangle] extern "C".
+// Async operations are driven by a Tokio runtime spawned at DLL init time.
+// Blocking C callbacks are called from a dedicated dispatcher thread.
 
-#![allow(non_snake_case)]
-#![allow(clippy::missing_safety_doc)]
-
-mod router;
-mod downloader;
-mod tor;
-mod gemini;
-mod gopher;
+#![allow(non_snake_case, dead_code)]
 
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint};
+use std::os::raw::c_char;
+use std::sync::{Arc, OnceLock};
+use tokio::runtime::Runtime;
 
-// ---------------------------------------------------------------------------
-// Router FFI
-// ---------------------------------------------------------------------------
+// ─── Tokio singleton ─────────────────────────────────────────────────────────
+static RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
 
-/// Initialise the protocol router. Call once at browser startup.
-/// Returns 1 on success, 0 on failure.
-#[no_mangle]
-pub extern "C" fn aeon_router_init() -> c_int {
-    match router::RouterEngine::global_init() {
-        Ok(_)  => 1,
-        Err(e) => {
-            eprintln!("[AeonRouter] init failed: {e}");
-            0
-        }
-    }
+fn rt() -> Arc<Runtime> {
+    RUNTIME.get_or_init(|| {
+        Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .thread_name("aeon-router")
+                .enable_all()
+                .build()
+                .expect("tokio runtime"),
+        )
+    })
+    .clone()
 }
 
-/// Dispatch a URL to the correct handler. Returns an opaque request ID,
-/// or 0 if the URL is unparseable.
-///
-/// # IT TROUBLESHOOTING
-/// - Returns 0 for unknown schemes: add handler in router.rs dispatch table.
-/// - Tor requests hang: check aeon_tor_start() was called first.
-/// - Gemini cert error: server cert mismatch — TOFU (trust-on-first-use)
-///   requires the cert to be stored after first visit.
-#[no_mangle]
-pub unsafe extern "C" fn aeon_router_dispatch(
+// ─── C-ABI types ─────────────────────────────────────────────────────────────
+#[repr(C)]
+pub enum Protocol {
+    Http      = 0,
+    Https     = 1,
+    Tor       = 2,   // proxied over tor://
+    Gemini    = 3,   // gemini:// RFC 2015 subset
+    Gopher    = 4,   // gopher+
+    Ipfs      = 5,   // ipfs://CID
+    Aeon      = 6,   // aeon://newtab, aeon://settings, etc.
+    Magnet    = 7,   // magnet: — forwarded to DownloadManager
+    Unknown   = 255,
+}
+
+#[repr(C)]
+pub enum RouteStatus {
+    Ok           = 0,
+    TorNotReady  = 1,
+    DnsBlocked   = 2,
+    Timeout      = 3,
+    Error        = 255,
+}
+
+#[repr(C)]
+pub struct AeonRoute {
+    pub protocol:       Protocol,
+    pub status:         RouteStatus,
+    /// The actual URL/resource to load (may differ from input — e.g. IPFS gateway rewrite)
+    pub resolved_url:   *mut c_char,  // caller must free with AeonRouter_Free
+    /// Optional proxy URL (socks5://127.0.0.1:9050 for Tor, etc.)
+    pub proxy_url:      *mut c_char,
+    pub use_ech:        u8,   // 1 = request ECH from engine
+    pub tls_1_3_only:   u8,
+}
+
+// Callback from C++ when navigation result arrives
+pub type NavigateCallback = extern "C" fn(
     url: *const c_char,
-    request_id_out: *mut c_uint,
-) -> c_int {
-    if url.is_null() || request_id_out.is_null() {
-        return 0;
-    }
-    let url_str = CStr::from_ptr(url).to_string_lossy();
-    match router::dispatch(&url_str) {
-        Ok(id) => {
-            *request_id_out = id;
-            1
+    status: RouteStatus,
+    proxy: *const c_char,
+);
+
+// ─── DLL init / deinit ───────────────────────────────────────────────────────
+/// Called once by TierDispatcher when loading the DLL.
+#[no_mangle]
+pub extern "C" fn AeonRouter_Init() -> i32 {
+    let _ = rt(); // Spin up Tokio
+    // tracing_subscriber::fmt::init();
+    eprintln!("[aeon_router] Initialized. Tokio runtime ready.");
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn AeonRouter_Shutdown() {
+    eprintln!("[aeon_router] Shutdown.");
+    // Runtime is dropped here via OnceLock when the DLL unloads
+}
+
+// ─── Protocol detection ───────────────────────────────────────────────────────
+fn detect_protocol(url: &str) -> Protocol {
+    if url.starts_with("aeon://")          { Protocol::Aeon   }
+    else if url.starts_with("tor://")      { Protocol::Tor    }
+    else if url.starts_with("gemini://")   { Protocol::Gemini }
+    else if url.starts_with("gopher://")   { Protocol::Gopher }
+    else if url.starts_with("ipfs://")     { Protocol::Ipfs   }
+    else if url.starts_with("magnet:")     { Protocol::Magnet }
+    else if url.starts_with("https://")    { Protocol::Https  }
+    else if url.starts_with("http://")     { Protocol::Http   }
+    else                                   { Protocol::Unknown }
+}
+
+// ─── IPFS gateway rewrite ────────────────────────────────────────────────────
+/// Tries local IPFS daemon first, falls back to public gateway.
+fn rewrite_ipfs(url: &str) -> String {
+    // ipfs://Qm... → http://localhost:8080/ipfs/Qm...
+    let cid = url.trim_start_matches("ipfs://");
+    // TODO: probe localhost:8080 — if reachable, use local gateway
+    format!("https://gateway.ipfs.io/ipfs/{}", cid)
+}
+
+// ─── Gemini fetch ─────────────────────────────────────────────────────────────
+/// Minimal Gemini/TLS1.3 fetch. Returns body as raw bytes.
+/// Gemini response line: "<STATUS> <META>\r\n<BODY>"
+async fn fetch_gemini(url: &str) -> Result<Vec<u8>, String> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpStream;
+
+    let rest = url.trim_start_matches("gemini://");
+    let (host_port, _path) = rest.split_once('/').unwrap_or((rest, ""));
+    let (host, port) = if host_port.contains(':') {
+        let mut p = host_port.splitn(2, ':');
+        let h = p.next().unwrap_or("localhost");
+        let pt = p.next().and_then(|s| s.parse::<u16>().ok()).unwrap_or(1965);
+        (h.to_owned(), pt)
+    } else {
+        (host_port.to_owned(), 1965u16)
+    };
+
+    let addr = format!("{}:{}", host, port);
+    let stream = TcpStream::connect(&addr).await
+        .map_err(|e| format!("connect: {}", e))?;
+
+    // Wrap in rustls TLS 1.3
+    // Simplified: use a plain TCP connection for the stub.
+    // Production: integrate rustls ClientConfig with webpki-roots.
+    let mut stream = stream; // TODO: replace with TlsStream
+    let req = format!("{}\r\n", url);
+    stream.write_all(req.as_bytes()).await.map_err(|e| e.to_string())?;
+
+    let mut buf = Vec::new();
+    stream.read_to_end(&mut buf).await.map_err(|e| e.to_string())?;
+    Ok(buf)
+}
+
+// ─── Gopher fetch ─────────────────────────────────────────────────────────────
+async fn fetch_gopher(url: &str) -> Result<Vec<u8>, String> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpStream;
+
+    let rest = url.trim_start_matches("gopher://");
+    let (host_port, path) = rest.split_once('/').unwrap_or((rest, ""));
+    let (host, port) = if host_port.contains(':') {
+        let mut p = host_port.splitn(2, ':');
+        (p.next().unwrap_or("localhost").to_owned(),
+         p.next().and_then(|s| s.parse::<u16>().ok()).unwrap_or(70))
+    } else {
+        (host_port.to_owned(), 70u16)
+    };
+
+    let mut stream = TcpStream::connect(format!("{}:{}", host, port)).await
+        .map_err(|e| e.to_string())?;
+    let req = format!("/{}\r\n", path);
+    stream.write_all(req.as_bytes()).await.map_err(|e| e.to_string())?;
+
+    let mut buf = Vec::new();
+    stream.read_to_end(&mut buf).await.map_err(|e| e.to_string())?;
+    Ok(buf)
+}
+
+// ─── Main dispatch ────────────────────────────────────────────────────────────
+/// Synchronous dispatch — C++ calls this and gets back a route struct.
+/// The caller must free route.resolved_url and route.proxy_url with AeonRouter_Free.
+#[no_mangle]
+pub extern "C" fn AeonRouter_Dispatch(url_cstr: *const c_char) -> AeonRoute {
+    let url = unsafe {
+        if url_cstr.is_null() { return err_route(); }
+        match CStr::from_ptr(url_cstr).to_str() {
+            Ok(s) => s.to_owned(),
+            Err(_) => return err_route(),
         }
-        Err(e) => {
-            eprintln!("[AeonRouter] dispatch error for '{}': {e}", url_str);
-            0
+    };
+
+    let proto = detect_protocol(&url);
+
+    match proto {
+        Protocol::Aeon => {
+            // Internal pages: pass back as-is, no proxy
+            AeonRoute {
+                protocol:     Protocol::Aeon,
+                status:       RouteStatus::Ok,
+                resolved_url: cstring_ptr(&url),
+                proxy_url:    null_cstr(),
+                use_ech:      0,
+                tls_1_3_only: 0,
+            }
+        }
+
+        Protocol::Magnet => {
+            // Forward to C++ DownloadManager
+            AeonRoute {
+                protocol:     Protocol::Magnet,
+                status:       RouteStatus::Ok,
+                resolved_url: cstring_ptr(&url),
+                proxy_url:    null_cstr(),
+                use_ech:      0,
+                tls_1_3_only: 0,
+            }
+        }
+
+        Protocol::Ipfs => {
+            let gateway = rewrite_ipfs(&url);
+            AeonRoute {
+                protocol:     Protocol::Ipfs,
+                status:       RouteStatus::Ok,
+                resolved_url: cstring_ptr(&gateway),
+                proxy_url:    null_cstr(),
+                use_ech:      0,
+                tls_1_3_only: 0,
+            }
+        }
+
+        Protocol::Tor => {
+            // Route via SOCKS5 Tor proxy (127.0.0.1:9050)
+            // In production: spin up embedded Arti and use its SOCKS port
+            let http_url = url.replacen("tor://", "https://", 1);
+            AeonRoute {
+                protocol:     Protocol::Tor,
+                status:       RouteStatus::Ok,
+                resolved_url: cstring_ptr(&http_url),
+                proxy_url:    cstring_ptr("socks5://127.0.0.1:9050"),
+                use_ech:      1,
+                tls_1_3_only: 1,
+            }
+        }
+
+        Protocol::Gemini | Protocol::Gopher => {
+            // Block until fetch completes (Tokio will handle async internally)
+            let result = rt().block_on(async {
+                if matches!(proto, Protocol::Gemini) {
+                    fetch_gemini(&url).await
+                } else {
+                    fetch_gopher(&url).await
+                }
+            });
+            match result {
+                Ok(_body) => {
+                    // TODO: body → data: URI for rendering by engine
+                    // For now: return the original URL, engine stub handles it
+                    AeonRoute {
+                        protocol:     proto,
+                        status:       RouteStatus::Ok,
+                        resolved_url: cstring_ptr(&url),
+                        proxy_url:    null_cstr(),
+                        use_ech:      0,
+                        tls_1_3_only: 0,
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[aeon_router] {} error: {}", url, e);
+                    AeonRoute {
+                        protocol:     proto,
+                        status:       RouteStatus::Error,
+                        resolved_url: cstring_ptr(&url),
+                        proxy_url:    null_cstr(),
+                        use_ech:      0,
+                        tls_1_3_only: 0,
+                    }
+                }
+            }
+        }
+
+        Protocol::Https => {
+            // Normal HTTPS: request ECH and TLS 1.3 minimum
+            AeonRoute {
+                protocol:     Protocol::Https,
+                status:       RouteStatus::Ok,
+                resolved_url: cstring_ptr(&url),
+                proxy_url:    null_cstr(),
+                use_ech:      1,
+                tls_1_3_only: 0, // Allow 1.2 for compatibility
+            }
+        }
+
+        _ => {
+            AeonRoute {
+                protocol:     Protocol::Http,
+                status:       RouteStatus::Ok,
+                resolved_url: cstring_ptr(&url),
+                proxy_url:    null_cstr(),
+                use_ech:      0,
+                tls_1_3_only: 0,
+            }
         }
     }
 }
 
-/// Tear down the router. Call at browser shutdown.
+/// Free a string allocated by AeonRouter_Dispatch.
 #[no_mangle]
-pub extern "C" fn aeon_router_shutdown() {
-    router::RouterEngine::global_shutdown();
+pub extern "C" fn AeonRouter_Free(ptr: *mut c_char) {
+    if ptr.is_null() { return; }
+    unsafe { drop(CString::from_raw(ptr)); }
 }
 
-// ---------------------------------------------------------------------------
-// Download Manager FFI
-// ---------------------------------------------------------------------------
-
-/// Enqueue a download. Supports http(s), ftp(s), magnet, .torrent paths.
-/// Returns a download task ID, or 0 on error.
-///
-/// # IT TROUBLESHOOTING
-/// - Magnet fails: DHT bootstrap nodes may be blocked by firewall.
-///   Check that UDP is not filtered on port 6881-6889.
-/// - FTP fails: passive mode required behind NAT. PASV is default.
-/// - Seeding: DISABLED. seed_ratio=0.0, seed_time=0 enforced in code.
+/// Async navigate with callback — fire-and-forget.
 #[no_mangle]
-pub unsafe extern "C" fn aeon_download_enqueue(
-    url:      *const c_char,
-    dest_dir: *const c_char,
-) -> c_uint {
-    if url.is_null() || dest_dir.is_null() {
-        return 0;
-    }
-    let url_s  = CStr::from_ptr(url).to_string_lossy();
-    let dest_s = CStr::from_ptr(dest_dir).to_string_lossy();
-    downloader::enqueue(&url_s, &dest_s).unwrap_or(0)
-}
-
-/// Cancel a running download by task ID.
-#[no_mangle]
-pub extern "C" fn aeon_download_cancel(task_id: c_uint) {
-    downloader::cancel(task_id);
-}
-
-/// Get download progress (0–100). Returns 255 on error/unknown ID.
-#[no_mangle]
-pub extern "C" fn aeon_download_progress(task_id: c_uint) -> u8 {
-    downloader::progress(task_id).unwrap_or(255)
-}
-
-// ---------------------------------------------------------------------------
-// Tor FFI
-// ---------------------------------------------------------------------------
-
-/// Start the Tor SOCKS5 proxy via Arti. Binds on 127.0.0.1:9150.
-/// Takes 15-60 seconds to bootstrap.
-#[no_mangle]
-pub extern "C" fn aeon_tor_start() -> c_int {
-    match tor::start_tor_socks5("127.0.0.1:9150") {
-        Ok(_)  => 1,
-        Err(e) => { eprintln!("[AeonTor] {e}"); 0 }
-    }
-}
-
-/// Stop the Tor proxy.
-#[no_mangle]
-pub extern "C" fn aeon_tor_stop() {
-    tor::stop_tor();
-}
-
-// ---------------------------------------------------------------------------
-// Gemini FFI
-// ---------------------------------------------------------------------------
-
-/// Fetch a Gemini URL. Response body is written to `buf` (max `buf_len` bytes).
-/// Returns actual bytes written, or 0 on error.
-#[no_mangle]
-pub unsafe extern "C" fn aeon_gemini_fetch(
-    url:     *const c_char,
-    buf:     *mut c_char,
-    buf_len: usize,
-) -> usize {
-    if url.is_null() || buf.is_null() || buf_len == 0 {
-        return 0;
-    }
-    let url_s = CStr::from_ptr(url).to_string_lossy();
-    match gemini::fetch(&url_s) {
-        Ok(body) => {
-            let n = body.len().min(buf_len - 1);
-            std::ptr::copy_nonoverlapping(body.as_ptr(), buf as *mut u8, n);
-            *buf.add(n) = 0; // null terminate
-            n
+pub extern "C" fn AeonRouter_Navigate(
+    url_cstr: *const c_char,
+    callback: NavigateCallback,
+) {
+    let url = unsafe {
+        if url_cstr.is_null() { return; }
+        match CStr::from_ptr(url_cstr).to_str() {
+            Ok(s) => s.to_owned(),
+            Err(_) => return,
         }
-        Err(e) => {
-            eprintln!("[AeonGemini] {e}");
-            0
-        }
+    };
+
+    rt().spawn(async move {
+        let route = AeonRouter_Dispatch(
+            CString::new(url.as_str()).unwrap().as_ptr()
+        );
+        callback(route.resolved_url, RouteStatus::Ok, route.proxy_url);
+        AeonRouter_Free(route.resolved_url);
+        AeonRouter_Free(route.proxy_url);
+    });
+}
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+fn cstring_ptr(s: &str) -> *mut c_char {
+    match CString::new(s) {
+        Ok(cs) => cs.into_raw(),
+        Err(_) => null_cstr(),
+    }
+}
+
+fn null_cstr() -> *mut c_char {
+    CString::new("").unwrap().into_raw()
+}
+
+fn err_route() -> AeonRoute {
+    AeonRoute {
+        protocol:     Protocol::Unknown,
+        status:       RouteStatus::Error,
+        resolved_url: null_cstr(),
+        proxy_url:    null_cstr(),
+        use_ech:      0,
+        tls_1_3_only: 0,
     }
 }

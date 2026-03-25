@@ -1,61 +1,55 @@
+# AeonBrowser — router/Cargo.toml
+# Protocol router — compiled as a C-ABI DLL (cdylib)
+# Handles: tor://, gemini://, gopher://, ftp://, ipfs://, i2p://
+
 [package]
 name    = "aeon_router"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
-authors = ["DelgadoLogic Engineering <eng@delgadologic.tech>"]
-description = "Aeon Browser protocol router, download engine, Tor/Gemini stack"
 
-# ---------------------------------------------------------------------------
-# This Cargo.toml compiles to a cdylib (.dll on Windows) so the C++ browser
-# core can LoadLibrary("aeon_router.dll") and call our C FFI functions.
-# The staticlib target is also listed for the retro tier (Win9x) where we
-# link the Rust code statically into the browser executable.
-# ---------------------------------------------------------------------------
 [lib]
-name   = "aeon_router"
-crate-type = ["cdylib", "staticlib"]
+name      = "aeon_router"
+crate-type = ["cdylib"]
 
 [dependencies]
-# ---------------------------------------------------------------------------
-# lazy_static: Safe global state for the router dispatch table.
-# Used instead of once_cell for Win9x build compat (older Rust target).
-lazy_static = "1.5"
+# Tor — Arti (pure-Rust Tor impl, C-ABI bindings in arti-client)
+arti-client   = { version = "0.23", features = ["tokio", "rustls"] }
+tor-rtcompat  = { version = "0.23", features = ["tokio"] }
 
-# ---------------------------------------------------------------------------
-# Arti: The Tor Project's official Rust Tor client (embeddable).
-# We use arti-client rather than the tor binary — no child process needed.
-# IT NOTE: Arti requires TLS 1.2+. On Win9x we provide WolfSSL as the TLS
-# backend via the native-tls feature + a custom wolfssl-sys crate (TODO).
-# For the initial build, disable on MSVC XP targets.
-[target.'cfg(not(target_os = "windows"))'.dependencies]
-arti-client  = { version = "0.12", optional = true }
-tor-rtcompat = { version = "0.12", optional = true }
+# Async runtime
+tokio = { version = "1.37", features = ["full"] }
 
-# ---------------------------------------------------------------------------
-# tokio: Async runtime for the download engine and Tor event loop.
-# The "rt-multi-thread" feature uses a thread pool — safe on all NT targets.
-# On Win9x the single-thread runtime ("rt") is used to minimize stack usage.
-tokio = { version = "1", features = ["full"] }
+# TLS
+rustls      = "0.23"
+webpki-roots = "0.26"
 
-# ---------------------------------------------------------------------------
-# rustls: Our TLS library for the Rust layer (Gemini, download HTTPS).
-# On Win9x, we use the wolfssl-sys wrapper instead (defined in [features]).
-rustls       = { version = "0.23", optional = true }
-rustls-native-certs = { version = "0.7", optional = true }
+# SOCKS5 proxy support (wraps Tor / Shadowsocks tunnel)
+tokio-socks = "0.5"
 
-[features]
-default      = ["modern_tls"]
-modern_tls   = ["rustls", "rustls-native-certs"]
-tor_support  = ["arti-client", "tor-rtcompat"]
-wolfssl_compat = [] # Enable for Win9x/XP without OCA
+# HTTP via Tor
+hyper       = { version = "1.3", features = ["full"] }
+hyper-util  = "0.1"
+http        = "1.1"
 
-# ---------------------------------------------------------------------------
+# Gemini protocol
+# (no crate available — we implement the 1034-line spec ourselves)
+
+# Gopher
+# (plain TCP, implemented inline)
+
+# IPFS HTTP gateway routing
+# (routes ipfs://CID to a local gateway: localhost:8080 if ipfs daemon running,
+#  else public.gateway.ipfs.io as fallback)
+
+# Logging
+tracing            = "0.1"
+tracing-subscriber = "0.3"
+
+# FFI helpers
+libc = "0.2"
+
 [profile.release]
-opt-level   = 3
-lto         = true
-codegen-units = 1   # Single unit = smaller binary (important for legacy disk space)
-panic       = "abort" # No unwinding on panic — gives us ~100KB savings
-
-[profile.dev]
-opt-level   = 0
-debug       = true
+opt-level     = 3
+lto           = true
+codegen-units = 1
+strip         = true   # Strip debug symbols for smaller DLL
