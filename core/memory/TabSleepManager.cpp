@@ -34,12 +34,26 @@
 #include <cstdio>
 #include <ctime>
 
-// Configurable thresholds
-static constexpr DWORD SLEEP_THRESHOLD_MS  = 30 * 60 * 1000; // 30 minutes
-static constexpr DWORD TIMER_INTERVAL_MS   = 60 * 1000;      // check every 60s
-static constexpr DWORD MAX_SLEEPING_TABS   = 50;              // cap memory benefit
+// ─── Configurable thresholds — auto-tuned to available RAM ───────────────────
+// 512MB or less  → 10 min  (legacy/low-RAM machines need aggressive sleep)
+// 512MB – 2GB    → 20 min
+// 2GB+           → 30 min  (power PCs)
+// All overridable via Settings → Tabs → Sleep threshold
+static constexpr DWORD TIMER_INTERVAL_MS = 60 * 1000; // check every 60 seconds
+static constexpr DWORD MAX_SLEEPING_TABS = 50;
+
+static DWORD GetSleepThresholdMs() {
+    MEMORYSTATUSEX ms = {};
+    ms.dwLength = sizeof(ms);
+    if (!GlobalMemoryStatusEx(&ms)) return 30 * 60 * 1000;
+    DWORDLONG totalMB = ms.ullTotalPhys / (1024 * 1024);
+    if (totalMB <= 512)  return  10 * 60 * 1000; // 10 min
+    if (totalMB <= 2048) return  20 * 60 * 1000; // 20 min
+    return                        30 * 60 * 1000; // 30 min
+}
 
 namespace TabSleepManager {
+
 
 struct TabEntry {
     unsigned int tab_id;
@@ -65,7 +79,9 @@ static DWORD WINAPI SleepTimerProc(LPVOID) {
         Sleep(TIMER_INTERVAL_MS);
         if (!g_Running) break;
 
-        DWORD now = GetTickCount();
+        DWORD now       = GetTickCount();
+        DWORD threshold = GetSleepThresholdMs(); // recalculated each tick
+
         std::lock_guard<std::mutex> lock(g_Mutex);
 
         unsigned int sleeping_count = 0;
