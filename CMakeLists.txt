@@ -52,26 +52,54 @@ endif()
 # Browser core (C++)
 # ---------------------------------------------------------------------------
 set(CORE_SOURCES
-    core/main.cpp
+    AeonMain.cpp
     core/probe/HardwareProbe.cpp
     core/engine/TierDispatcher.cpp
+    core/ui/BrowserChrome.cpp
     core/ui/EraChrome.cpp
-    core/tls/TlsAbstraction.cpp
-    core/extensions/ExtensionRuntime.cpp
-    core/session/SessionManager.cpp
-    core/crash/CrashHandler.cpp
+    core/network/CircumventionEngine.cpp
+    core/network/NetworkSentinel.cpp
+    core/settings/SettingsEngine.cpp
+    core/security/PasswordVault.cpp
+    core/history/HistoryEngine.cpp
+    core/history/sqlite3.c
+    core/download/DownloadManager.cpp
     core/memory/TabSleepManager.cpp
+    core/tls/TlsAbstraction.cpp
+    core/crash/CrashHandler.cpp
+    updater/AutoUpdater.cpp
     privacy/ContentBlocker.cpp
     telemetry/PulseBridge.cpp
+)
+
+# SQLite3 — vendor, single-threaded (browser is single-process)
+set_source_files_properties(core/history/sqlite3.c PROPERTIES
+    COMPILE_DEFINITIONS "SQLITE_THREADSAFE=0"
 )
 
 add_executable(Aeon WIN32 ${CORE_SOURCES})
 
 # Windows system libraries
 target_link_libraries(Aeon
-    kernel32 user32 gdi32 shell32 advapi32
-    dwmapi dbghelp crypt32
-    ws2_32  # Winsock for network checks
+    kernel32 user32 gdi32 shell32 advapi32 shlwapi ole32 oleaut32
+    dwmapi uxtheme dbghelp
+    crypt32     # DPAPI — password vault
+    winhttp     # Corporate proxy detection + captive portal probe
+    iphlpapi    # IP adapter info
+    ws2_32      # Winsock
+)
+
+# ── Post-build: copy HTML resources to output dir ─────────────────────
+add_custom_command(TARGET Aeon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/newtab"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/settings"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/downloads"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/history"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/newtab/newtab.html"       "$<TARGET_FILE_DIR:Aeon>/newtab/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/settings/settings.html"   "$<TARGET_FILE_DIR:Aeon>/settings/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/downloads/downloads.html" "$<TARGET_FILE_DIR:Aeon>/downloads/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/history/history.html"     "$<TARGET_FILE_DIR:Aeon>/history/"
+    COMMENT "[Aeon] Copying HTML resources to output"
 )
 
 # ---------------------------------------------------------------------------

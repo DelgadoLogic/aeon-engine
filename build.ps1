@@ -1,0 +1,220 @@
+# AeonBrowser — build.ps1
+# DelgadoLogic
+#
+# One-command build: fetches tools → Rust router → MSVC C++ core → icon → publish
+#
+# Usage:
+#   .\build.ps1                    # Release build, Pro tier
+#   .\build.ps1 -Tier Extended     # Vista/7 tier
+#   .\build.ps1 -Tier Retro        # Win9x/2000 (requires Open Watcom)
+#   .\build.ps1 -Config Debug      # Debug build
+#   .\build.ps1 -SkipRust          # Skip cargo if unchanged
+#   .\build.ps1 -SkipTools         # Skip tool downloader
+#
+# Requires: MSVC 2022 (cl.exe in PATH via vcvars64.bat), CMake 3.22+, Rust 1.75+
+
+param(
+    [ValidateSet("Pro","Modern","Extended","XPHi","XPLo","Retro2000","Retro9x","Win16")]
+    [string]$Tier      = "Pro",
+    [ValidateSet("Release","Debug")]
+    [string]$Config    = "Release",
+    [switch]$SkipRust  = $false,
+    [switch]$SkipTools = $false,
+    [switch]$Clean     = $false
+)
+
+$ErrorActionPreference = "Stop"
+$StartTime = Get-Date
+$Root      = $PSScriptRoot
+
+function Step { param([string]$n,[string]$msg)
+    Write-Host ""
+    Write-Host "  [$n] $msg" -ForegroundColor Cyan
+}
+function OK   { param([string]$msg) Write-Host "    OK  $msg" -ForegroundColor Green  }
+function WARN { param([string]$msg) Write-Host "    !!  $msg" -ForegroundColor Yellow }
+function FAIL { param([string]$msg) Write-Host "    ✗   $msg" -ForegroundColor Red; exit 1 }
+
+Write-Host ""
+Write-Host "╔═══════════════════════════════════════════╗" -ForegroundColor DarkMagenta
+Write-Host "║   Aeon Browser — Build System             ║" -ForegroundColor DarkMagenta
+Write-Host "║   DelgadoLogic  ·  $((Get-Date).ToString('yyyy-MM-dd HH:mm'))          ║" -ForegroundColor DarkMagenta
+Write-Host "╚═══════════════════════════════════════════╝" -ForegroundColor DarkMagenta
+Write-Host "  Tier: $Tier   Config: $Config   Root: $Root"
+Write-Host ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 0. Prerequisites check
+# ─────────────────────────────────────────────────────────────────────────────
+Step "0/7" "Checking prerequisites"
+
+$cmakeOk  = (Get-Command cmake  -ErrorAction SilentlyContinue) -ne $null
+$cargoOk  = (Get-Command cargo  -ErrorAction SilentlyContinue) -ne $null
+$clOk     = (Get-Command cl     -ErrorAction SilentlyContinue) -ne $null
+$gitOk    = (Get-Command git    -ErrorAction SilentlyContinue) -ne $null
+
+if (-not $cmakeOk) { FAIL "CMake not found. Install from cmake.org" }
+if (-not $cargoOk) { FAIL "Rust/Cargo not found. Install from rustup.rs" }
+if (-not $clOk)    {
+    WARN "MSVC (cl.exe) not in PATH. Trying to locate vcvars64.bat..."
+    $vcvars = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" `
+        -Recurse -Filter "vcvars64.bat" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($vcvars) {
+        cmd /c "`"$($vcvars.FullName)`" && set" | Where-Object { $_ -match "=" } |
+            ForEach-Object {
+                $parts = $_.Split("=",2)
+                [System.Environment]::SetEnvironmentVariable($parts[0],$parts[1],"Process")
+            }
+        OK "MSVC environment loaded."
+    } else {
+        FAIL "MSVC not found. Install Visual Studio 2022 with C++ workload."
+    }
+}
+OK "cmake  $(cmake --version | Select-Object -First 1)"
+OK "cargo  $(cargo --version)"
+OK "cl     $(cl 2>&1 | Select-Object -First 1)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. Clean (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+if ($Clean) {
+    Step "1/7" "Clean previous build"
+    if (Test-Path "$Root\build")   { Remove-Item "$Root\build"   -Recurse -Force; OK "build/ removed" }
+    if (Test-Path "$Root\publish") { Remove-Item "$Root\publish" -Recurse -Force; OK "publish/ removed" }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Fetch bypass tools (GoodbyeDPI, Tor PTs, Shadowsocks, etc.)
+# ─────────────────────────────────────────────────────────────────────────────
+if (-not $SkipTools) {
+    Step "2/7" "Fetching network bypass tools"
+    & "$Root\tools\fetch_bypass_tools.ps1" -ProjectRoot $Root
+    OK "Bypass tools ready in Network\"
+} else {
+    WARN "Skipping tool fetch (-SkipTools)"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Build Rust protocol router (aeon_router.dll)
+# ─────────────────────────────────────────────────────────────────────────────
+if (-not $SkipRust) {
+    Step "3/7" "Building Rust protocol router"
+    Push-Location "$Root\router"
+    $cargoConfig = if ($Config -eq "Release") { "--release" } else { "" }
+    cargo build $cargoConfig
+    if ($LASTEXITCODE -ne 0) { Pop-Location; FAIL "Cargo build failed" }
+    Pop-Location
+    $routerDll = if ($Config -eq "Release") { "$Root\router\target\release\aeon_router.dll" } `
+                                            else { "$Root\router\target\debug\aeon_router.dll" }
+    if (Test-Path $routerDll) { OK "aeon_router.dll built: $routerDll" }
+    else { WARN "aeon_router.dll not found — check router/src/lib.rs for cdylib config" }
+} else {
+    WARN "Skipping Rust build (-SkipRust)"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. CMake configure + build (C++ core)
+# ─────────────────────────────────────────────────────────────────────────────
+Step "4/7" "Building C++ core (Tier: $Tier)"
+$buildDir = "$Root\build\$Tier"
+New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+
+$arch = switch ($Tier) {
+    "Win16"   { "x86" }   # Open Watcom handles Win16 separately
+    "Retro9x" { "x86" }
+    "Retro2000"{ "x86" }
+    "XPHi"    { "x86" }
+    "XPLo"    { "x86" }
+    default   { "x64" }
+}
+
+$cmakeArgs = @(
+    "-B", $buildDir,
+    "-G", "Visual Studio 17 2022",
+    "-A", $arch,
+    "-DAEON_TARGET_TIER=$Tier",
+    "-DAEON_ROUTER_DLL=$routerDll",
+    "-DCMAKE_BUILD_TYPE=$Config"
+)
+
+cmake @cmakeArgs $Root
+if ($LASTEXITCODE -ne 0) { FAIL "CMake configure failed" }
+
+cmake --build $buildDir --config $Config --parallel
+if ($LASTEXITCODE -ne 0) { FAIL "CMake build failed" }
+OK "C++ core built."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. Build multi-size icon
+# ─────────────────────────────────────────────────────────────────────────────
+Step "5/7" "Building icon pack"
+& "$Root\resources\icons\build_icon.ps1" -ProjectRoot $Root
+OK "Aeon.ico assembled (16/32/48/64/128/256)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Assemble publish/ output
+# ─────────────────────────────────────────────────────────────────────────────
+Step "6/7" "Assembling publish output"
+$publishDir = "$Root\publish\$Tier"
+New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+
+# Binary
+$exeName = if ($Tier -eq "Win16") { "Aeon16.exe" } else { "Aeon.exe" }
+$exeSrc  = "$buildDir\$Config\Aeon.exe"
+if (Test-Path $exeSrc) {
+    Copy-Item $exeSrc "$publishDir\$exeName" -Force
+    OK "Copied: $exeName"
+}
+
+# Rust router
+if ($routerDll -and (Test-Path $routerDll)) {
+    Copy-Item $routerDll "$publishDir\" -Force
+    OK "Copied: aeon_router.dll"
+}
+
+# Resources
+$resItems = @(
+    "resources\newtab\newtab.html",
+    "resources\settings\settings.html",
+    "resources\icons\Aeon.ico"
+)
+foreach ($item in $resItems) {
+    $src = "$Root\$item"
+    if (Test-Path $src) {
+        $destSubDir = "$publishDir\" + (Split-Path (Split-Path $item -Parent) -Leaf)
+        New-Item -ItemType Directory -Force -Path $destSubDir | Out-Null
+        Copy-Item $src $destSubDir -Force
+        OK "Copied: $item"
+    }
+}
+
+# Network bypass tools
+$netDst = "$publishDir\Network"
+if (Test-Path "$Root\Network") {
+    Copy-Item "$Root\Network" $netDst -Recurse -Force
+    OK "Copied: Network\ (bypass tools)"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Summary
+# ─────────────────────────────────────────────────────────────────────────────
+Step "7/7" "Build complete"
+$elapsed = [math]::Round(((Get-Date) - $StartTime).TotalSeconds, 1)
+$outSize = [math]::Round((Get-ChildItem $publishDir -Recurse |
+    Measure-Object Length -Sum).Sum / 1MB, 2)
+
+Write-Host ""
+Write-Host "╔═══════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║   BUILD SUCCESSFUL                        ║" -ForegroundColor Green
+Write-Host "╚═══════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "  Output : $publishDir"
+Write-Host "  Size   : $outSize MB"
+Write-Host "  Time   : ${elapsed}s"
+Write-Host ""
+Write-Host "  To run:"
+Write-Host "    .\publish\$Tier\$exeName"
+Write-Host ""
+Write-Host "  To build installer (LogicFlow):"
+Write-Host "    cd ..\LogicFlow\Installer && .\build_installer.ps1"
+Write-Host ""

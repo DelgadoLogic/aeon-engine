@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<!--
+  Aeon Browser — aeon://downloads
+  DelgadoLogic | UI Team
+
+  Served from embedded resources. No external requests.
+  Updated by C++ DownloadManager via window.aeon.downloads bridge.
+  Bridge contract:
+    aeon.downloads.getAll()  → [{id, url, filename, size, received, status, speed, eta}]
+    aeon.downloads.pause(id)
+    aeon.downloads.resume(id)
+    aeon.downloads.cancel(id)
+    aeon.downloads.reveal(id)  → open Explorer at file
+    aeon.downloads.open(id)    → open completed file
+    aeon.downloads.clearDone() → remove completed entries
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Downloads — Aeon Browser</title>
+  <style>
+    :root {
+      --bg:       #0d0e14;
+      --card:     #16182a;
+      --card2:    #1e2140;
+      --accent:   #6c63ff;
+      --accent2:  #a78bfa;
+      --glow:     rgba(108,99,255,.35);
+      --text:     #e8e8f0;
+      --dim:      #8888aa;
+      --faint:    #44445a;
+      --border:   rgba(108,99,255,.18);
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --amber:    #f59e0b;
+      --r:        12px;
+      --t:        .2s cubic-bezier(.4,0,.2,1);
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html, body {
+      height:100%;
+      background:var(--bg); color:var(--text);
+      font-family:'Segoe UI', system-ui, sans-serif;
+      overflow-x:hidden;
+    }
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 0%,   rgba(108,99,255,.12) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 80% 100%,  rgba(167,139,250,.08) 0%, transparent 60%);
+    }
+
+    /* ── Layout ── */
+    .page {
+      position:relative; z-index:1;
+      max-width:860px; margin:0 auto;
+      padding:40px 24px 60px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:32px;
+    }
+    .header-left { display:flex; align-items:center; gap:14px; }
+    .page-icon {
+      width:40px; height:40px; border-radius:12px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; box-shadow:0 0 20px var(--glow);
+    }
+    .page-title { font-size:22px; font-weight:300; letter-spacing:-.5px; }
+    .page-sub   { font-size:13px; color:var(--dim); margin-top:2px; }
+
+    .header-actions { display:flex; gap:10px; }
+    .btn {
+      background:transparent; border:1px solid var(--border);
+      border-radius:8px; padding:8px 16px;
+      color:var(--dim); font-family:inherit; font-size:13px;
+      cursor:pointer; transition:all var(--t);
+    }
+    .btn:hover { border-color:var(--accent); color:var(--text); }
+    .btn-primary {
+      background:var(--accent); border-color:var(--accent);
+      color:#fff; box-shadow:0 0 16px rgba(108,99,255,.3);
+    }
+    .btn-primary:hover { background:var(--accent2); border-color:var(--accent2); }
+
+    /* ── Active Downloads ── */
+    .section-label {
+      font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--faint); margin-bottom:12px;
+    }
+
+    .dl-list { display:flex; flex-direction:column; gap:10px; margin-bottom:40px; }
+
+    .dl-card {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:var(--r); padding:18px 20px;
+      transition:border-color var(--t);
+    }
+    .dl-card:hover { border-color:rgba(108,99,255,.4); }
+
+    .dl-top {
+      display:flex; align-items:flex-start;
+      justify-content:space-between; gap:12px; margin-bottom:12px;
+    }
+    .dl-info { flex:1; min-width:0; }
+    .dl-filename {
+      font-size:14px; font-weight:500;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .dl-url {
+      font-size:11px; color:var(--dim); margin-top:3px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .dl-actions { display:flex; gap:8px; flex-shrink:0; }
+    .dl-btn {
+      background:none; border:none; cursor:pointer;
+      width:30px; height:30px; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      color:var(--dim); font-size:16px;
+      transition:all var(--t);
+    }
+    .dl-btn:hover { background:rgba(108,99,255,.12); color:var(--text); }
+    .dl-btn.danger:hover { background:rgba(239,68,68,.12); color:var(--red); }
+
+    /* Progress bar */
+    .dl-progress { margin-bottom:8px; }
+    .progress-track {
+      height:4px; background:rgba(255,255,255,.07);
+      border-radius:2px; overflow:hidden; position:relative;
+    }
+    .progress-bar {
+      height:100%; border-radius:2px;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      transition:width .5s linear;
+      position:relative;
+    }
+    .progress-bar::after {
+      content:''; position:absolute; top:0; right:0; bottom:0; width:40px;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.2));
+      animation:shimmer 1.5s infinite;
+    }
+    @keyframes shimmer { 0%{opacity:0} 50%{opacity:1} 100%{opacity:0} }
+
+    .dl-meta {
+      display:flex; gap:20px; font-size:12px; color:var(--dim);
+      margin-top:6px;
+    }
+    .dl-meta span { display:flex; align-items:center; gap:4px; }
+
+    /* Status badges */
+    .badge {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:3px 10px; border-radius:10px; font-size:11px; font-weight:500;
+    }
+    .badge-dl    { background:rgba(108,99,255,.15); color:var(--accent2); }
+    .badge-done  { background:rgba(34,197,94,.12);  color:#86efac; }
+    .badge-pause { background:rgba(245,158,11,.12); color:#fcd34d; }
+    .badge-err   { background:rgba(239,68,68,.12);  color:#fca5a5; }
+
+    .badge-dot {
+      width:6px; height:6px; border-radius:50%;
+      background:currentColor; animation:blink 1.5s infinite;
+    }
+    .badge-done .badge-dot,
+    .badge-err  .badge-dot { animation:none; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Completed section ── */
+    .done-card {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:var(--r); padding:14px 20px;
+      display:flex; align-items:center; gap:14px;
+      transition:border-color var(--t);
+    }
+    .done-card:hover { border-color:rgba(108,99,255,.35); }
+    .done-icon {
+      font-size:22px; flex-shrink:0;
+      width:38px; height:38px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(255,255,255,.05);
+    }
+    .done-info { flex:1; min-width:0; }
+    .done-name {
+      font-size:13px; font-weight:500;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .done-meta { font-size:11px; color:var(--dim); margin-top:2px; }
+    .done-actions { display:flex; gap:6px; }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align:center; padding:80px 24px;
+      color:var(--dim);
+    }
+    .empty-icon { font-size:48px; margin-bottom:16px; opacity:.4; }
+    .empty h3 { font-size:16px; font-weight:400; margin-bottom:8px; }
+    .empty p  { font-size:13px; }
+
+    /* ── Storage bar ── */
+    .storage-bar {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:var(--r); padding:16px 20px;
+      display:flex; align-items:center; gap:16px;
+      margin-bottom:32px;
+    }
+    .storage-info { flex:1; }
+    .storage-label { font-size:13px; color:var(--dim); margin-bottom:8px; }
+    .storage-track {
+      height:6px; background:rgba(255,255,255,.07);
+      border-radius:3px; overflow:hidden;
+    }
+    .storage-fill {
+      height:100%; border-radius:3px;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+    }
+    .storage-size { font-size:22px; font-weight:200; }
+    .storage-size span { font-size:13px; color:var(--dim); }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="page-icon">⬇</div>
+      <div>
+        <div class="page-title">Downloads</div>
+        <div class="page-sub" id="dl-count">Loading...</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="clearDone()">Clear completed</button>
+      <button class="btn btn-primary" onclick="openFolder()">Open folder</button>
+    </div>
+  </div>
+
+  <!-- Storage usage -->
+  <div class="storage-bar">
+    <div class="storage-info">
+      <div class="storage-label">Downloads folder</div>
+      <div class="storage-track">
+        <div class="storage-fill" id="storage-fill" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="storage-size">
+      <span id="storage-used">--</span> <span>GB used</span>
+    </div>
+  </div>
+
+  <!-- Active downloads -->
+  <div class="section-label">Active</div>
+  <div class="dl-list" id="active-list">
+    <!-- Populated by JS from aeon.downloads.getAll() -->
+  </div>
+
+  <!-- Completed downloads -->
+  <div class="section-label">Completed</div>
+  <div class="dl-list" id="done-list">
+    <!-- Populated by JS -->
+  </div>
+
+</div>
+
+<script>
+// ─── Helpers ─────────────────────────────────────────────────────────────
+function fmtSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  if (bytes < 1024*1024*1024) return (bytes/1024/1024).toFixed(1) + ' MB';
+  return (bytes/1024/1024/1024).toFixed(2) + ' GB';
+}
+function fmtSpeed(bps) {
+  if (!bps) return '';
+  if (bps < 1024) return bps + ' B/s';
+  if (bps < 1024*1024) return (bps/1024).toFixed(0) + ' KB/s';
+  return (bps/1024/1024).toFixed(1) + ' MB/s';
+}
+function fmtEta(s) {
+  if (!s || s > 86400) return '';
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+function fileIcon(filename) {
+  var ext = (filename||'').split('.').pop().toLowerCase();
+  var map = {
+    mp4:'🎬', mkv:'🎬', avi:'🎬', mov:'🎬',
+    mp3:'🎵', flac:'🎵', wav:'🎵',
+    zip:'📦', rar:'📦', '7z':'📦', gz:'📦', tar:'📦',
+    pdf:'📄', doc:'📄', docx:'📄', txt:'📄',
+    exe:'⚙️', msi:'⚙️', dmg:'⚙️',
+    png:'🖼️', jpg:'🖼️', jpeg:'🖼️', gif:'🖼️', webp:'🖼️',
+    torrent:'🧲', iso:'💿'
+  };
+  return map[ext] || '📁';
+}
+function statusBadge(status) {
+  switch((status||'').toLowerCase()) {
+    case 'downloading': return '<span class="badge badge-dl"><span class="badge-dot"></span>Downloading</span>';
+    case 'paused':      return '<span class="badge badge-pause"><span class="badge-dot"></span>Paused</span>';
+    case 'error':       return '<span class="badge badge-err"><span class="badge-dot"></span>Error</span>';
+    case 'complete':    return '<span class="badge badge-done"><span class="badge-dot"></span>Done</span>';
+    default:            return '<span class="badge badge-pause"><span class="badge-dot"></span>' + (status||'—') + '</span>';
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────
+function renderActive(items) {
+  var el = document.getElementById('active-list');
+  if (!items || !items.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⏸</div><h3>No active downloads</h3><p>Downloads will appear here automatically.</p></div>';
+    return;
+  }
+  el.innerHTML = items.map(function(d) {
+    var pct = d.size ? Math.round(d.received/d.size*100) : 0;
+    return '<div class="dl-card" id="dl-'+d.id+'">' +
+      '<div class="dl-top">' +
+        '<div class="dl-info">' +
+          '<div class="dl-filename">' + fileIcon(d.filename) + '  ' + (d.filename||'Unknown') + '</div>' +
+          '<div class="dl-url">' + (d.url||'') + '</div>' +
+        '</div>' +
+        '<div class="dl-actions">' +
+          (d.status==='downloading'
+            ? '<button class="dl-btn" title="Pause" onclick="dlPause('+d.id+')">⏸</button>'
+            : '<button class="dl-btn" title="Resume" onclick="dlResume('+d.id+')">▶</button>') +
+          '<button class="dl-btn danger" title="Cancel" onclick="dlCancel('+d.id+')">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dl-progress">' +
+        '<div class="progress-track">' +
+          '<div class="progress-bar" style="width:'+pct+'%"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dl-meta">' +
+        '<span>' + statusBadge(d.status) + '</span>' +
+        '<span>' + fmtSize(d.received) + ' / ' + fmtSize(d.size) + '</span>' +
+        (d.speed ? '<span>⚡ '+fmtSpeed(d.speed)+'</span>' : '') +
+        (d.eta   ? '<span>⏱ '+fmtEta(d.eta)+'</span>' : '') +
+        '<span>'+pct+'%</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderDone(items) {
+  var el = document.getElementById('done-list');
+  if (!items || !items.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><h3>No completed downloads yet</h3></div>';
+    return;
+  }
+  el.innerHTML = items.map(function(d) {
+    return '<div class="done-card">' +
+      '<div class="done-icon">' + fileIcon(d.filename) + '</div>' +
+      '<div class="done-info">' +
+        '<div class="done-name">' + (d.filename||'Unknown') + '</div>' +
+        '<div class="done-meta">' + fmtSize(d.size) + ' · ' + (d.date||'') + '</div>' +
+      '</div>' +
+      '<div class="done-actions">' +
+        '<button class="dl-btn" title="Open" onclick="dlOpen('+d.id+')">↗</button>' +
+        '<button class="dl-btn" title="Reveal in Explorer" onclick="dlReveal('+d.id+')">📁</button>' +
+        '<button class="dl-btn danger" title="Remove" onclick="dlRemove('+d.id+')">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────
+function dlPause(id)  { if (window.aeon && aeon.downloads) aeon.downloads.pause(id);  refresh(); }
+function dlResume(id) { if (window.aeon && aeon.downloads) aeon.downloads.resume(id); refresh(); }
+function dlCancel(id) { if (window.aeon && aeon.downloads) aeon.downloads.cancel(id); refresh(); }
+function dlOpen(id)   { if (window.aeon && aeon.downloads) aeon.downloads.open(id);   }
+function dlReveal(id) { if (window.aeon && aeon.downloads) aeon.downloads.reveal(id); }
+function dlRemove(id) { if (window.aeon && aeon.downloads) aeon.downloads.remove(id); refresh(); }
+function clearDone()  { if (window.aeon && aeon.downloads) aeon.downloads.clearDone(); refresh(); }
+function openFolder() { if (window.aeon && aeon.downloads) aeon.downloads.openFolder(); }
+
+// ─── Refresh ──────────────────────────────────────────────────────────────
+function refresh() {
+  var all = (window.aeon && aeon.downloads) ? aeon.downloads.getAll() : DEMO_DATA;
+  var active = all.filter(function(d){ return d.status !== 'complete'; });
+  var done   = all.filter(function(d){ return d.status === 'complete'; });
+  renderActive(active);
+  renderDone(done);
+  document.getElementById('dl-count').textContent =
+    active.length + ' active · ' + done.length + ' completed';
+  // Storage display
+  var totalBytes = done.reduce(function(a,d){ return a+(d.size||0); },0);
+  var gbUsed = (totalBytes/1024/1024/1024).toFixed(2);
+  document.getElementById('storage-used').textContent = gbUsed;
+  document.getElementById('storage-fill').style.width = Math.min(totalBytes/10e9*100,100)+'%';
+}
+
+// ─── Demo fallback (standalone / no bridge) ───────────────────────────────
+var DEMO_DATA = [
+  { id:1, filename:'ubuntu-24.04-desktop.iso', url:'releases.ubuntu.com/...', size:2.1e9, received:1.47e9, status:'downloading', speed:4.2e6, eta:150 },
+  { id:2, filename:'AeonBrowser-Setup.exe',    url:'delgadologic.tech/...',   size:45e6,  received:45e6,   status:'complete', date:'Today 14:32' },
+  { id:3, filename:'inception.2010.bluray.mkv',url:'magnet:?xt=...',         size:14e9,  received:2.8e9,  status:'paused',   speed:0, eta:0 },
+  { id:4, filename:'sqlite-dll-win64.zip',     url:'sqlite.org/...',         size:1.2e6, received:1.2e6,  status:'complete', date:'Yesterday' }
+];
+
+refresh();
+setInterval(refresh, 2000); // Poll C++ bridge every 2s
+</script>
+</body>
+</html>

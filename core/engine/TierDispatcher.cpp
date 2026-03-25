@@ -1,102 +1,105 @@
 // AeonBrowser — TierDispatcher.cpp
-// DelgadoLogic | Lead Systems Architect
+// DelgadoLogic | Engine Team
 //
-// PURPOSE: Loads the correct rendering engine DLL based on AeonTier.
-// Each engine is a separate DLL (aeon_blink.dll, aeon_gecko.dll,
-// aeon_html4.dll) with a standardised AeonEngine C interface.
+// Loads the correct rendering engine DLL based on SystemProfile tier.
+// Returns a populated AeonEngineVTable* ready for BrowserChrome::Create().
 //
-// IT TROUBLESHOOTING:
-//   - "Engine DLL not found" → check installation dir for right DLL set.
-//   - "Entry point missing" → DLL was built with wrong API version.
-//   - XP Blink crash immediately → SSE2 missing, wrong tier detected.
-//     Force WinXP_LowSpec by adding reg: HKLM\SOFTWARE\DelgadoLogic\Aeon\ForceTier=3
+// ENGINE SEARCH ORDER (per tier):
+//   Pro/Modern    → aeon_blink.dll   (Chromium Blink-compatible renderer)
+//   Extended      → aeon_gecko.dll   (Gecko lightweight fork)
+//   XPHi          → aeon_blink_xp.dll → fallback: aeon_gecko.dll
+//   XPLo          → aeon_gecko_nsse.dll
+//   Retro2000/9x  → aeon_html4.dll   (our custom HTML4/CSS2 GDI renderer)
+//   Win16         → Not loaded here — aeon16.c handles everything natively
+//
+// If the preferred DLL is not found, TierDispatcher falls back down the chain
+// until it hits aeon_html4.dll which is always bundled.
 
 #include "TierDispatcher.h"
+#include "AeonEngine_Interface.h"
 #include "../probe/HardwareProbe.h"
 #include <windows.h>
 #include <cstdio>
 
-// Standard engine DLL entry point signature (all tiers implement this)
-typedef bool (__cdecl *AeonEngineInit_t)(const SystemProfile*, HINSTANCE);
-typedef void (__cdecl *AeonEngineShutdown_t)();
+namespace TierDispatcher {
 
-struct TierDispatcher::Impl {
-    HMODULE    engineDll    = nullptr;
-    AeonEngineInit_t     fnInit     = nullptr;
-    AeonEngineShutdown_t fnShutdown = nullptr;
+struct EngineCandidate {
+    const char* dllName;
+    const char* description;
 };
 
-static const char* SelectEngineDll(AeonTier tier) {
-    // IT NOTE: DLL names are deliberate — aeon_html4 for anything pre-XP,
-    // aeon_gecko for the Gecko-based lightweight build (no SSE2 XP + Vista/7),
-    // aeon_blink for the Chromium-core modern builds.
+static const EngineCandidate k_proTier[] = {
+    { "aeon_blink.dll",       "Blink shim (Chromium-compatible)" },
+    { "aeon_blink_stub.dll",  "Blink stub (development)" },
+    { "aeon_gecko.dll",       "Gecko lightweight fork" },
+    { "aeon_html4.dll",       "HTML4 fallback" },
+    { nullptr, nullptr }
+};
+static const EngineCandidate k_extendedTier[] = {
+    { "aeon_gecko.dll",       "Gecko lightweight (Vista/7)" },
+    { "aeon_html4.dll",       "HTML4 fallback" },
+    { nullptr, nullptr }
+};
+static const EngineCandidate k_xpHiTier[] = {
+    { "aeon_blink_xp.dll",   "Blink XP edition (SSE2)" },
+    { "aeon_gecko.dll",      "Gecko" },
+    { "aeon_html4.dll",      "HTML4 fallback" },
+    { nullptr, nullptr }
+};
+static const EngineCandidate k_xpLoTier[] = {
+    { "aeon_gecko_nsse.dll", "Gecko no-SSE2 edition" },
+    { "aeon_html4.dll",      "HTML4 fallback" },
+    { nullptr, nullptr }
+};
+static const EngineCandidate k_retroTier[] = {
+    { "aeon_html4.dll",      "HTML4/CSS2 GDI renderer" },
+    { nullptr, nullptr }
+};
+
+static const EngineCandidate* CandidatesFor(OSTier tier) {
     switch (tier) {
-        case AeonTier::Win16_Retro:
-        case AeonTier::Win9x_Retro:
-        case AeonTier::Win2000_Compat:
-        case AeonTier::WinXP_LowSpec:  return "aeon_html4.dll";   // Our HTML4/CSS2 renderer
-        case AeonTier::WinXP_HiSpec:
-        case AeonTier::WinVista_7:     return "aeon_gecko.dll";   // Gecko lightweight
-        case AeonTier::Win8_Modern:
-        case AeonTier::Win10_11_Pro:   return "aeon_blink.dll";   // Blink/Chromium core
-        default:                       return nullptr;
+        case OSTier::Pro:
+        case OSTier::Modern:   return k_proTier;
+        case OSTier::Extended: return k_extendedTier;
+        case OSTier::XPHi:    return k_xpHiTier;
+        case OSTier::XPLo:    return k_xpLoTier;
+        default:               return k_retroTier;
     }
 }
 
-TierDispatcher::TierDispatcher(const SystemProfile& p, HINSTANCE hInst)
-    : m_Profile(p), m_hInst(hInst), m_impl(new Impl) {}
+AeonEngineVTable* LoadEngine(const SystemProfile* profile) {
+    if (!profile) return nullptr;
+    if (profile->tier == OSTier::Win16) return nullptr; // aeon16.c handles it
 
-TierDispatcher::~TierDispatcher() {
-    if (m_impl->engineDll) {
-        if (m_impl->fnShutdown) m_impl->fnShutdown();
-        FreeLibrary(m_impl->engineDll);
-    }
-    delete m_impl;
-}
+    char exeDir[MAX_PATH];
+    GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
+    if (char* s = strrchr(exeDir, '\\')) *s = '\0';
 
-bool TierDispatcher::LoadEngine() {
-    // Check for forced tier override (for IT troubleshooting)
-    // HKLM\SOFTWARE\DelgadoLogic\Aeon\ForceTier (REG_DWORD)
-    HKEY hk;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
-            "SOFTWARE\\DelgadoLogic\\Aeon", 0, KEY_READ, &hk) == ERROR_SUCCESS) {
-        DWORD forced = 0xFF, sz = sizeof(forced);
-        RegQueryValueExA(hk, "ForceTier", nullptr, nullptr,
-            reinterpret_cast<BYTE*>(&forced), &sz);
-        RegCloseKey(hk);
-        if (forced != 0xFF) {
-            m_effectiveTier = static_cast<AeonTier>(forced);
-#ifdef AEON_DEBUG
-            printf("[TierDispatcher] Tier overridden to %u\n", forced);
-#endif
+    const EngineCandidate* candidates = CandidatesFor(profile->tier);
+
+    for (int i = 0; candidates[i].dllName; i++) {
+        char path[MAX_PATH];
+        _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\%s", exeDir, candidates[i].dllName);
+
+        HMODULE hMod = LoadLibraryA(path);
+        if (!hMod) { fprintf(stdout,"[TierDispatcher] Not found: %s\n",candidates[i].dllName); continue; }
+
+        auto createFn = reinterpret_cast<AeonEngine_CreateFn>(GetProcAddress(hMod,"AeonEngine_Create"));
+        if (!createFn) { FreeLibrary(hMod); continue; }
+
+        AeonEngineVTable* e = createFn();
+        if (!e || e->api_version < AEON_ENGINE_API_VERSION) {
+            if (e && e->Shutdown) e->Shutdown();
+            FreeLibrary(hMod); continue;
         }
-    } else {
-        m_effectiveTier = m_Profile.tier;
+
+        fprintf(stdout,"[TierDispatcher] Engine: %s (%s) API v%u\n",
+            candidates[i].dllName, candidates[i].description, e->api_version);
+        return e;
     }
 
-    const char* dllName = SelectEngineDll(m_effectiveTier);
-    if (!dllName) {
-        fprintf(stderr, "[TierDispatcher] No engine defined for tier %u\n",
-            static_cast<unsigned>(m_effectiveTier));
-        return false;
-    }
-
-    m_impl->engineDll = LoadLibraryA(dllName);
-    if (!m_impl->engineDll) {
-        fprintf(stderr, "[TierDispatcher] LoadLibrary(%s) failed: %lu\n",
-            dllName, GetLastError());
-        return false;
-    }
-
-    m_impl->fnInit = reinterpret_cast<AeonEngineInit_t>(
-        GetProcAddress(m_impl->engineDll, "AeonEngine_Init"));
-    m_impl->fnShutdown = reinterpret_cast<AeonEngineShutdown_t>(
-        GetProcAddress(m_impl->engineDll, "AeonEngine_Shutdown"));
-
-    if (!m_impl->fnInit) {
-        fprintf(stderr, "[TierDispatcher] %s missing AeonEngine_Init\n", dllName);
-        return false;
-    }
-
-    return m_impl->fnInit(&m_Profile, m_hInst);
+    fprintf(stderr,"[TierDispatcher] FATAL: no engine found for tier %d\n",(int)profile->tier);
+    return nullptr;
 }
+
+} // namespace TierDispatcher

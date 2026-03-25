@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<!--
+  Aeon Browser — aeon://history
+  DelgadoLogic | UI Team
+
+  History, bookmarks, and reading list — unified page.
+  Bridge:
+    aeon.history.getAll(limit)     → [{url, title, visitTime, favicon}]
+    aeon.history.search(query)     → [{...}]
+    aeon.history.delete(url)
+    aeon.history.wipe()
+    aeon.bookmarks.getAll()        → [{url, title, folder, addedTime}]
+    aeon.bookmarks.add(url, title, folder)
+    aeon.bookmarks.delete(url)
+    aeon.bookmarks.export()        → downloads HTML file
+    aeon.readingList.getAll()      → [{url, title, savedTime, read}]
+    aeon.readingList.markRead(url)
+    aeon.readingList.delete(url)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>History & Bookmarks — Aeon Browser</title>
+  <style>
+    :root {
+      --bg:      #0d0e14;
+      --card:    #16182a;
+      --card2:   #1e2140;
+      --accent:  #6c63ff;
+      --accent2: #a78bfa;
+      --glow:    rgba(108,99,255,.3);
+      --text:    #e8e8f0;
+      --dim:     #8888aa;
+      --faint:   #44445a;
+      --border:  rgba(108,99,255,.18);
+      --green:   #22c55e;
+      --r:       12px;
+      --t:       .2s cubic-bezier(.4,0,.2,1);
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html, body {
+      height:100%;
+      background:var(--bg); color:var(--text);
+      font-family:'Segoe UI', system-ui, sans-serif;
+      overflow-x:hidden;
+    }
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none;
+      background:
+        radial-gradient(ellipse 60% 40% at 80% 10%, rgba(108,99,255,.10) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 60% at 10% 90%, rgba(167,139,250,.08) 0%, transparent 60%);
+    }
+
+    /* ── Shell: sidebar + content ── */
+    .shell {
+      display:flex; height:100vh;
+      position:relative; z-index:1;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width:200px; flex-shrink:0;
+      border-right:1px solid var(--border);
+      padding:32px 12px;
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .sidebar-header {
+      padding:0 10px 20px;
+      font-size:12px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--faint);
+    }
+    .nav-item {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border-radius:9px;
+      cursor:pointer; color:var(--dim);
+      font-size:13px; font-weight:500;
+      transition:all var(--t);
+      border:none; background:none;
+      width:100%; text-align:left;
+    }
+    .nav-item:hover { background:rgba(108,99,255,.08); color:var(--text); }
+    .nav-item.active { background:rgba(108,99,255,.15); color:var(--accent2); }
+    .nav-icon { font-size:16px; flex-shrink:0; }
+    .nav-count {
+      margin-left:auto; font-size:10px;
+      background:rgba(108,99,255,.2); color:var(--accent2);
+      padding:1px 7px; border-radius:8px;
+    }
+
+    /* ── Main content ── */
+    .content { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ── Top bar ── */
+    .topbar {
+      padding:20px 28px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:14px;
+    }
+    .search-wrap {
+      flex:1; position:relative;
+      display:flex; align-items:center;
+    }
+    .search-icon {
+      position:absolute; left:14px;
+      font-size:14px; color:var(--dim); pointer-events:none;
+    }
+    #search-input {
+      width:100%; background:var(--card);
+      border:1px solid var(--border); border-radius:8px;
+      padding:10px 14px 10px 38px;
+      color:var(--text); font-family:inherit; font-size:13px;
+      outline:none; transition:border-color var(--t);
+    }
+    #search-input:focus { border-color:var(--accent); }
+    #search-input::placeholder { color:var(--faint); }
+
+    .topbar-actions { display:flex; gap:8px; }
+    .btn {
+      background:transparent; border:1px solid var(--border);
+      border-radius:8px; padding:8px 14px;
+      color:var(--dim); font-family:inherit; font-size:12px;
+      cursor:pointer; transition:all var(--t);
+    }
+    .btn:hover { border-color:var(--accent); color:var(--text); }
+    .btn-danger:hover { border-color:rgba(239,68,68,.5); color:#fca5a5; }
+
+    /* ── Date group header ── */
+    .date-group { padding:24px 28px 8px; }
+    .date-label {
+      font-size:11px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--faint);
+    }
+
+    /* ── Items ── */
+    .items-list { flex:1; overflow-y:auto; padding:0 28px 40px; }
+    .items-list::-webkit-scrollbar { width:6px; }
+    .items-list::-webkit-scrollbar-track { background:transparent; }
+    .items-list::-webkit-scrollbar-thumb { background:var(--faint); border-radius:3px; }
+
+    .item {
+      display:flex; align-items:center; gap:14px;
+      padding:10px 12px; border-radius:9px;
+      transition:background var(--t);
+      cursor:pointer; position:relative;
+    }
+    .item:hover { background:rgba(108,99,255,.06); }
+    .item:hover .item-actions { opacity:1; }
+
+    .item-favicon {
+      width:28px; height:28px; border-radius:7px;
+      background:var(--card2); flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:14px; overflow:hidden;
+    }
+    .item-favicon img { width:16px; height:16px; }
+
+    .item-body { flex:1; min-width:0; }
+    .item-title {
+      font-size:13px; font-weight:500;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .item-url {
+      font-size:11px; color:var(--dim);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      margin-top:2px;
+    }
+
+    .item-time {
+      font-size:11px; color:var(--faint);
+      white-space:nowrap; flex-shrink:0;
+    }
+
+    .item-actions {
+      display:flex; gap:4px;
+      opacity:0; transition:opacity var(--t);
+      flex-shrink:0;
+    }
+    .item-btn {
+      background:none; border:none; cursor:pointer;
+      width:26px; height:26px; border-radius:6px;
+      display:flex; align-items:center; justify-content:center;
+      color:var(--dim); font-size:13px;
+      transition:all var(--t);
+    }
+    .item-btn:hover { background:rgba(108,99,255,.12); color:var(--text); }
+    .item-btn.danger:hover { background:rgba(239,68,68,.12); color:#fca5a5; }
+
+    /* Bookmark folder badge */
+    .folder-badge {
+      font-size:10px; padding:2px 8px;
+      border:1px solid var(--border); border-radius:6px;
+      color:var(--dim); white-space:nowrap; flex-shrink:0;
+    }
+
+    /* Reading list read indicator */
+    .read-dot {
+      width:7px; height:7px; border-radius:50%;
+      background:var(--accent2); flex-shrink:0;
+      box-shadow:0 0 6px rgba(167,139,250,.5);
+    }
+    .read-dot.done { background:var(--faint); box-shadow:none; }
+
+    /* ── Empty state ── */
+    .empty {
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; padding:80px 24px;
+      color:var(--dim); text-align:center;
+    }
+    .empty-icon { font-size:48px; margin-bottom:16px; opacity:.4; }
+    .empty h3 { font-size:15px; font-weight:400; margin-bottom:8px; }
+    .empty p  { font-size:13px; }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">Library</div>
+    <button class="nav-item active" data-tab="history" onclick="switchTab('history',this)">
+      <span class="nav-icon">🕐</span> History
+      <span class="nav-count" id="count-history">—</span>
+    </button>
+    <button class="nav-item" data-tab="bookmarks" onclick="switchTab('bookmarks',this)">
+      <span class="nav-icon">🔖</span> Bookmarks
+      <span class="nav-count" id="count-bookmarks">—</span>
+    </button>
+    <button class="nav-item" data-tab="reading" onclick="switchTab('reading',this)">
+      <span class="nav-icon">📖</span> Reading List
+      <span class="nav-count" id="count-reading">—</span>
+    </button>
+
+    <div style="margin-top:auto; padding:12px 10px 0; border-top:1px solid var(--border);">
+      <button class="nav-item" onclick="aeon && aeon.history && aeon.history.wipe(); refresh();"
+        style="color:rgba(239,68,68,.7)">
+        <span class="nav-icon">🗑</span> Clear all history
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="content">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="search-input" type="text" placeholder="Search history, bookmarks..."
+          oninput="onSearch(this.value)" autocomplete="off">
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" id="export-btn" style="display:none" onclick="exportBookmarks()">Export HTML</button>
+        <button class="btn btn-danger" id="clear-btn" onclick="clearCurrent()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Scrollable items -->
+    <div class="items-list" id="items-list">
+      <!-- Rendered by JS -->
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────
+var currentTab = 'history';
+var searchQuery = '';
+
+// ─── Demo data ────────────────────────────────────────────────────────────
+var DEMO = {
+  history: [
+    { url:'https://github.com/DelgadoLogic', title:'DelgadoLogic · GitHub', visitTime:'2:47 PM', favicon:'🐙', group:'Today' },
+    { url:'https://delgadologic.tech', title:'DelgadoLogic — LogicFlow & Aeon', visitTime:'2:31 PM', favicon:'⚡', group:'Today' },
+    { url:'https://developer.mozilla.org/en-US/docs/Web/API', title:'Web APIs | MDN', visitTime:'1:14 PM', favicon:'🦊', group:'Today' },
+    { url:'https://crates.io/crates/tokio', title:'tokio — async runtime for Rust', visitTime:'11:22 AM', favicon:'📦', group:'Today' },
+    { url:'https://news.ycombinator.com', title:'Hacker News', visitTime:'10:05 AM', favicon:'📰', group:'Today' },
+    { url:'https://rust-lang.org', title:'Rust Programming Language', visitTime:'Yesterday 6:12 PM', favicon:'🦀', group:'Yesterday' },
+    { url:'https://3g2upl4pq6kufc4m.onion', title:'DuckDuckGo (Tor)', visitTime:'Yesterday 4:44 PM', favicon:'🧅', group:'Yesterday' },
+  ],
+  bookmarks: [
+    { url:'https://delgadologic.tech', title:'DelgadoLogic', folder:'Work', addedTime:'Mar 19' },
+    { url:'https://github.com', title:'GitHub', folder:'Dev', addedTime:'Mar 20' },
+    { url:'https://crates.io', title:'crates.io — Rust packages', folder:'Dev', addedTime:'Mar 21' },
+    { url:'https://developer.mozilla.org', title:'MDN Web Docs', folder:'Dev', addedTime:'Mar 22' },
+    { url:'https://search.brave.com', title:'Brave Search', folder:'Search', addedTime:'Mar 19' },
+  ],
+  reading: [
+    { url:'https://blog.cloudflare.com/ech/', title:'How ECH Works — Cloudflare Blog', savedTime:'2h ago', read:false },
+    { url:'https://arxiv.org/abs/2301.01234', title:'Measuring GFW: A Longitudinal Study', savedTime:'Yesterday', read:false },
+    { url:'https://news.ycombinator.com/item?id=39999', title:'Ask HN: Best approaches to DPI evasion', savedTime:'2 days ago', read:true },
+  ]
+};
+
+// ─── Tab switching ────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('export-btn').style.display = tab==='bookmarks' ? '' : 'none';
+  searchQuery = '';
+  document.getElementById('search-input').value = '';
+  render();
+}
+
+function onSearch(q) { searchQuery = q.toLowerCase(); render(); }
+
+function clearCurrent() {
+  if (currentTab==='history' && window.aeon && aeon.history) aeon.history.wipe();
+  else if (currentTab==='bookmarks') { /* individual delete */ }
+  refresh();
+}
+
+function exportBookmarks() {
+  if (window.aeon && aeon.bookmarks) aeon.bookmarks.export();
+}
+
+// ─── Format ───────────────────────────────────────────────────────────────
+function faviconFor(item) {
+  if (item.favicon && item.favicon.length < 5) return '<span>' + item.favicon + '</span>';
+  if (item.favicon && item.favicon.startsWith('data:')) return '<img src="'+item.favicon+'">';
+  // Extract letter fallback
+  var letter = (item.title||item.url||'?')[0].toUpperCase();
+  return '<span style="font-size:11px;font-weight:600;color:var(--accent2)">' + letter + '</span>';
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────
+function render() {
+  var src = (window.aeon) ? {
+    history:   aeon.history   ? aeon.history.getAll(500)   : [],
+    bookmarks: aeon.bookmarks ? aeon.bookmarks.getAll()     : [],
+    reading:   aeon.readingList ? aeon.readingList.getAll() : []
+  } : DEMO;
+
+  // Update counts
+  document.getElementById('count-history').textContent   = src.history.length;
+  document.getElementById('count-bookmarks').textContent = src.bookmarks.length;
+  document.getElementById('count-reading').textContent   = src.reading.length;
+
+  var items = src[currentTab] || [];
+
+  // Filter by search
+  if (searchQuery) {
+    items = items.filter(function(it){
+      return (it.title||'').toLowerCase().includes(searchQuery) ||
+             (it.url||'').toLowerCase().includes(searchQuery);
+    });
+  }
+
+  if (!items.length) {
+    document.getElementById('items-list').innerHTML =
+      '<div class="empty"><div class="empty-icon">' +
+      (currentTab==='history'?'🕐':currentTab==='bookmarks'?'🔖':'📖') +
+      '</div><h3>Nothing here yet</h3><p>' +
+      (searchQuery ? 'No results for "'+searchQuery+'"' : 'Start browsing and it will show up here.') +
+      '</p></div>';
+    return;
+  }
+
+  var html = '';
+  if (currentTab === 'history') {
+    var groups = {};
+    items.forEach(function(it){
+      var g = it.group || 'Older';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(it);
+    });
+    Object.keys(groups).forEach(function(g){
+      html += '<div class="date-group"><div class="date-label">'+g+'</div></div>';
+      groups[g].forEach(function(it){
+        html += '<div class="item" onclick="navigate(\''+escUrl(it.url)+'\')">' +
+          '<div class="item-favicon">'+faviconFor(it)+'</div>' +
+          '<div class="item-body">' +
+            '<div class="item-title">'+esc(it.title||it.url)+'</div>' +
+            '<div class="item-url">'+esc(it.url)+'</div>' +
+          '</div>' +
+          '<div class="item-time">'+esc(it.visitTime||'')+'</div>' +
+          '<div class="item-actions">' +
+            '<button class="item-btn" title="Open" onclick="navigate(\''+escUrl(it.url)+'\');event.stopPropagation()">↗</button>' +
+            '<button class="item-btn" title="Bookmark" onclick="bookmarkIt(\''+escUrl(it.url)+'\',\''+esc(it.title)+'\');event.stopPropagation()">🔖</button>' +
+            '<button class="item-btn danger" title="Delete" onclick="deleteHistory(\''+escUrl(it.url)+'\');event.stopPropagation()">✕</button>' +
+          '</div>' +
+        '</div>';
+      });
+    });
+  } else if (currentTab === 'bookmarks') {
+    html += '<div style="padding:16px 0">';
+    items.forEach(function(it){
+      html += '<div class="item" onclick="navigate(\''+escUrl(it.url)+'\')">' +
+        '<div class="item-favicon">'+faviconFor(it)+'</div>' +
+        '<div class="item-body">' +
+          '<div class="item-title">'+esc(it.title||it.url)+'</div>' +
+          '<div class="item-url">'+esc(it.url)+'</div>' +
+        '</div>' +
+        '<span class="folder-badge">'+esc(it.folder||'Bookmarks')+'</span>' +
+        '<div class="item-time">'+esc(it.addedTime||'')+'</div>' +
+        '<div class="item-actions">' +
+          '<button class="item-btn" title="Open" onclick="navigate(\''+escUrl(it.url)+'\');event.stopPropagation()">↗</button>' +
+          '<button class="item-btn danger" title="Delete" onclick="deleteBookmark(\''+escUrl(it.url)+'\');event.stopPropagation()">✕</button>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="padding:16px 0">';
+    items.forEach(function(it){
+      html += '<div class="item" onclick="navigate(\''+escUrl(it.url)+'\')">' +
+        '<div class="read-dot'+(it.read?' done':'')+'"></div>' +
+        '<div class="item-favicon">'+faviconFor(it)+'</div>' +
+        '<div class="item-body">' +
+          '<div class="item-title">'+esc(it.title||it.url)+'</div>' +
+          '<div class="item-url">'+esc(it.url)+'</div>' +
+        '</div>' +
+        '<div class="item-time">'+esc(it.savedTime||'')+'</div>' +
+        '<div class="item-actions">' +
+          '<button class="item-btn" title="Open" onclick="navigate(\''+escUrl(it.url)+'\');event.stopPropagation()">↗</button>' +
+          '<button class="item-btn danger" title="Remove" onclick="deleteReading(\''+escUrl(it.url)+'\');event.stopPropagation()">✕</button>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('items-list').innerHTML = html;
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────
+function navigate(url) {
+  if (window.aeon && aeon.navigate) aeon.navigate(url);
+  else location.href = url;
+}
+function bookmarkIt(url, title) {
+  if (window.aeon && aeon.bookmarks) aeon.bookmarks.add(url, title, 'Bookmarks');
+}
+function deleteHistory(url) {
+  if (window.aeon && aeon.history) { aeon.history.delete(url); refresh(); }
+  else { DEMO.history = DEMO.history.filter(function(i){ return i.url !== url; }); render(); }
+}
+function deleteBookmark(url) {
+  if (window.aeon && aeon.bookmarks) { aeon.bookmarks.delete(url); refresh(); }
+  else { DEMO.bookmarks = DEMO.bookmarks.filter(function(i){ return i.url !== url; }); render(); }
+}
+function deleteReading(url) {
+  if (window.aeon && aeon.readingList) { aeon.readingList.delete(url); refresh(); }
+  else { DEMO.reading = DEMO.reading.filter(function(i){ return i.url !== url; }); render(); }
+}
+
+function refresh() { render(); }
+
+// ─── XSS helpers ─────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escUrl(u) { return esc(u).replace(/'/g,'%27'); }
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
