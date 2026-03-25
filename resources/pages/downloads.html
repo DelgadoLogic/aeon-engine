@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon Downloads</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0e14;
+    --surface:   #16182a;
+    --card:      #1e2140;
+    --border:    #2e3064;
+    --accent:    #6c63ff;
+    --accent2:   #a78bfa;
+    --text:      #e8e8f0;
+    --text-dim:  #8888aa;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --orange:    #f97316;
+    --radius:    10px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 48px 80px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  h1 { font-size: 22px; font-weight: 600; }
+
+  .header-actions { display: flex; gap: 10px; }
+  .btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: background .12s, color .12s;
+  }
+  .btn-ghost { background: var(--surface); color: var(--text-dim); }
+  .btn-ghost:hover { background: var(--card); color: var(--text); }
+  .btn-danger {
+    background: rgba(239,68,68,.1);
+    border-color: rgba(239,68,68,.3);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(239,68,68,.2); }
+
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .pill.active, .pill:hover {
+    background: var(--card);
+    border-color: var(--accent);
+    color: var(--accent2);
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .stat-label { font-size: 11px; color: var(--text-dim); }
+
+  /* Download cards */
+  .dl-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: background .12s;
+  }
+  .dl-card:hover { background: var(--card); }
+  .dl-card:hover .dl-actions { opacity: 1; }
+
+  .file-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .dl-info { flex: 1; min-width: 0; }
+  .dl-name {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .dl-name:hover { color: var(--accent2); }
+  .dl-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: flex; gap: 12px;
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    height: 4px;
+    background: var(--card);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .progress-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .3s ease;
+  }
+  .progress-bar.downloading { background: var(--accent); }
+  .progress-bar.paused     { background: var(--orange); }
+  .progress-bar.done       { background: var(--green); }
+  .progress-bar.error      { background: var(--red); }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+    min-width: 90px;
+    justify-content: center;
+  }
+  .status-badge.done       { background: rgba(34,197,94,.12);  color: var(--green); }
+  .status-badge.active     { background: rgba(108,99,255,.15); color: var(--accent2); }
+  .status-badge.paused     { background: rgba(249,115,22,.12); color: var(--orange); }
+  .status-badge.error      { background: rgba(239,68,68,.12);  color: var(--red); }
+
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .dl-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity .12s;
+  }
+  .action-btn {
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: color .12s, border-color .12s;
+  }
+  .action-btn:hover { color: var(--text); border-color: var(--accent); }
+  .action-btn.del:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
+
+  .speed-badge {
+    font-size: 11px;
+    color: var(--accent2);
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 70px;
+    text-align: right;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state .big { font-size: 56px; margin-bottom: 20px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⬇ Downloads</h1>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="openFolder()">📂 Open Folder</button>
+    <button class="btn btn-danger" onclick="clearCompleted()">✕ Clear Completed</button>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="pill active" onclick="filter('all', this)">All</span>
+  <span class="pill" onclick="filter('active', this)">Active</span>
+  <span class="pill" onclick="filter('done', this)">Completed</span>
+  <span class="pill" onclick="filter('error', this)">Failed</span>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-value" id="stat_total">0</div>
+    <div class="stat-label">Total Downloads</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--green)" id="stat_done">0</div>
+    <div class="stat-label">Completed</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--accent2)" id="stat_active">0</div>
+    <div class="stat-label">Active</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat_size">0 GB</div>
+    <div class="stat-label">Total Size</div>
+  </div>
+</div>
+
+<div id="dl_list"></div>
+
+<script>
+// Demo downloads — in production: aeonBridge.getDownloads() returns live data
+let downloads = [
+  { id: 1, name: 'AeonBrowser-Setup-1.0.0.exe', size: 42.8, downloaded: 42.8, speed: 0,
+    status: 'done', icon: '⚙', started: '2:41 PM', url: 'https://releases.delgadologic.tech/aeon/1.0.0/setup.exe' },
+  { id: 2, name: 'easylist.txt', size: 2.1, downloaded: 2.1, speed: 0,
+    status: 'done', icon: '📋', started: '2:38 PM', url: 'https://easylist.to/easylist/easylist.txt' },
+  { id: 3, name: 'ubuntu-24.04.1-desktop-amd64.iso', size: 5820, downloaded: 2943, speed: 8.4,
+    status: 'active', icon: '💿', started: '2:20 PM', url: 'https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso' },
+  { id: 4, name: 'wolfssl-5.7.2.zip', size: 18.6, downloaded: 18.6, speed: 0,
+    status: 'done', icon: '🔒', started: 'Yesterday', url: 'https://github.com/wolfSSL/wolfssl/releases' },
+  { id: 5, name: 'broken-link-file.pdf', size: 4.2, downloaded: 1.1, speed: 0,
+    status: 'error', icon: '📄', started: 'Yesterday', url: 'https://example.com/broken.pdf' },
+];
+
+function ext(name) {
+  const m = name.match(/\.([a-z0-9]{1,6})$/i);
+  return m ? m[1].toUpperCase() : '?';
+}
+
+function fmtSize(mb) {
+  if (mb >= 1024) return (mb/1024).toFixed(2) + ' GB';
+  if (mb >= 1) return mb.toFixed(1) + ' MB';
+  return (mb * 1024).toFixed(0) + ' KB';
+}
+
+function pct(dl) {
+  if (!dl.size) return 0;
+  return Math.min(100, Math.round((dl.downloaded / dl.size) * 100));
+}
+
+let currentFilter = 'all';
+
+function filter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function render() {
+  const list = document.getElementById('dl_list');
+  const items = currentFilter === 'all'
+    ? downloads
+    : downloads.filter(d => {
+        if (currentFilter === 'active') return d.status === 'active' || d.status === 'paused';
+        if (currentFilter === 'done')   return d.status === 'done';
+        if (currentFilter === 'error')  return d.status === 'error';
+        return true;
+      });
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><div class="big">⬇</div><p>No downloads here yet.</p></div>`;
+  } else {
+    list.innerHTML = items.map(dl => {
+      const p = pct(dl);
+      const barClass = dl.status === 'done' ? 'done' : dl.status === 'error' ? 'error'
+        : dl.status === 'paused' ? 'paused' : 'downloading';
+      const badgeClass = dl.status === 'done' ? 'done' : dl.status === 'active' ? 'active'
+        : dl.status === 'error' ? 'error' : 'paused';
+      const badgeText = dl.status === 'done' ? '✓ Done' : dl.status === 'active' ? '↓ Downloading'
+        : dl.status === 'error' ? '✕ Failed' : '⏸ Paused';
+
+      return `
+      <div class="dl-card" id="dl_${dl.id}">
+        <div class="file-icon">${dl.icon}</div>
+        <div class="dl-info">
+          <div class="dl-name" onclick="open_file(${dl.id})">${dl.name}</div>
+          <div class="dl-meta">
+            <span>${fmtSize(dl.downloaded)} / ${fmtSize(dl.size)}</span>
+            <span>${p}%</span>
+            <span>${dl.started}</span>
+          </div>
+          ${dl.status !== 'done' && dl.status !== 'error' ? `
+            <div class="progress-wrap">
+              <div class="progress-bar ${barClass}" style="width:${p}%"></div>
+            </div>
+          ` : ''}
+        </div>
+        ${dl.speed > 0 ? `<div class="speed-badge">${dl.speed} MB/s</div>` : ''}
+        <div class="status-badge ${badgeClass}">
+          <span class="dot"></span> ${badgeText}
+        </div>
+        <div class="dl-actions">
+          ${dl.status === 'active' ? `<button class="action-btn" title="Pause" onclick="pause_dl(${dl.id})">⏸</button>` : ''}
+          ${dl.status === 'paused' ? `<button class="action-btn" title="Resume" onclick="resume_dl(${dl.id})">▶</button>` : ''}
+          ${dl.status === 'error' ? `<button class="action-btn" title="Retry" onclick="retry_dl(${dl.id})">↺</button>` : ''}
+          ${dl.status === 'done' ? `<button class="action-btn" title="Show in folder" onclick="show_file(${dl.id})">📂</button>` : ''}
+          <button class="action-btn del" title="Remove" onclick="remove_dl(${dl.id})">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Update stats
+  document.getElementById('stat_total').textContent  = downloads.length;
+  document.getElementById('stat_done').textContent   = downloads.filter(d => d.status === 'done').length;
+  document.getElementById('stat_active').textContent = downloads.filter(d => d.status === 'active').length;
+  const totalMb = downloads.reduce((s, d) => s + d.downloaded, 0);
+  document.getElementById('stat_size').textContent   = fmtSize(totalMb);
+}
+
+function open_file(id)   { try { window.aeonBridge?.openDownload(id); } catch(_) {} }
+function show_file(id)   { try { window.aeonBridge?.showInFolder(id); } catch(_) {} }
+function pause_dl(id)    {
+  const dl = downloads.find(d => d.id === id);
+  if (dl) { dl.status = 'paused'; dl.speed = 0; }
+  try { window.aeonBridge?.pauseDownload(id); } catch(_) {}
+  render();
+}
+function resume_dl(id)   {
+  const dl = downloads.find(d => d.id === id);
+  if (dl) { dl.status = 'active'; dl.speed = 1.2; }
+  try { window.aeonBridge?.resumeDownload(id); } catch(_) {}
+  render();
+}
+function retry_dl(id)    {
+  const dl = downloads.find(d => d.id === id);
+  if (dl) { dl.status = 'active'; dl.downloaded = 0; dl.speed = 0.8; }
+  try { window.aeonBridge?.retryDownload(id); } catch(_) {}
+  render();
+}
+function remove_dl(id)   {
+  downloads = downloads.filter(d => d.id !== id);
+  try { window.aeonBridge?.cancelDownload(id); } catch(_) {}
+  render();
+}
+function clearCompleted() {
+  downloads = downloads.filter(d => d.status !== 'done');
+  try { window.aeonBridge?.clearCompleted(); } catch(_) {}
+  render();
+}
+function openFolder() {
+  try { window.aeonBridge?.openDownloadFolder(); } catch(_) {}
+}
+
+// Live progress simulation for active downloads (only in stub mode)
+setInterval(() => {
+  let changed = false;
+  downloads.forEach(dl => {
+    if (dl.status === 'active' && dl.downloaded < dl.size) {
+      const inc = Math.random() * 12;
+      dl.downloaded = Math.min(dl.size, dl.downloaded + inc);
+      if (dl.downloaded >= dl.size) { dl.status = 'done'; dl.speed = 0; }
+      changed = true;
+    }
+  });
+  if (changed) render();
+}, 500);
+
+// Load real data from native bridge if available
+try {
+  const real = window.aeonBridge?.getDownloads?.();
+  if (real && real.length) downloads = real;
+} catch(_) {}
+
+render();
+</script>
+</body>
+</html>

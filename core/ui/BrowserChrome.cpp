@@ -47,6 +47,10 @@
 #include <cstdio>
 #include <vector>
 #include <string>
+#include <thread>
+#include "../../updater/AutoUpdater.h"
+#include "../../core/network/NetworkSentinel.h"
+#include "../../core/network/DnsResolver.h"
 
 #pragma comment(lib, "dwmapi.lib")
 
@@ -368,6 +372,22 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
 
     fprintf(stdout, "[Chrome] Browser chrome created. Logo badge: active. "
         "Tab strip: %d tab(s).\n", (int)ch->tabs.size());
+
+    // ── Background services on worker thread (non-blocking) ─────────────
+    std::thread([]{
+        // 1. Initialize DNS resolver first (needed by NetworkSentinel)
+        DnsResolver::Initialize();
+
+        // 2. Network analysis — classifies network type and sets DnsResolver hint
+        NetworkSentinel::Analyze();
+        NetworkSentinel::ApplyBestStrategy();
+        NetworkSentinel::StartMonitor(); // re-checks every 30s
+
+        // 3. Start AutoUpdater background poller
+        //    Polls update.delgadologic.tech once every 24 hours.
+        //    Downloads + verifies + silently installs if update is available.
+        AutoUpdater::StartPoller();
+    }).detach();
 }
 
 void OnPaint(HWND hwnd) {

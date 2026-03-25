@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon Settings</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0e14;
+    --surface:   #16182a;
+    --card:      #1e2140;
+    --border:    #2e3064;
+    --accent:    #6c63ff;
+    --accent2:   #a78bfa;
+    --text:      #e8e8f0;
+    --text-dim:  #8888aa;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --radius:    12px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* Sidebar */
+  nav {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 12px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .badge {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: #fff;
+  }
+  .nav-logo span { font-weight: 600; font-size: 15px; }
+
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background .15s, color .15s;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  nav a:hover  { background: var(--card); color: var(--text); }
+  nav a.active { background: var(--card); color: var(--accent2); }
+  nav a .icon  { width: 16px; text-align: center; font-size: 14px; }
+
+  /* Main content */
+  main {
+    flex: 1;
+    padding: 40px 48px;
+    overflow-y: auto;
+    max-width: 860px;
+  }
+
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 32px; }
+
+  section { margin-bottom: 36px; }
+  h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 24px;
+  }
+  .setting-row:last-child { border-bottom: none; }
+
+  .setting-info { flex: 1; min-width: 0; }
+  .setting-label {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .setting-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* Toggle switch */
+  .toggle {
+    position: relative;
+    width: 44px; height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform .2s;
+  }
+  input:checked + .slider { background: var(--accent); }
+  input:checked + .slider::before { transform: translateX(20px); }
+
+  /* Select */
+  select {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 7px 12px;
+    cursor: pointer;
+    outline: none;
+    min-width: 160px;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* Input */
+  input[type="text"], input[type="number"] {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 7px 12px;
+    outline: none;
+    width: 240px;
+  }
+  input[type="text"]:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+  }
+
+  /* Sentinel status */
+  .sentinel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .sentinel-badge.safe { background: rgba(34,197,94,.15); color: var(--green); }
+  .sentinel-badge.warn { background: rgba(239,68,68,.15);  color: var(--red);  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  /* Save button */
+  .save-bar {
+    position: fixed;
+    bottom: 0; left: 220px; right: 0;
+    background: rgba(13,14,20,.9);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    padding: 14px 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .btn {
+    padding: 9px 22px;
+    border-radius: 8px;
+    border: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .save-msg { font-size: 12px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="badge">A</div>
+    <span>Aeon Settings</span>
+  </div>
+  <a class="active" href="#general"><span class="icon">⚙</span> General</a>
+  <a href="#privacy"><span class="icon">🛡</span> Privacy</a>
+  <a href="#network"><span class="icon">🌐</span> Network & DNS</a>
+  <a href="#security"><span class="icon">🔒</span> Security</a>
+  <a href="#appearance"><span class="icon">🎨</span> Appearance</a>
+  <a href="#downloads"><span class="icon">⬇</span> Downloads</a>
+  <a href="#passwords"><span class="icon">🗝</span> Passwords</a>
+  <a href="#advanced"><span class="icon">🔧</span> Advanced</a>
+  <a href="#about"><span class="icon">ℹ</span> About Aeon</a>
+</nav>
+
+<main>
+
+  <h1>Settings</h1>
+  <p class="subtitle">Aeon Browser by DelgadoLogic</p>
+
+  <!-- GENERAL -->
+  <section id="general">
+    <h2>General</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Default browser</div>
+          <div class="setting-desc">Make Aeon your default browser for https:// links</div>
+        </div>
+        <button class="btn btn-primary" onclick="aeon.setDefault()">Set as Default</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Startup page</div>
+          <div class="setting-desc">What Aeon opens when you launch it</div>
+        </div>
+        <select onchange="aeon.set('startup_page', this.value)">
+          <option value="newtab">New Tab page</option>
+          <option value="home">Homepage</option>
+          <option value="last">Restore last session</option>
+          <option value="blank">Blank page</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Homepage URL</div>
+          <div class="setting-desc">Used when startup page is set to "Homepage"</div>
+        </div>
+        <input type="text" id="homepage" value="aeon://newtab"
+               onchange="aeon.set('homepage', this.value)">
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Search engine</div>
+          <div class="setting-desc">Default search engine for the address bar</div>
+        </div>
+        <select onchange="aeon.set('search_engine', this.value)">
+          <option value="ddg">DuckDuckGo (Recommended)</option>
+          <option value="brave">Brave Search</option>
+          <option value="google">Google</option>
+          <option value="bing">Bing</option>
+          <option value="kagi">Kagi (Paid)</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY -->
+  <section id="privacy">
+    <h2>Privacy & Content Blocking</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Block ads & trackers</div>
+          <div class="setting-desc">EasyList + uBlock rules — built-in, no extension needed</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('adblock', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Block cookie banners</div>
+          <div class="setting-desc">Fanboy Annoyances — auto-dismisses GDPR consent dialogs</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('cookie_banners', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Fingerprint randomization</div>
+          <div class="setting-desc">Randomizes Canvas, WebGL, AudioContext, and screen resolution APIs</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('fingerprint_guard', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Global Privacy Control (GPC)</div>
+          <div class="setting-desc">Sends Sec-GPC: 1 header on every request — legally binding opt-out in CA, EU</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('gpc', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Block third-party cookies</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('block_3p_cookies', this.checked)"><span class="slider"></span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- NETWORK & DNS -->
+  <section id="network">
+    <h2>Network & DNS</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Network Sentinel</div>
+          <div class="setting-desc">Auto-detects your network type and adapts DNS, bypass, and TLS strategy</div>
+        </div>
+        <div class="sentinel-badge safe"><span class="dot"></span> Protected</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">DNS-over-HTTPS (DoH)</div>
+          <div class="setting-desc">Encrypts DNS queries — prevents ISP and network tracking of every site you visit</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('doh_enabled', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">DoH provider</div>
+          <div class="setting-desc">Cascades automatically if provider is unavailable</div>
+        </div>
+        <select onchange="aeon.set('doh_provider', this.value)">
+          <option value="cloudflare">Cloudflare 1.1.1.1 (ECH, no-log)</option>
+          <option value="google">Google 8.8.8.8</option>
+          <option value="quad9">Quad9 9.9.9.9 (malware filter)</option>
+          <option value="nextdns">NextDNS</option>
+          <option value="mullvad">Mullvad DNS</option>
+          <option value="auto">Auto (fastest)</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Tor routing</div>
+          <div class="setting-desc">Routes all traffic through Tor — much slower but maximum anonymity. .onion sites always use Tor.</div>
+        </div>
+        <label class="toggle"><input type="checkbox" onchange="aeon.set('tor_enabled', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">I2P routing</div>
+          <div class="setting-desc">Enables access to .i2p sites via integrated i2pd router</div>
+        </div>
+        <label class="toggle"><input type="checkbox" onchange="aeon.set('i2p_enabled', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">🔥 Firewall bypass mode</div>
+          <div class="setting-desc">Enables SNI fragmentation and DPI evasion (GoodbyeDPI). Use on restricted networks: school, corporate, national firewall.</div>
+        </div>
+        <label class="toggle"><input type="checkbox" onchange="aeon.set('bypass_enabled', this.checked)"><span class="slider"></span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECURITY -->
+  <section id="security">
+    <h2>Security</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Minimum TLS version</div>
+          <div class="setting-desc">Connections using older TLS will be blocked</div>
+        </div>
+        <select onchange="aeon.set('min_tls', this.value)">
+          <option value="tls12">TLS 1.2</option>
+          <option value="tls13" selected>TLS 1.3 (Recommended)</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Block mixed content</div>
+          <div class="setting-desc">Block HTTP sub-resources on HTTPS pages</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('mixed_content', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Safe browsing</div>
+          <div class="setting-desc">Local blocklist check — no data sent to Google</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('safe_browsing', this.checked)"><span class="slider"></span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOADS -->
+  <section id="downloads">
+    <h2>Downloads</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Download folder</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="dl_path" value="C:\Users\User\Downloads" onchange="aeon.set('dl_path', this.value)">
+          <button class="btn btn-ghost" onclick="aeon.browseDlPath()">Browse…</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Ask where to save each file</div>
+        </div>
+        <label class="toggle"><input type="checkbox" onchange="aeon.set('dl_ask', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Parallel connections per download</div>
+          <div class="setting-desc">More connections = faster downloads on most servers (max 16)</div>
+        </div>
+        <input type="number" value="4" min="1" max="16" style="width:80px" onchange="aeon.set('dl_streams', this.value)">
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about">
+    <h2>About</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Aeon Browser</div>
+          <div class="setting-desc">Version 1.0.0-dev (Build 2026.03) · DelgadoLogic</div>
+        </div>
+        <button class="btn btn-ghost" onclick="aeon.checkUpdate()">Check for updates</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Telemetry</div>
+          <div class="setting-desc">Anonymous OS tier and crash reports only. Never URLs or personal data.</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('telemetry', this.checked)"><span class="slider"></span></label>
+      </div>
+    </div>
+  </section>
+
+  <div style="height:64px"></div><!-- spacer for save bar -->
+</main>
+
+<div class="save-bar">
+  <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
+  <button class="btn btn-ghost" onclick="revertSettings()">Revert</button>
+  <span class="save-msg" id="save_msg"></span>
+</div>
+
+<script>
+// aeon object — calls native C++ bridge via postMessage or custom protocol
+const aeon = {
+  set: (key, value) => {
+    try { window.aeonBridge?.setSetting(key, value); } catch(_) {}
+    document.getElementById('save_msg').textContent = 'Unsaved changes…';
+  },
+  setDefault: () => { try { window.aeonBridge?.setDefaultBrowser(); } catch(_) {} },
+  checkUpdate: () => { try { window.aeonBridge?.checkUpdate(); } catch(_) {} },
+  browseDlPath: () => { try { window.aeonBridge?.browseDlPath(); } catch(_) {} }
+};
+
+function saveSettings() {
+  try { window.aeonBridge?.commitSettings(); } catch(_) {}
+  const msg = document.getElementById('save_msg');
+  msg.textContent = '✓ Settings saved';
+  setTimeout(() => msg.textContent = '', 2000);
+}
+function revertSettings() {
+  try { window.aeonBridge?.revertSettings(); } catch(_) {}
+  window.location.reload();
+}
+
+// Sidebar navigation highlight
+document.querySelectorAll('nav a').forEach(a => {
+  a.addEventListener('click', function() {
+    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+</script>
+</body>
+</html>

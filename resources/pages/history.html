@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon History</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0e14;
+    --surface:   #16182a;
+    --card:      #1e2140;
+    --border:    #2e3064;
+    --accent:    #6c63ff;
+    --accent2:   #a78bfa;
+    --text:      #e8e8f0;
+    --text-dim:  #8888aa;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --radius:    10px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 48px 80px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  h1 { font-size: 22px; font-weight: 600; }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .search-box {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    gap: 10px;
+    max-width: 540px;
+  }
+  .search-box input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 11px 0;
+  }
+  .search-box .icon { color: var(--text-dim); font-size: 14px; }
+
+  .filter-pills {
+    display: flex;
+    gap: 8px;
+  }
+  .pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .pill:hover, .pill.active {
+    background: var(--card);
+    border-color: var(--accent);
+    color: var(--accent2);
+  }
+
+  .clear-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(239,68,68,.4);
+    background: rgba(239,68,68,.08);
+    color: var(--red);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s;
+    margin-left: auto;
+  }
+  .clear-btn:hover { background: rgba(239,68,68,.18); }
+
+  .day-group { margin-bottom: 28px; }
+  .day-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+
+  .history-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .history-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .history-row:last-child { border-bottom: none; }
+  .history-row:hover { background: var(--card); }
+  .history-row:hover .row-actions { opacity: 1; }
+
+  .favicon {
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    background: var(--card);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .row-info { flex: 1; min-width: 0; }
+  .row-title {
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .row-url {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-url a {
+    color: var(--accent2);
+    text-decoration: none;
+  }
+
+  .row-time {
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    min-width: 50px;
+    text-align: right;
+  }
+
+  .row-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity .12s;
+  }
+  .action-btn {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: color .12s, background .12s;
+  }
+  .action-btn:hover { color: var(--red); background: rgba(239,68,68,.12); }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state .big { font-size: 48px; margin-bottom: 16px; }
+  .empty-state p { font-size: 14px; }
+
+  /* Checkbox select */
+  .row-check {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .history-row:hover .row-check { opacity: 1; }
+  .row-check:checked { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🕐 History</h1>
+</div>
+
+<div class="top-bar">
+  <div class="search-box">
+    <span class="icon">🔍</span>
+    <input type="text" id="search_input" placeholder="Search history…"
+           oninput="searchHistory(this.value)">
+  </div>
+
+  <div class="filter-pills">
+    <span class="pill active" onclick="filterHistory('all', this)">All</span>
+    <span class="pill" onclick="filterHistory('today', this)">Today</span>
+    <span class="pill" onclick="filterHistory('week', this)">This Week</span>
+    <span class="pill" onclick="filterHistory('month', this)">This Month</span>
+  </div>
+
+  <button class="clear-btn" onclick="clearHistory()">🗑 Clear All</button>
+</div>
+
+<div id="history_list">
+  <!-- Populated by loadHistory() -->
+</div>
+
+<script>
+// Demo data — in production: aeon.getHistory() calls native bridge
+const DEMO = [
+  { title: 'DelgadoLogic — Home', url: 'https://delgadologic.tech', time: '2:41 PM', ts: Date.now() - 3*60000 },
+  { title: 'Aeon Browser — GitHub', url: 'https://github.com/DelgadoLogic/AeonBrowser', time: '2:38 PM', ts: Date.now() - 6*60000 },
+  { title: 'DuckDuckGo — aeon browser', url: 'https://duckduckgo.com/?q=aeon+browser', time: '2:37 PM', ts: Date.now() - 7*60000 },
+  { title: 'EasyList — Filter Lists', url: 'https://easylist.to', time: '2:20 PM', ts: Date.now() - 24*60000 },
+  { title: 'Cloudflare Radar — DNS Insights', url: 'https://radar.cloudflare.com', time: '1:55 PM', ts: Date.now() - 49*60000 },
+  { title: 'Wikipedia — Deep Packet Inspection', url: 'https://en.wikipedia.org/wiki/Deep_packet_inspection', time: '1:42 PM', ts: Date.now() - 62*60000 },
+  { title: 'Mozilla — ECH Specification', url: 'https://blog.mozilla.org/security/2021/01/07/encrypted-client-hello-the-future-of-esni/', time: '1:30 PM', ts: Date.now() - 74*60000 },
+  { title: 'WolfSSL — TLS 1.3 Documentation', url: 'https://www.wolfssl.com/docs/tls13', time: 'Yesterday', ts: Date.now() - 26*3600000 },
+  { title: 'Inno Setup — Official Docs', url: 'https://jrsoftware.org/ishelp/', time: 'Yesterday', ts: Date.now() - 27*3600000 },
+  { title: 'Quad9 — Privacy Policy', url: 'https://quad9.net/privacy/policy/', time: 'Yesterday', ts: Date.now() - 30*3600000 },
+];
+
+let allItems = [...DEMO];
+let filtered = [...DEMO];
+
+function groupByDay(items) {
+  const groups = {};
+  const now = new Date();
+  items.forEach(item => {
+    const d = new Date(item.ts);
+    const diff = (now - d) / 86400000;
+    let label;
+    if (diff < 1) label = 'Today';
+    else if (diff < 2) label = 'Yesterday';
+    else label = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(item);
+  });
+  return groups;
+}
+
+function favLetter(title) {
+  return title && title.length ? title[0].toUpperCase() : '?';
+}
+
+function renderHistory(items) {
+  const list = document.getElementById('history_list');
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><div class="big">🕐</div><p>No history found.</p></div>`;
+    return;
+  }
+  const groups = groupByDay(items);
+  list.innerHTML = Object.entries(groups).map(([day, rows]) => `
+    <div class="day-group">
+      <div class="day-label">${day}</div>
+      <div class="history-card">
+        ${rows.map((r, i) => `
+          <div class="history-row" onclick="navigate('${r.url}')">
+            <input type="checkbox" class="row-check" onclick="event.stopPropagation()">
+            <div class="favicon">${favLetter(r.title)}</div>
+            <div class="row-info">
+              <div class="row-title">${r.title}</div>
+              <div class="row-url"><a href="${r.url}" onclick="event.stopPropagation();navigate('${r.url}');return false">${r.url}</a></div>
+            </div>
+            <div class="row-time">${r.time}</div>
+            <div class="row-actions">
+              <button class="action-btn" title="Open" onclick="event.stopPropagation();navigate('${r.url}')">↗</button>
+              <button class="action-btn" title="Remove" onclick="event.stopPropagation();removeItem(${i})">✕</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function searchHistory(q) {
+  q = q.toLowerCase();
+  filtered = q ? allItems.filter(r => r.title.toLowerCase().includes(q) || r.url.toLowerCase().includes(q)) : [...allItems];
+  renderHistory(filtered);
+}
+
+function filterHistory(range, el) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  const now = Date.now();
+  const bounds = { all: 0, today: 86400000, week: 7*86400000, month: 30*86400000 };
+  filtered = range === 'all' ? [...allItems] : allItems.filter(r => (now - r.ts) < bounds[range]);
+  renderHistory(filtered);
+}
+
+function clearHistory() {
+  if (!confirm('Clear all browsing history? This cannot be undone.')) return;
+  try { window.aeonBridge?.clearHistory(); } catch(_) {}
+  allItems = []; filtered = [];
+  renderHistory([]);
+}
+
+function removeItem(idx) {
+  const item = filtered[idx];
+  allItems = allItems.filter(r => r !== item);
+  filtered = filtered.filter(r => r !== item);
+  try { window.aeonBridge?.deleteHistoryEntry(item.url, item.ts); } catch(_) {}
+  renderHistory(filtered);
+}
+
+function navigate(url) {
+  try { window.aeonBridge?.navigate(url); } catch(_) { window.location.href = url; }
+}
+
+// Load real history from native bridge if available
+try {
+  const real = window.aeonBridge?.getHistory?.();
+  if (real && real.length) { allItems = real; filtered = real; }
+} catch(_) {}
+
+renderHistory(filtered);
+</script>
+</body>
+</html>

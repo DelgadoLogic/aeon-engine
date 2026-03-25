@@ -93,6 +93,7 @@
 
 #include "NetworkSentinel.h"
 #include "CircumventionEngine.h"
+#include "DnsResolver.h"
 #include "../settings/SettingsEngine.h"
 #include "../tls/TlsAbstraction.h"
 #include <windows.h>
@@ -484,6 +485,27 @@ NetworkEnvironment Analyze() {
 
     // 6. Classify environment
     g_env.type = ClassifyNetwork(portal, proxyServer);
+
+    // 7. Notify DnsResolver so it adapts its provider cascade immediately
+    {
+        DnsResolver::NetworkEnvHint dnsHint = DnsResolver::NetworkEnvHint::Open;
+        switch (g_env.type) {
+            case NetworkType::Open:           dnsHint = DnsResolver::NetworkEnvHint::Open; break;
+            case NetworkType::CoffeeShop:     dnsHint = DnsResolver::NetworkEnvHint::CaptivePortal; break;
+            case NetworkType::Hotel:          dnsHint = DnsResolver::NetworkEnvHint::Hotel; break;
+            case NetworkType::Corporate:      dnsHint = DnsResolver::NetworkEnvHint::Corporate; break;
+            case NetworkType::School:         dnsHint = DnsResolver::NetworkEnvHint::School; break;
+            case NetworkType::NationalFirewall:dnsHint = DnsResolver::NetworkEnvHint::NationalFirewall; break;
+            case NetworkType::ISP_Throttle:   dnsHint = DnsResolver::NetworkEnvHint::Open; break;
+            default:                          dnsHint = DnsResolver::NetworkEnvHint::Unknown; break;
+        }
+        // Pass corporate AD suffix so DnsResolver can do split-horizon
+        const char* corpSuffix = g_env.has_corporate_proxy ? g_env.proxy_server : nullptr;
+        DnsResolver::SetNetworkHint(dnsHint, corpSuffix);
+
+        // During captive portal: allow system DNS so the portal page can load
+        DnsResolver::AllowSystemDns(g_env.captive_portal);
+    }
 
     const char* typeNames[] = {
         "Open", "CoffeeShop/Captive", "Hotel/Captive", "Corporate", "School",
