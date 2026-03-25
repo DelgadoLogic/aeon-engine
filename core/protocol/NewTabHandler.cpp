@@ -104,12 +104,14 @@ char* Serve(const char* aeonUrl) {
     const char* path = aeonUrl;
     if (strncmp(path, "aeon://", 7) == 0) path += 7;
 
-    char resourceFile[64] = {};
+    char resourceFile[128] = {};
     if      (strcmp(path, "newtab")     == 0) strcpy_s(resourceFile, "newtab/newtab.html");
-    else if (strcmp(path, "settings")   == 0) strcpy_s(resourceFile, "settings/settings.html");
-    else if (strcmp(path, "history")    == 0) strcpy_s(resourceFile, "history/history.html");
-    else if (strcmp(path, "bookmarks")  == 0) strcpy_s(resourceFile, "bookmarks/bookmarks.html");
-    else if (strcmp(path, "downloads")  == 0) strcpy_s(resourceFile, "downloads/downloads.html");
+    else if (strcmp(path, "settings")   == 0) strcpy_s(resourceFile, "pages/settings.html");
+    else if (strcmp(path, "history")    == 0) strcpy_s(resourceFile, "pages/history.html");
+    else if (strcmp(path, "bookmarks")  == 0) strcpy_s(resourceFile, "pages/bookmarks.html");
+    else if (strcmp(path, "downloads")  == 0) strcpy_s(resourceFile, "pages/downloads.html");
+    else if (strcmp(path, "passwords")  == 0) strcpy_s(resourceFile, "pages/passwords.html");
+    else if (strcmp(path, "crash")      == 0) strcpy_s(resourceFile, "pages/crash.html");
     else if (strcmp(path, "about")      == 0) {
         // Generate about page inline
         char* buf = static_cast<char*>(malloc(4096));

@@ -1,0 +1,194 @@
+# aeon_extra.txt — Aeon Browser custom filter rules
+# DelgadoLogic | Privacy & Security Team
+#
+# These rules are applied FIRST (highest priority) before EasyList,
+# EasyPrivacy, uBlock, and Fanboy Annoyances.
+#
+# Format: uBlock Origin / Adblock Plus compatible.
+# Lines starting with ! are comments.
+# Lines starting with # are also comments (this file style).
+#
+# Categories:
+#   [TRACKING]    — Analytics, pixel tracking, fingerprinting SDKs
+#   [MALWARE]     — Known malware domains, phishing infra
+#   [TELEMETRY]   — OS/App phone-home endpoints (Windows, Adobe, etc.)
+#   [COINMINER]   — Cryptominer hosts and WebAssembly miner endpoints
+#   [SCAM]        — Tech support scam pages, fake alert sites
+#   [ADULT-ADS]   — Adtech on adult sites (non-filter, just adtech)
+#   [SOCIAL]      — Social media widgets that track without consent
+#   [CDN-ABUSE]   — Legitimate CDNs abused for C2 or tracker hosting
+#   [AEON]        — Aeon-specific rules (custom UI cleanup, vendor overrides)
+
+! ===== [TRACKING] =================================================================================
+
+! Google Analytics & Tag Manager (blocked globally — site must use own analytics)
+||google-analytics.com^
+||analytics.google.com^
+||googletagmanager.com^$third-party
+||googletagservices.com^$third-party
+||googlesyndication.com^$third-party
+||stats.g.doubleclick.net^
+
+! Meta (Facebook) Pixel
+||facebook.net/en_US/fbevents.js^
+||connect.facebook.net/en_US/sdk.js^
+||pixel.facebook.com^
+||pxl.jivox.com^
+
+! Adobe Analytics / Launch
+||demdex.net^
+||omtrdc.net^
+||2o7.net^
+||analytics.adobedc.net^
+||sc.omtrdc.net^
+
+! Mixpanel, Amplitude, Segment, Heap
+||api.mixpanel.com^
+||cdn.mxpnl.com^
+||api2.amplitude.com^
+||api.segment.io^
+||cdn.segment.com^
+||heapanalytics.com^
+
+! Microsoft Clarity (session replay — records all mouse movement)
+||clarity.ms^
+||c.clarity.ms^
+
+! Hotjar (heatmap + session recording)
+||hotjar.com^
+||static.hotjar.com^
+||vars.hotjar.com^
+||insights.hotjar.com^
+
+! FullStory (session recording)
+||fullstory.com^
+||rs.fullstory.com^
+||edge.fullstory.com^
+
+! Sentry (can fingerprint users via crash reports)
+||sentry.io^$third-party
+||o*.ingest.sentry.io^$third-party
+
+! TikTok Pixel
+||analytics.tiktok.com^
+||ads-api.tiktok.com^
+||log.byteoversea.com^
+
+! Quantcast / Nielsen
+||quantserve.com^
+||secure-dcr.imrworldwide.com^
+||cdn.quantcount.com^
+
+! ===== [TELEMETRY] ================================================================================
+
+! Windows / Microsoft telemetry
+||v10.events.data.microsoft.com^
+||v20.events.data.microsoft.com^
+||settings-win.data.microsoft.com^
+||telemetry.microsoft.com^
+||watson.telemetry.microsoft.com^
+||oca.telemetry.microsoft.com^
+||cxl.microsoft.com^
+||ca.telemetry.microsoft.com^
+||co4.telemet.services.live.com^
+
+! Adobe Creative Cloud / Acrobat phone-home
+||adobe.com/2006/01/exifext^
+||lmlicenses.wip4.adobe.com^
+||na2.acrobat.com/services/api^
+
+! ===== [COINMINER] ================================================================================
+
+||coinhive.com^
+||coin-hive.com^
+||cryptoloot.pro^
+||jsecoin.com^
+||crypto-loot.com^
+||minemytraffic.com^
+||minero.cc^
+||papoto.com^
+||rocks.io^
+||webmine.pro^
+||deepminer.io^
+||hashforgood.com$script
+||authedmine.com^
+||miner.pr0gramm.com^
+
+! JS-based miner SDKs
+/websocket/wss$script
+/miner.js$script
+/mine.js$script
+/coinminer.js$script
+
+! ===== [MALWARE / C2] =============================================================================
+
+! Known malware distribution networks
+||malware-traffic-analysis.net/traces^
+||icanhazip.com^$third-party
+||ifconfig.me^$third-party,image
+! Note: above two are legit tools but abused by malware for IP exfil
+
+! Phishing kit infrastructure (rotated — update monthly via CI)
+||secure-paypa1.com^
+||bankofamerica-alert.net^
+||appleid-verify-me.com^
+||support-microsoft-helpdesk.com^
+
+! ===== [SCAM] =====================================================================================
+
+! Fake antivirus / tech support scam pages
+||pop-upp.com^
+||microsoftsupport-alert.com^
+||windows-error-helplines.com^
+||freevirus-scan.com^
+||pc-speedoptimize.com^
+
+! ===== [SOCIAL WIDGETS] ===========================================================================
+! These embed trackers even on pages with no login. Blocked as third-party only.
+
+||platform.twitter.com^$third-party
+||syndication.twitter.com^$third-party
+||platform.linkedin.com^$third-party
+||badges.linkedin.com^$third-party
+||apis.google.com/js/platform.js^$third-party
+||platform.instagram.com^$third-party
+
+! ===== [CDN ABUSE] ================================================================================
+
+! Cloudflare Workers used for phishing / C2 (domain-based block)
+! Legitimate workers.dev subdomains are NOT blocked — only abused ones.
+||evil-form.workers.dev^
+||exfil*.workers.dev^
+
+! ===== [AEON-SPECIFIC RULES] ======================================================================
+
+! Suppress update nag banners on common dev tools sites
+delgadologic.tech##.cookie-banner
+delgadologic.tech##.gdpr-notice
+
+! GitHub — hide the mobile app banner
+github.com##.js-app-banner
+
+! YouTube — hide premium nag
+youtube.com##ytd-mealbar-promo-renderer
+youtube.com##.ytd-statement-banner-renderer
+
+! Reddit — hide app install prompts in mobile view
+www.reddit.com##.XPromoPopup
+www.reddit.com##.promotedlink
+
+! Stack Overflow — hide jobs teaser
+stackoverflow.com##.s-sidebarwidget--header:has(.fc-orange-400)
+
+! Amazon — hide sponsored product rows
+www.amazon.com##.s-sponsored-label-info-icon
+www.amazon.com##[data-component-type="sp-sponsored-result"]
+
+! Google Search — dim "People also search for" spam
+www.google.com##.ULSxyf
+
+! ===== END OF CUSTOM RULES ========================================================================
+! Total rules: ~120
+! Last updated: 2026-03-24
+! Next update: Run resources/filters/download_filterlists.ps1 to refresh EasyList/uBlock.
+! Aeon-specific additions should be placed above this line.

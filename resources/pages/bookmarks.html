@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon Bookmarks</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0e14; --surface: #16182a; --card: #1e2140;
+    --border: #2e3064; --accent: #6c63ff; --accent2: #a78bfa;
+    --text: #e8e8f0; --text-dim: #8888aa; --green: #22c55e;
+    --red: #ef4444; --radius: 10px;
+  }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 40px 48px 80px; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  h1 { font-size: 22px; font-weight: 600; }
+
+  .top-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; }
+  .search-box {
+    flex: 1; max-width: 480px;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0 14px;
+  }
+  .search-box input {
+    flex: 1; background: none; border: none; outline: none;
+    color: var(--text); font-family: inherit; font-size: 14px; padding: 11px 0;
+  }
+  .icon { color: var(--text-dim); font-size: 14px; }
+
+  .btn {
+    padding: 8px 16px; border-radius: 8px; font-family: inherit;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); transition: all .12s;
+  }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: .88; }
+  .btn-ghost { background: var(--surface); color: var(--text-dim); }
+  .btn-ghost:hover { background: var(--card); color: var(--text); }
+
+  /* View toggle */
+  .view-toggle { display: flex; gap: 4px; }
+  .view-btn {
+    width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-dim); cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; transition: all .12s;
+  }
+  .view-btn.active { background: var(--card); color: var(--accent2); border-color: var(--accent); }
+
+  /* Folder sidebar */
+  .layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
+
+  .folder-list {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 8px; height: fit-content;
+    position: sticky; top: 20px;
+  }
+  .folder-header {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-dim); padding: 4px 8px 10px;
+  }
+  .folder-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 7px; cursor: pointer;
+    font-size: 13px; color: var(--text-dim); transition: all .12s;
+    position: relative;
+  }
+  .folder-item:hover { background: var(--card); color: var(--text); }
+  .folder-item.active { background: var(--card); color: var(--accent2); }
+  .folder-count {
+    margin-left: auto; background: var(--card); border-radius: 20px;
+    padding: 1px 7px; font-size: 10px; color: var(--text-dim); border: 1px solid var(--border);
+  }
+  .folder-item.active .folder-count { border-color: var(--accent); color: var(--accent2); }
+
+  .new-folder-btn {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border-radius: 7px; font-size: 12px; color: var(--text-dim);
+    cursor: pointer; width: 100%; background: none; border: none; font-family: inherit;
+    transition: background .12s;
+  }
+  .new-folder-btn:hover { background: var(--card); color: var(--accent2); }
+
+  /* Grid view */
+  .bm-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+  }
+  .bm-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; cursor: pointer;
+    transition: all .15s; position: relative; group: true;
+  }
+  .bm-card:hover { background: var(--card); border-color: var(--accent); transform: translateY(-1px); }
+  .bm-card:hover .bm-card-actions { opacity: 1; }
+  .bm-favicon { font-size: 24px; margin-bottom: 10px; }
+  .bm-card-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
+  .bm-card-url { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bm-card-actions {
+    position: absolute; top: 8px; right: 8px;
+    display: flex; gap: 4px; opacity: 0; transition: opacity .12s;
+  }
+  .bm-act {
+    width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text-dim); font-size: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: color .12s;
+  }
+  .bm-act:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
+
+  /* List view */
+  .bm-list-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 0;
+  }
+  .bm-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s;
+  }
+  .bm-row:last-child { border-bottom: none; }
+  .bm-row:hover { background: var(--card); }
+  .bm-row:hover .bm-row-actions { opacity: 1; }
+  .bm-row-icon { font-size: 18px; flex-shrink: 0; }
+  .bm-row-info { flex: 1; min-width: 0; }
+  .bm-row-title { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+  .bm-row-url { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bm-row-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .12s; }
+  .bm-row-act {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text-dim); font-size: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: color .12s;
+  }
+  .bm-row-act:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
+
+  /* Add modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,9,.7); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center; z-index: 99;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 420px; max-width: 90vw;
+  }
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { font-size: 12px; font-weight: 500; color: var(--text-dim); display: block; margin-bottom: 6px; }
+  .form-input {
+    width: 100%; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: inherit;
+    font-size: 13px; padding: 9px 12px; outline: none; transition: border-color .12s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--text-dim); }
+  .empty-state .big { font-size: 56px; margin-bottom: 20px; }
+  .empty-state p { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>★ Bookmarks</h1>
+</div>
+
+<div class="top-bar">
+  <div class="search-box">
+    <span class="icon">🔍</span>
+    <input type="text" id="bm_search" placeholder="Search bookmarks…" oninput="search(this.value)">
+  </div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="grid_btn" onclick="setView('grid')" title="Grid view">⊞</button>
+    <button class="view-btn" id="list_btn" onclick="setView('list')" title="List view">☰</button>
+  </div>
+  <button class="btn btn-primary" onclick="openAddModal()">+ Add Bookmark</button>
+</div>
+
+<div class="layout">
+  <!-- Folder Sidebar -->
+  <div class="folder-list">
+    <div class="folder-header">Folders</div>
+    <div class="folder-item active" onclick="selectFolder('all', this)">
+      <span>📚</span> All Bookmarks <span class="folder-count" id="fc_all">0</span>
+    </div>
+    <div id="folder_nav">
+      <!-- Dynamic folders -->
+    </div>
+    <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 4px;">
+    <button class="new-folder-btn" onclick="newFolder()">+ New Folder</button>
+  </div>
+
+  <!-- Bookmark Content -->
+  <div id="bm_content"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal_title">Add Bookmark</h2>
+    <div class="form-group">
+      <label>Title</label>
+      <input class="form-input" id="f_title" placeholder="Bookmark title">
+    </div>
+    <div class="form-group">
+      <label>URL</label>
+      <input class="form-input" id="f_url" placeholder="https://example.com">
+    </div>
+    <div class="form-group">
+      <label>Folder</label>
+      <select class="form-input" id="f_folder">
+        <option value="">Bookmarks Bar</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBookmark()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Demo bookmark data — in production: aeonBridge.getBookmarks()
+let bookmarks = [
+  { id: 1, title: 'DelgadoLogic', url: 'https://delgadologic.tech', icon: '🌐', folder: 'Bookmarks Bar' },
+  { id: 2, title: 'Aeon Browser Repo', url: 'https://github.com/DelgadoLogic/AeonBrowser', icon: '🐙', folder: 'Bookmarks Bar' },
+  { id: 3, title: 'DuckDuckGo', url: 'https://duckduckgo.com', icon: '🔍', folder: 'Bookmarks Bar' },
+  { id: 4, title: 'Cloudflare Radar', url: 'https://radar.cloudflare.com', icon: '📡', folder: 'Research' },
+  { id: 5, title: 'EasyList', url: 'https://easylist.to', icon: '🛡', folder: 'Research' },
+  { id: 6, title: 'WolfSSL Docs', url: 'https://wolfssl.com/docs', icon: '🔒', folder: 'Research' },
+  { id: 7, title: 'Inno Setup Docs', url: 'https://jrsoftware.org/ishelp/', icon: '📦', folder: 'Dev Tools' },
+  { id: 8, title: 'CMake Reference', url: 'https://cmake.org/cmake/help/latest/', icon: '⚙', folder: 'Dev Tools' },
+  { id: 9, title: 'MSDN Win32 API', url: 'https://docs.microsoft.com/en-us/windows/win32/', icon: '🪟', folder: 'Dev Tools' },
+  { id: 10, title: 'Rust Book', url: 'https://doc.rust-lang.org/book/', icon: '🦀', folder: 'Dev Tools' },
+];
+
+let currentFolder = 'all';
+let currentView = 'grid';
+let searchQ = '';
+let editingId = null;
+
+function folders() {
+  const f = [...new Set(bookmarks.map(b => b.folder))];
+  return f;
+}
+
+function visibleBookmarks() {
+  let bms = bookmarks;
+  if (currentFolder !== 'all') bms = bms.filter(b => b.folder === currentFolder);
+  if (searchQ) bms = bms.filter(b =>
+    b.title.toLowerCase().includes(searchQ) || b.url.toLowerCase().includes(searchQ));
+  return bms;
+}
+
+function renderFolderNav() {
+  const nav = document.getElementById('folder_nav');
+  nav.innerHTML = folders().map(f => `
+    <div class="folder-item${currentFolder === f ? ' active' : ''}" onclick="selectFolder('${f}', this)">
+      <span>📁</span> ${f}
+      <span class="folder-count">${bookmarks.filter(b => b.folder === f).length}</span>
+    </div>
+  `).join('');
+  document.getElementById('fc_all').textContent = bookmarks.length;
+}
+
+function renderContent() {
+  const bms = visibleBookmarks();
+  const cont = document.getElementById('bm_content');
+
+  if (!bms.length) {
+    cont.innerHTML = `<div class="empty-state"><div class="big">★</div><p>No bookmarks yet.<br>Click <b>+ Add Bookmark</b> to save your first site.</p></div>`;
+    return;
+  }
+
+  if (currentView === 'grid') {
+    cont.innerHTML = `<div class="bm-grid">${bms.map(b => `
+      <div class="bm-card" onclick="navigate('${b.url}')">
+        <div class="bm-card-actions">
+          <button class="bm-act" title="Edit" onclick="event.stopPropagation();editBookmark(${b.id})">✎</button>
+          <button class="bm-act" title="Delete" onclick="event.stopPropagation();deleteBookmark(${b.id})">✕</button>
+        </div>
+        <div class="bm-favicon">${b.icon}</div>
+        <div class="bm-card-title">${b.title}</div>
+        <div class="bm-card-url">${b.url.replace(/^https?:\/\//,'')}</div>
+      </div>`).join('')}</div>`;
+  } else {
+    cont.innerHTML = `<div class="bm-list-card">${bms.map(b => `
+      <div class="bm-row" onclick="navigate('${b.url}')">
+        <div class="bm-row-icon">${b.icon}</div>
+        <div class="bm-row-info">
+          <div class="bm-row-title">${b.title}</div>
+          <div class="bm-row-url">${b.url}</div>
+        </div>
+        <div class="bm-row-actions">
+          <button class="bm-row-act" title="Edit" onclick="event.stopPropagation();editBookmark(${b.id})">✎</button>
+          <button class="bm-row-act" title="Delete" onclick="event.stopPropagation();deleteBookmark(${b.id})">✕</button>
+        </div>
+      </div>`).join('')}</div>`;
+  }
+}
+
+function render() { renderFolderNav(); renderContent(); }
+
+function selectFolder(f, el) {
+  currentFolder = f;
+  document.querySelectorAll('.folder-item').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('grid_btn').classList.toggle('active', v === 'grid');
+  document.getElementById('list_btn').classList.toggle('active', v === 'list');
+  renderContent();
+}
+
+function search(q) { searchQ = q.toLowerCase(); renderContent(); }
+
+function navigate(url) {
+  try { window.aeonBridge?.navigate(url); } catch(_) { window.open(url, '_blank'); }
+}
+
+function openAddModal(title='', url='', folder='') {
+  editingId = null;
+  document.getElementById('modal_title').textContent = 'Add Bookmark';
+  document.getElementById('f_title').value = title;
+  document.getElementById('f_url').value = url;
+  document.getElementById('f_folder').innerHTML =
+    ['Bookmarks Bar', ...folders()].map(f => `<option${f === folder ? ' selected' : ''}>${f}</option>`).join('');
+  document.getElementById('modal').classList.add('open');
+}
+
+function editBookmark(id) {
+  const b = bookmarks.find(x => x.id === id);
+  if (!b) return;
+  editingId = id;
+  document.getElementById('modal_title').textContent = 'Edit Bookmark';
+  document.getElementById('f_title').value = b.title;
+  document.getElementById('f_url').value = b.url;
+  document.getElementById('f_folder').innerHTML =
+    [...new Set(['Bookmarks Bar', ...folders()])].map(f => `<option${f === b.folder ? ' selected' : ''}>${f}</option>`).join('');
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveBookmark() {
+  const title  = document.getElementById('f_title').value.trim();
+  const url    = document.getElementById('f_url').value.trim();
+  const folder = document.getElementById('f_folder').value;
+  if (!title || !url) return;
+
+  if (editingId) {
+    const b = bookmarks.find(x => x.id === editingId);
+    if (b) { b.title = title; b.url = url; b.folder = folder; }
+    try { window.aeonBridge?.updateBookmark(editingId, title, url, folder); } catch(_) {}
+  } else {
+    const newBm = { id: Date.now(), title, url, icon: '🌐', folder };
+    bookmarks.unshift(newBm);
+    try { window.aeonBridge?.addBookmark(title, url, folder); } catch(_) {}
+  }
+  closeModal();
+  render();
+}
+
+function deleteBookmark(id) {
+  bookmarks = bookmarks.filter(b => b.id !== id);
+  try { window.aeonBridge?.deleteBookmark(id); } catch(_) {}
+  render();
+}
+
+function newFolder() {
+  const name = prompt('Folder name:');
+  if (name && name.trim()) {
+    try { window.aeonBridge?.createFolder(name.trim()); } catch(_) {}
+    renderFolderNav();
+  }
+}
+
+// Load real data from native bridge
+try {
+  const real = window.aeonBridge?.getBookmarks?.();
+  if (real && real.length) bookmarks = real;
+} catch(_) {}
+
+render();
+</script>
+</body>
+</html>

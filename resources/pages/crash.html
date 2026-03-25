@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aeon — Session Restored</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0d0e14;
+    color: #e8e8f0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  .card {
+    background: #16182a;
+    border: 1px solid #2e3064;
+    border-radius: 20px;
+    padding: 48px;
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .icon { font-size: 56px; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { font-size: 14px; color: #8888aa; margin-bottom: 36px; line-height: 1.6; }
+
+  /* Tabs to restore */
+  .tabs-label {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #8888aa;
+    margin-bottom: 10px;
+  }
+
+  .tab-list {
+    background: #1e2140;
+    border: 1px solid #2e3064;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .tab-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2e3064;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .tab-row:last-child { border-bottom: none; }
+  .tab-row:hover { background: rgba(108,99,255,.08); }
+
+  .tab-favicon { font-size: 16px; flex-shrink: 0; }
+  .tab-info { flex: 1; min-width: 0; }
+  .tab-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab-url   { font-size: 11px; color: #8888aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .tab-check {
+    width: 18px; height: 18px;
+    accent-color: #6c63ff;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; justify-content: center; }
+  .btn {
+    padding: 11px 28px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: #6c63ff; color: #fff; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid #2e3064;
+    color: #8888aa;
+  }
+  .btn-ghost:hover { color: #e8e8f0; }
+
+  .footer-note { font-size: 11px; color: #44445a; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="icon">⚡</div>
+  <h1>Aeon was closed unexpectedly</h1>
+  <p class="subtitle">
+    We saved your tabs. Choose which ones to restore — or start fresh.
+  </p>
+
+  <div class="tabs-label">Saved Tabs</div>
+  <div class="tab-list" id="tab_list">
+    <!-- Populated by restoreData or aeonBridge -->
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="restoreSelected()">↺ Restore Selected</button>
+    <button class="btn btn-primary" onclick="restoreAll()">↺ Restore All Tabs</button>
+    <button class="btn btn-ghost" onclick="newSession()">Start Fresh</button>
+  </div>
+
+  <p class="footer-note">
+    Session auto-saved every 30 seconds. Report a crash:
+    <a href="https://delgadologic.tech/support" style="color:#6c63ff">delgadologic.tech/support</a>
+  </p>
+</div>
+
+<script>
+// Data injected by SessionManager or aeonBridge at page load
+let tabs = [];
+try {
+  tabs = window.aeonBridge?.getCrashedTabs?.() || [
+    { id: 1, title: 'DelgadoLogic', url: 'https://delgadologic.tech', icon: '🌐' },
+    { id: 2, title: 'Aeon Browser — GitHub', url: 'https://github.com/DelgadoLogic/AeonBrowser', icon: '🐙' },
+    { id: 3, title: 'DuckDuckGo Search', url: 'https://duckduckgo.com', icon: '🔍' },
+  ];
+} catch(_) {}
+
+function render() {
+  document.getElementById('tab_list').innerHTML = tabs.map(t => `
+    <div class="tab-row">
+      <input type="checkbox" class="tab-check" id="chk_${t.id}" checked>
+      <div class="tab-favicon">${t.icon || '🌐'}</div>
+      <div class="tab-info">
+        <div class="tab-title">${t.title}</div>
+        <div class="tab-url">${t.url}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function restoreSelected() {
+  const ids = tabs
+    .filter(t => document.getElementById('chk_'+t.id)?.checked)
+    .map(t => t.id);
+  try { window.aeonBridge?.restoreTabs(ids); } catch(_) {}
+}
+
+function restoreAll() {
+  try { window.aeonBridge?.restoreTabs(tabs.map(t => t.id)); } catch(_) {}
+}
+
+function newSession() {
+  try { window.aeonBridge?.navigate('aeon://newtab'); }
+  catch(_) { window.location.href = 'aeon://newtab'; }
+}
+
+render();
+</script>
+</body>
+</html>
