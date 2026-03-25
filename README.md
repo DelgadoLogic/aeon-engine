@@ -4,7 +4,7 @@
 
 <br><br>
 
-<img src="resources/icons/Aeon_64.png" alt="Aeon Icon" width="64">
+<img src="resources/images/icon_medium.png" alt="Aeon Icon" width="64">
 
 # Aeon Browser
 
@@ -40,6 +40,16 @@ It ships bundled inside the **[LogicFlow](https://delgadologic.tech/logicflow)**
 <img src="resources/images/ui_mockup.png" alt="Aeon Browser UI — dark mode new tab page" width="90%">
 <br>
 <sub><i>Aeon Browser — dark mode new tab page with aurora background, live clock, and speed dial</i></sub>
+</div>
+
+---
+
+## 🖱️ App Menu (Three-Dot Menu)
+
+<div align="center">
+<img src="resources/images/app_menu.png" alt="Aeon Browser App Menu" width="340">
+<br>
+<sub><i>Aeon's Chrome-style app menu — includes unique 🔥 Firewall Mode and 🛡 Network Sentinel quick-access</i></sub>
 </div>
 
 ---
@@ -177,7 +187,7 @@ AeonBrowser/
 
 | 16px | 32px | 48px | 64px | 128px | 256px |
 |------|------|------|------|-------|-------|
-| <img src="resources/icons/Aeon_16.png" width="16"> | <img src="resources/icons/Aeon_32.png" width="32"> | <img src="resources/icons/Aeon_48.png" width="48"> | <img src="resources/icons/Aeon_64.png" width="64"> | <img src="resources/icons/Aeon_128.png" width="128"> | <img src="resources/icons/Aeon_256.png" width="128"> |
+| <img src="resources/images/icon_small.png" width="16"> | <img src="resources/images/icon_small.png" width="32"> | <img src="resources/images/icon_medium.png" width="48"> | <img src="resources/images/icon_medium.png" width="64"> | <img src="resources/images/icon_large.png" width="128"> | <img src="resources/images/icon_large.png" width="128"> |
 | Taskbar | Start Menu | Desktop | Explorer | Large | HiDPI |
 
 *All sizes baked into a single `Aeon.ico` using `resources/icons/build_icon.ps1`*
@@ -275,7 +285,7 @@ Third-party component licenses:
 
 <div align="center">
 
-<img src="resources/icons/Aeon_64.png" width="48">
+<img src="resources/images/icon_medium.png" width="48">
 
 **Aeon Browser by DelgadoLogic**
 
