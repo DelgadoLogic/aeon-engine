@@ -130,6 +130,33 @@ endif()
 # Install
 # ---------------------------------------------------------------------------
 install(TARGETS Aeon DESTINATION bin)
+
+# ---------------------------------------------------------------------------
+# Retro tier HTML4 GDI renderer DLL  (aeon_html4.dll)
+# Built only when AEON_TARGET_TIER=Retro; loaded at runtime by TierDispatcher.
+# ---------------------------------------------------------------------------
+if(AEON_TARGET_TIER STREQUAL "Retro")
+    add_compile_definitions(AEON_HTML4_BUILD)
+    add_library(aeon_html4 SHARED
+        retro/aeon_html4.c
+    )
+    target_compile_definitions(aeon_html4 PRIVATE AEON_HTML4_BUILD)
+    target_link_libraries(aeon_html4 kernel32 user32 gdi32)
+    set_target_properties(aeon_html4 PROPERTIES
+        OUTPUT_NAME "aeon_html4"
+        SUFFIX ".dll"
+    )
+    install(TARGETS aeon_html4 DESTINATION bin)
+    # Copy alongside Aeon.exe post-build
+    add_custom_command(TARGET aeon_html4 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "$<TARGET_FILE:aeon_html4>"
+            "$<TARGET_FILE_DIR:Aeon>/aeon_html4.dll"
+        COMMENT "[Aeon] Copying aeon_html4.dll to output"
+    )
+    add_dependencies(Aeon aeon_html4)
+endif()
+
 install(FILES
     "${CMAKE_SOURCE_DIR}/router/target/release/aeon_router.dll"
     DESTINATION bin OPTIONAL)
