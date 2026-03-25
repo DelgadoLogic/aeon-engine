@@ -63,6 +63,7 @@ set(CORE_SOURCES
     core/ui/DownloadButton.cpp
     core/network/CircumventionEngine.cpp
     core/network/NetworkSentinel.cpp
+    core/network/DnsResolver.cpp
     core/settings/SettingsEngine.cpp
     core/security/PasswordVault.cpp
     core/history/HistoryEngine.cpp
