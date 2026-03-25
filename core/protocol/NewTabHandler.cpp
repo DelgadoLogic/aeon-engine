@@ -23,9 +23,11 @@
 
 #include "NewTabHandler.h"
 #include "../settings/SettingsEngine.h"
+#include "../engine/AeonBridge.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // Resource loader: read a file from the EXE's embedded resource section,

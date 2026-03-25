@@ -55,6 +55,7 @@ set(CORE_SOURCES
     AeonMain.cpp
     core/probe/HardwareProbe.cpp
     core/engine/TierDispatcher.cpp
+    core/engine/AeonBridge.cpp
     core/ui/BrowserChrome.cpp
     core/ui/EraChrome.cpp
     core/ui/AppMenu.cpp
@@ -64,14 +65,18 @@ set(CORE_SOURCES
     core/network/CircumventionEngine.cpp
     core/network/NetworkSentinel.cpp
     core/network/DnsResolver.cpp
+    core/network/I2pdShim.cpp
+    core/protocol/NewTabHandler.cpp
     core/settings/SettingsEngine.cpp
     core/security/PasswordVault.cpp
     core/history/HistoryEngine.cpp
     core/history/sqlite3.c
     core/download/DownloadManager.cpp
     core/memory/TabSleepManager.cpp
+    core/session/SessionManager.cpp
     core/tls/TlsAbstraction.cpp
     core/crash/CrashHandler.cpp
+    core/extensions/ExtensionRuntime.cpp
     updater/AutoUpdater.cpp
     privacy/ContentBlocker.cpp
     telemetry/PulseBridge.cpp
@@ -97,13 +102,18 @@ target_link_libraries(Aeon
 # ── Post-build: copy HTML resources to output dir ─────────────────────
 add_custom_command(TARGET Aeon POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/newtab"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/settings"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/downloads"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/history"
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/newtab/newtab.html"       "$<TARGET_FILE_DIR:Aeon>/newtab/"
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/settings/settings.html"   "$<TARGET_FILE_DIR:Aeon>/settings/"
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/downloads/downloads.html" "$<TARGET_FILE_DIR:Aeon>/downloads/"
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/history/history.html"     "$<TARGET_FILE_DIR:Aeon>/history/"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/pages"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/resources/newtab/newtab.html"
+        "$<TARGET_FILE_DIR:Aeon>/newtab/"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/resources/pages/settings.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/history.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/downloads.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/bookmarks.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/passwords.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/crash.html"
+        "$<TARGET_FILE_DIR:Aeon>/pages/"
     COMMENT "[Aeon] Copying HTML resources to output"
 )
 
