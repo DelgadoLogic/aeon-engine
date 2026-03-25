@@ -63,7 +63,10 @@ It ships bundled inside the **[LogicFlow](https://delgadologic.tech/logicflow)**
 | Native ad-blocker (no extension) | ✅ | ❌ | ❌ | ✅ | ❌ |
 | FTP + Magnet + Torrent download | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Gemini/Gopher support | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Tab sleep (< 5MB idle) | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| Auto captive portal detection | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| GFW / firewall bypass (built-in) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| DoH with ECH (SNI hidden from DPI) | ✅ | ⚠️ | ⚠️ | ❌ | ❌ |
+| RAM-pressure-aware tab sleep | ✅ | ❌ | ❌ | ❌ | ⚠️ |
 | Password vault (DPAPI) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Ships with system optimizer | ✅ | ❌ | ❌ | ❌ | ❌ |
 
@@ -78,12 +81,12 @@ It ships bundled inside the **[LogicFlow](https://delgadologic.tech/logicflow)**
 | **Extended** | Windows Vista / 7 | Gecko (light) | Schannel unlock | ~80 MB |
 | **XP-Hi** | Windows XP + SSE2 | Blink (XP build) | WolfSSL | ~60 MB |
 | **XP-Lo** | Windows XP (no SSE2) | Gecko (no SSE2) | WolfSSL | ~45 MB |
-| **2000** | Windows 2000 | HTML4 renderer | WolfSSL | ~30 MB |
-| **9x** | Windows 95/98/ME | HTML4 renderer | WolfSSL 32-bit | ~20 MB |
+| **2000** | Windows 2000 | HTML4 GDI (`aeon_html4.dll`) | WolfSSL | ~30 MB |
+| **9x** | Windows 95/98/ME | HTML4 GDI (`aeon_html4.dll`) | WolfSSL 32-bit | ~20 MB |
 | **Win16** | Windows 3.1 / 3.11 | HTML4 GDI 16-bit | WolfSSL 16-bit | ~6 MB |
 
 > **How does it know which tier to use?**  
-> `HardwareProbe.cpp` runs at startup and detects your OS, CPU, and RAM.  
+> `HardwareProbe.cpp` runs at startup, detects your OS, CPU, and RAM.  
 > The `TierDispatcher` loads the right engine DLL automatically. Zero config needed.
 
 ---
@@ -105,23 +108,53 @@ aeon://                              ← Internal pages (newtab, settings, etc.)
 
 ---
 
+## 🌍 DNS & Network Bypass
+
+Aeon automatically detects your network environment and adapts — **zero configuration**.
+
+| Environment | DNS Strategy | Bypass Active |
+|---|---|---|
+| 🏠 Home / Open | DoH cascade (Cloudflare→Google→Quad9→NextDNS) | None needed |
+| ☕ Coffee Shop / Hotel | System DNS (portal phase) → DoH (after auth) | Auto-detects & opens portal tab |
+| 🏢 Corporate | DoH external + System DNS for internal (`.corp`, `.local`) | CDN fronting for filtered categories |
+| 🏫 School / University | Full DoH (overrides forced DNS filter) | SNI fragmentation via GoodbyeDPI |
+| 🇨🇳 National Firewall (GFW, RKN, etc.) | Cloudflare **ECH** → ODoH relay → Tor meek | GoodbyeDPI + full circumvention stack |
+| ✈️ Airplane WiFi | DoH (6s timeout, 1 retry, 30-min cache) | Captive portal detection |
+| 🏛️ Government / Military | DoH fast-fail (2s) → System DNS | None (respects gov security posture) |
+| 🛰️ Metered (satellite) | DoH (bandwidth-save mode) | Minimal retries |
+
+**Key techniques (researched from GoodbyeDPI, zapret, dnscrypt-proxy):**
+- **ECH** (Encrypted Client Hello) — hides the domain name from DPI even inside TLS
+- **SNI fragmentation** — splits TLS ClientHello across TCP segments so DPI can't read the SNI
+- **TTL-limited decoy packets** — confuses inline DPI hardware
+- **DNS-over-HTTPS on port 443** — looks identical to regular web traffic
+- **Split-horizon detection** — internal corporate/gov domains always use system DNS
+- **NIPR/SIPR detection** — if no public routes exist, air-gap mode activates silently
+
+> **Government/Military note:** Aeon does **not** attempt Tor or GoodbyeDPI on `.mil`/`.gov` networks. It uses a fast DoH probe (2s timeout), then falls back to system DNS gracefully. No aggressive bypass that could trigger endpoint security alerts.
+
+---
+
 ## 🔒 Security Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   AEON SECURITY MODEL                   │
-├─────────────┬───────────────────────────────────────────┤
-│ TLS         │ WolfSSL (legacy) or OS-native Schannel    │
-│ DNS         │ DNS-over-HTTPS — Cloudflare 1.1.1.1       │
-│ Tracking    │ EasyList engine — native C++, not JS ext  │
-│ Fingerprint │ Canvas + WebGL + Audio randomization       │
-│ Privacy     │ GPC header injected on every request       │
-│ Passwords   │ Windows DPAPI (CryptProtectData)           │
-│ Tor         │ Embedded Arti (Rust) — no Tor Browser dep │
-│ I2P         │ i2pd child process — transit tunnels OFF   │
-│ Updates     │ WinTrust Authenticode + SHA-256 verify     │
-│ Sandbox     │ Renderer process isolation per tab         │
-└─────────────┴───────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     AEON SECURITY MODEL                     │
+├─────────────────┬───────────────────────────────────────────┤
+│ TLS             │ WolfSSL (legacy) or OS-native Schannel    │
+│ DNS             │ DoH cascade — Cloudflare ECH, Quad9, DoT  │
+│                 │ Split-horizon for corporate/gov/mil       │
+│ Tracking        │ EasyList engine — native C++, not JS ext  │
+│ Fingerprint     │ Canvas + WebGL + Audio randomization       │
+│ Privacy         │ GPC header injected on every request       │
+│ Passwords       │ Windows DPAPI (CryptProtectData)           │
+│ Tor             │ Embedded Arti (Rust) — no Tor Browser dep │
+│ I2P             │ i2pd child process — transit tunnels OFF   │
+│ Captive Portal  │ Auto-detected via NCSI probe, auto-open   │
+│ DPI Bypass      │ GoodbyeDPI/zapret (SNI frag, TTL tricks)  │
+│ Updates         │ WinTrust Authenticode + SHA-256 verify     │
+│ Sandbox         │ Renderer process isolation per tab         │
+└─────────────────┴───────────────────────────────────────────┘
 ```
 
 **Zero inherited CVEs.** Aeon is not a Chromium fork or Firefox fork.  
@@ -133,46 +166,71 @@ We studied them and wrote our own from scratch.
 
 ```
 AeonBrowser/
-├── core/                    ← C++ Browser Host Process
-│   ├── probe/               HardwareProbe  — OS + CPU + Tier detection
-│   ├── engine/              TierDispatcher + AeonEngine DLL interface (C ABI)
-│   ├── ui/                  EraChrome      — Mica (Win11) / Win32 (Legacy) UI
-│   ├── tls/                 TlsAbstraction — WolfSSL / Schannel / TLS 1.3
-│   ├── protocol/            NewTabHandler  — aeon:// internal pages
-│   ├── settings/            SettingsEngine — JSON + HKLM two-tier config
-│   ├── session/             SessionManager — crash recovery + tab restore
-│   ├── crash/               CrashHandler   — minidump + telemetry queue
-│   └── memory/              TabSleepManager— 30-min idle = 5 MB suspended tab
+├── core/                      ← C++ Browser Host Process
+│   ├── probe/                 HardwareProbe   — OS + CPU + Tier detection
+│   ├── engine/                TierDispatcher  — loads right engine DLL per OS
+│   ├── ui/                    EraChrome       — Mica (Win11) / Win32 (Legacy) UI
+│   │   ├── AppMenu.cpp        Chrome-style three-dot popup (custom GDI)
+│   │   ├── BookmarkBar.cpp    Native child strip + folder submenus
+│   │   ├── BookmarkToast.cpp  Star-button "Bookmark added" popup
+│   │   └── DownloadButton.cpp Animated toolbar progress indicator
+│   ├── network/
+│   │   ├── NetworkSentinel.cpp  Auto network classification (6 env types)
+│   │   ├── CircumventionEngine  GoodbyeDPI + Tor + meek bypass stack
+│   │   └── DnsResolver.cpp    DoH cascade, split-horizon, ECH, air-gap
+│   ├── tls/                   TlsAbstraction  — WolfSSL / Schannel / TLS 1.3
+│   ├── security/              PasswordVault   — DPAPI encrypted vault
+│   ├── settings/              SettingsEngine  — JSON + HKLM two-tier config
+│   ├── session/               SessionManager  — crash recovery + tab restore
+│   ├── history/               HistoryEngine   — SQLite WAL + FTS5 + bookmarks
+│   ├── download/              DownloadManager — WinINet multi-thread + resume
+│   ├── crash/                 CrashHandler    — minidump + telemetry queue
+│   └── memory/                TabSleepManager — RAM-pressure-aware idle suspend
+│                                                (≤512MB→10min, ≤2GB→20min, 2GB+→30min)
 │
-├── router/                  ← Rust Protocol Router (aeon_router.dll)
+├── router/                    ← Rust Protocol Router (aeon_router.dll)
 │   └── src/
-│       ├── router.rs        14-protocol scheme dispatcher
-│       ├── downloader.rs    Download manager (NO seeding, compile-time)
-│       ├── tor.rs           Arti Tor client (embedded, no Tor Browser)
-│       └── gemini.rs        Gemini + Gopher handlers
+│       ├── router.rs          14-protocol scheme dispatcher
+│       ├── downloader.rs      Download manager (NO seeding, compile-time)
+│       ├── tor.rs             Arti Tor client (embedded, no Tor Browser)
+│       └── gemini.rs          Gemini + Gopher handlers
 │
-├── engines/                 ← Renderer DLLs (swappable per tier)
-│   └── blink/               aeon_blink_stub.cpp → aeon_blink.dll
+├── privacy/
+│   └── ContentBlocker.cpp     EasyList/uBlock engine, DoH, GPC, fingerprint guard
 │
-├── history/                 ← SQLite3 Bookmark + History Engine
-│   └── HistoryEngine.cpp    WAL mode, incognito = :memory:, Netscape export
+├── updater/
+│   └── AutoUpdater.cpp        WinTrust Authenticode + SHA-256 + delta patch
 │
-├── privacy/                 ← Content Blocker
-│   └── ContentBlocker.cpp   EasyList, DoH, GPC, fingerprint guard
+├── telemetry/
+│   └── PulseBridge.cpp        Category-level only, opt-out, shared with LogicFlow
 │
-├── updater/                 ← Auto-Updater
-│   └── AutoUpdater.cpp      WinTrust Authenticode + SHA-256 + 3 channels
+├── retro/                     ← Legacy Tier (Win9x / 2000 / 3.x)
+│   ├── aeon_html4.c           GDI HTML4/CSS2 renderer — zero deps, single-file C
+│   ├── aeon_html4.h           C ABI DLL header (AEON_HTML4_API_VERSION = 1)
+│   ├── aeon16.c               16-bit WinMain for Win3.x
+│   └── wolfssl_bridge.c       WinSock 1.1 + WolfSSL TLS 1.3 (16-bit)
 │
-├── telemetry/               ← Anonymous Telemetry
-│   └── PulseBridge.cpp      Category-level only, opt-out, shared with LogicFlow
+├── installer/
+│   ├── AeonBrowser.iss        Inno Setup 6.2 — all 4 tiers, multilingual
+│   └── build_installer.ps1   8-step CI: cargo→cmake→icon→filters→sign→ISCC→manifest
 │
 ├── resources/
-│   └── newtab/newtab.html   ← aeon://newtab — aurora + clock + speed dial
+│   ├── filters/
+│   │   ├── easylist.txt       Bundled EasyList snapshot (auto-updated by CI)
+│   │   ├── easyprivacy.txt    EasyPrivacy snapshot
+│   │   ├── ublock_base.txt    uBlock Origin base filters
+│   │   ├── ublock_privacy.txt uBlock Origin privacy filters
+│   │   ├── annoyances.txt     Fanboy Annoyances (cookie banners)
+│   │   ├── aeon_extra.txt     Aeon-specific additions (highest priority)
+│   │   └── download_filterlists.ps1  Updater script (24h cache, strips comments)
+│   ├── icons/
+│   │   └── build_icon.ps1     Multi-size ICO bake (ImageMagick or System.Drawing)
+│   └── newtab/newtab.html     aeon://newtab — aurora + clock + speed dial
 │
-└── retro/                   ← 16-bit Windows 3.x Tier
-    ├── aeon16.c             WinMain — full 16-bit browser entry point
-    ├── html4.c              HTML4/CSS2 GDI renderer (word-wrap, headings, links)
-    └── wolfssl_bridge.c     WinSock 1.1 + WolfSSL TLS 1.3 (16-bit)
+└── _research/                 ← Reference repos (for technique analysis only)
+    ├── GoodbyeDPI/            SNI fragmentation, TTL tricks, HTTP header mangling
+    ├── zapret/                Russian TSPU desync, TCP window manipulation
+    └── dnscrypt-proxy/        DoH provider list, ODoH relay structure
 ```
 
 ---
@@ -194,14 +252,11 @@ AeonBrowser/
 - **MSVC 2022** (x64 for Pro/Modern, x86 for XP tiers)
 - **Rust 1.75+** (`cargo` for router DLL)
 - **CMake 3.22+**
+- **Inno Setup 6.2+** (`iscc.exe` for installer)
 - **Open Watcom 2.0** (16-bit Win3.x retro tier only)
 
 ### Quick Build (Pro tier — Windows 10/11)
-```bash
-# Clone
-git clone https://github.com/DelgadoLogic/AeonBrowser.git
-cd AeonBrowser
-
+```powershell
 # Build Rust router
 cd router && cargo build --release && cd ..
 
@@ -211,13 +266,22 @@ cmake --build build --config Release
 
 # Build icons
 powershell -File resources/icons/build_icon.ps1
+
+# (Optional) Download fresh filter lists
+powershell -File resources/filters/download_filterlists.ps1
+```
+
+### Full Installer Build (CI)
+```powershell
+# Builds everything: Rust + C++ + icons + filters + signs + Inno Setup + SHA-256 manifest
+powershell -File installer/build_installer.ps1 -Version 1.0.0 -Tier Pro -Channel stable
 ```
 
 ### All Tiers
-```bash
+```powershell
 cmake -B build -DAEON_TARGET_TIER=Extended   # Vista/7
 cmake -B build -DAEON_TARGET_TIER=XPHi       # XP + SSE2
-cmake -B build -DAEON_TARGET_TIER=Retro      # Win9x/2000
+cmake -B build -DAEON_TARGET_TIER=Retro      # Win9x/2000 (builds aeon_html4.dll)
 
 # 16-bit (Win3.x) — requires Open Watcom 2.0
 cd retro && wmake
@@ -255,7 +319,7 @@ It can also be installed as a standalone browser.
 | **Beta** | Bi-weekly | Power users |
 | **Nightly** | Daily | Developers |
 
-Updates are delivered via `update.delgadologic.tech` — verified with **Authenticode** signature + **SHA-256** hash before installation.
+Updates are delivered via `update.delgadologic.tech` — verified with **Authenticode** signature + **SHA-256** hash before installation. Delta patches minimize download size.
 
 ---
 
@@ -272,8 +336,8 @@ Third-party component licenses:
 | Arti (Tor) | MIT/Apache 2.0 | Rust crate |
 | i2pd | BSD 3-clause | Child process |
 | SQLite3 | Public domain | Vendored amalgamation |
-
----
+| GoodbyeDPI | MIT | Bundled binary (research basis) |
+| Zapret | MIT | Research basis only |
 
 ---
 
