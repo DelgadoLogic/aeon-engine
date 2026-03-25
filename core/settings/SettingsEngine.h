@@ -35,27 +35,36 @@ struct AeonSettings {
     bool  adblock_enabled;          // default: true
     bool  tracker_block_enabled;    // default: true
     bool  fingerprint_guard;        // default: true
-    bool  gpc_header_enabled;       // default: true
+    bool  gpc_enabled;              // default: true  (GPC opt-out header)
+    bool  cookie_banners;           // default: true  (block cookie consent overlays)
+    bool  block_3p_cookies;         // default: true
     bool  doh_enabled;              // default: true
-    char  doh_provider[64];         // default: "https://1.1.1.1/dns-query"
+    char  doh_provider[64];         // default: "cloudflare"
 
     // --- Security ---
-    bool  https_upgrade;            // default: true  (auto-upgrade http→https)
+    bool  https_upgrade;            // default: true
     bool  safe_browsing;            // default: true
     bool  cert_transparency;        // default: true
+    bool  mixed_content_block;      // default: true
+    char  min_tls[8];               // default: "tls13"
 
     // --- Network / Protocols ---
-    bool  tor_enabled;              // default: false (off unless user enables)
+    bool  tor_enabled;              // default: false
     bool  i2p_enabled;              // default: false
+    bool  bypass_enabled;           // default: false (DPI bypass / GoodbyeDPI)
     char  tor_socks_addr[64];       // default: "127.0.0.1:9150"
     char  i2p_http_proxy[64];       // default: "127.0.0.1:4444"
     bool  auto_detect_proxy;        // default: true
 
+    // --- Firewall bypass (legacy field — mirrors bypass_enabled) ---
+    bool  firewall_mode;            // default: false
+    char  ss_uri[256];              // Shadowsocks URI (used by CircumventionEngine)
+
     // --- Downloads ---
-    char  download_dir[MAX_PATH];   // default: %USERPROFILE%\Downloads\Aeon
-    bool  ask_per_download;         // default: true
+    char  dl_path[MAX_PATH];        // default: %USERPROFILE%\Downloads
+    bool  dl_ask;                   // default: false (auto-save to dl_path)
     bool  auto_open_after;          // default: false
-    int   max_parallel_downloads;   // default: 4
+    int   dl_streams;               // default: 4  (parallel connections per file)
 
     // --- UI / Features ---
     bool  tab_sleep_enabled;        // default: true
@@ -64,9 +73,10 @@ struct AeonSettings {
     bool  show_bookmarks_bar;       // default: true
     bool  smooth_scrolling;         // default: true
     char  homepage[512];            // default: "aeon://newtab"
-    char  search_engine[64];        // default: "https://search.brave.com/search?q="
+    char  startup_page[32];         // default: "newtab"
+    char  search_engine[64];        // default: "ddg"
     char  theme;                    // 'A'=auto  'D'=dark  'L'=light  'R'=retro
-    bool  hardware_accel;           // default: true (false auto-set on retro tier)
+    bool  hardware_accel;           // default: true
 
     // --- Updates ---
     bool  auto_update;              // default: true

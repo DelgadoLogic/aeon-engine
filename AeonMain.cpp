@@ -8,6 +8,7 @@
 #include <windows.h>
 #include "core/probe/HardwareProbe.h"
 #include "core/engine/TierDispatcher.h"
+#include "core/engine/AeonBridge.h"
 #include "core/ui/BrowserChrome.h"
 #include "core/network/NetworkSentinel.h"
 #include "core/network/CircumventionEngine.h"
@@ -16,6 +17,7 @@
 #include "core/security/PasswordVault.h"
 #include "updater/AutoUpdater.h"
 #include <cstdio>
+#include <shlobj.h>
 
 #define AEON_WINDOW_CLASS L"AeonBrowserHost"
 #define AEON_TITLE        L"Aeon Browser — by DelgadoLogic"
@@ -134,6 +136,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int nShowCmd
     // Store engine pointer in window data
     SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(engine));
 
+    // ── AeonBridge — wire C++/JS bridge to this window ────────────────
+    // navigateFn: called from JS pages (settings, history, etc.) when
+    // window.aeonBridge.navigate(url) is invoked.
+    AeonBridge::Init(hWnd, [](const char* url) {
+        // Post a WM_AEONBRIDGE navigate command to the UI thread
+        // so we don't navigate from an arbitrary thread.
+        char* urlCopy = _strdup(url);
+        PostMessage(GetForegroundWindow(), WM_AEONBRIDGE,
+            BRIDGE_CMD_NAVIGATE, (LPARAM)urlCopy);
+    });
+
     // Initialize browser chrome (draws the "A" badge, tab strip, nav bar)
     BrowserChrome::Create(hWnd, profile, engine);
 
@@ -183,6 +196,21 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 
         case WM_ERASEBKGND:
             return 1; // BrowserChrome handles background, prevent flicker
+
+        case WM_AEONBRIDGE: {
+            // Handle JS→C++ bridge messages posted from AeonBridge
+            if ((int)wParam == BRIDGE_CMD_NAVIGATE) {
+                // lParam is a _strdup'd URL string
+                char* url = reinterpret_cast<char*>(lParam);
+                AeonEngineVTable* eng = reinterpret_cast<AeonEngineVTable*>(
+                    GetWindowLongPtr(hWnd, GWLP_USERDATA));
+                if (eng && url && url[0]) eng->Navigate(hWnd, url);
+                free(url);
+            } else {
+                AeonBridge::HandleWmAeonBridge(wParam, lParam);
+            }
+            return 0;
+        }
 
         case WM_DESTROY:
             PostQuitMessage(0);

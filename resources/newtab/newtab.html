@@ -525,13 +525,10 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
   // Direct URL if it looks like one
   if (/^https?:\/\//i.test(val) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/|$)/.test(val)) {
     var url = (/^https?:\/\//i.test(val)) ? val : 'https://' + val;
-    // Pass to Aeon core via the C++ bridge (aeon.navigate is registered by EraChrome)
-    if (window.aeon && window.aeon.navigate) { aeon.navigate(url); }
-    else { location.href = url; }
+    try { window.aeonBridge?.navigate(url); } catch(_) { location.href = url; }
   } else {
     var searchUrl = ENGINES[activeEngine] + encodeURIComponent(val);
-    if (window.aeon && window.aeon.navigate) { aeon.navigate(searchUrl); }
-    else { location.href = searchUrl; }
+    try { window.aeonBridge?.navigate(searchUrl); } catch(_) { location.href = searchUrl; }
   }
 });
 
@@ -541,9 +538,13 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
 // { adblock: true, tor: false, https_upgrade: true, fp_guard: true }
 // =========================================================
 function updatePrivacy() {
-  var s = (window.aeon && window.aeon.settings) ? aeon.settings : {
-    adblock: true, tor: false, https_upgrade: true, fp_guard: true
-  };
+  // Use __aeon (injected by AeonBridge::BuildInjectionScript) or legacy window.aeon
+  var s = (window.__aeon && window.__aeon.settings) ? window.__aeon.settings
+        : (window.aeon  && window.aeon.settings)    ? window.aeon.settings
+        : { adblock: true, tor_enabled: false, https_upgrade: true, fingerprint_guard: true };
+
+  // Network info
+  var net = (window.__aeon && window.__aeon.network) ? window.__aeon.network : {};
 
   function setDot(id, labelId, active, onText, offText) {
     var dot = document.getElementById(id);
@@ -557,20 +558,20 @@ function updatePrivacy() {
     }
   }
 
-  setDot('dot-adblock', 'label-adblock', s.adblock,       'AdBlock ON',   'AdBlock OFF');
-  setDot('dot-tor',     'label-tor',     s.tor,           'Tor ON',       'Tor OFF');
-  setDot('dot-https',   'label-https',   s.https_upgrade, 'HTTPS upgrade','HTTP only');
-  setDot('dot-fp',      'label-fp',      s.fp_guard,      'FP Guard ON',  'FP Guard OFF');
+  setDot('dot-adblock', 'label-adblock', s.adblock,           'AdBlock ON',   'AdBlock OFF');
+  setDot('dot-tor',     'label-tor',     s.tor_enabled,       'Tor ON',       'Tor OFF');
+  setDot('dot-https',   'label-https',   s.https_upgrade,     'HTTPS upgrade','HTTP only');
+  setDot('dot-fp',      'label-fp',      s.fingerprint_guard, 'FP Guard ON',  'FP Guard OFF');
 
-  // Firewall Mode indicator
-  if (s.firewall_mode) {
+  // Firewall / bypass indicator
+  if (s.bypass_enabled || net.bypass_active) {
     document.getElementById('fw-status').style.display = 'flex';
-    document.getElementById('label-fw').textContent = '🔥 ' + (s.active_transport || 'Firewall Mode');
+    document.getElementById('label-fw').textContent = '🛡 DPI Bypass';
   }
-  // Network Sentinel auto-bypass indicator
-  if (s.sentinel_bypass) {
+  // Corporate/firewall network type
+  if (net.type && net.type !== 'Open' && net.type !== 'ISP_Throttle') {
     document.getElementById('sentinel-status').style.display = 'flex';
-    document.getElementById('label-sentinel').textContent = '🛡 ' + (s.sentinel_mode || 'Auto Bypass');
+    document.getElementById('label-sentinel').textContent = '🔍 ' + net.type;
   }
 }
 updatePrivacy();
