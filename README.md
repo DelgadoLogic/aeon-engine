@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="resources/images/banner.png" alt="Aeon Browser by DelgadoLogic" width="100%">
+![Aeon Browser by DelgadoLogic](resources/images/banner.png)
 
 <br><br>
 
-<img src="resources/images/icon_medium.png" alt="Aeon Icon" width="64">
+![Aeon Icon](resources/images/icon_medium.png)
 
 # Aeon Browser
 
@@ -36,21 +36,17 @@ It ships bundled inside the **[LogicFlow](https://delgadologic.tech/logicflow)**
 
 ## 🖥️ UI Preview
 
-<div align="center">
-<img src="resources/images/ui_mockup.png" alt="Aeon Browser UI — dark mode new tab page" width="90%">
-<br>
-<sub><i>Aeon Browser — dark mode new tab page with aurora background, live clock, and speed dial</i></sub>
-</div>
+![Aeon Browser UI — dark mode new tab page](resources/images/ui_mockup.png)
+
+*Aeon Browser — dark mode new tab page with aurora background, live clock, and speed dial*
 
 ---
 
 ## 🖱️ App Menu (Three-Dot Menu)
 
-<div align="center">
-<img src="resources/images/app_menu.png" alt="Aeon Browser App Menu" width="340">
-<br>
-<sub><i>Aeon's Chrome-style app menu — includes unique 🔥 Firewall Mode and 🛡 Network Sentinel quick-access</i></sub>
-</div>
+![Aeon Browser App Menu](resources/images/app_menu.png)
+
+*Aeon's Chrome-style app menu — includes 🔥 Firewall Mode and 🛡 Network Sentinel quick-access*
 
 ---
 
@@ -183,16 +179,12 @@ AeonBrowser/
 
 ## 🖼️ Icon Pack
 
-<div align="center">
-
-| 16px | 32px | 48px | 64px | 128px | 256px |
-|------|------|------|------|-------|-------|
-| <img src="resources/images/icon_small.png" width="16"> | <img src="resources/images/icon_small.png" width="32"> | <img src="resources/images/icon_medium.png" width="48"> | <img src="resources/images/icon_medium.png" width="64"> | <img src="resources/images/icon_large.png" width="128"> | <img src="resources/images/icon_large.png" width="128"> |
-| Taskbar | Start Menu | Desktop | Explorer | Large | HiDPI |
+| Small | Medium | Large |
+|-------|--------|-------|
+| ![16px icon](resources/images/icon_small.png) | ![Medium icon](resources/images/icon_medium.png) | ![Large icon](resources/images/icon_large.png) |
+| 16 / 32px | 48 / 64px | 128 / 256px |
 
 *All sizes baked into a single `Aeon.ico` using `resources/icons/build_icon.ps1`*
-
-</div>
 
 ---
 
@@ -283,14 +275,12 @@ Third-party component licenses:
 
 ---
 
-<div align="center">
+---
 
-<img src="resources/images/icon_medium.png" width="48">
+![Aeon Icon](resources/images/icon_medium.png)
 
 **Aeon Browser by DelgadoLogic**
 
 *Timeless. From Windows 3.1 to Windows 11.*
 
-[🌐 delgadologic.tech](https://delgadologic.tech) &nbsp;·&nbsp; [📦 LogicFlow](https://delgadologic.tech/logicflow) &nbsp;·&nbsp; [🐛 Issues](https://github.com/DelgadoLogic/AeonBrowser/issues) &nbsp;·&nbsp; [📧 Support](https://delgadologic.tech/support)
-
-</div>
+[🌐 delgadologic.tech](https://delgadologic.tech) · [📦 LogicFlow](https://delgadologic.tech/logicflow) · [🐛 Issues](https://github.com/DelgadoLogic/AeonBrowser/issues) · [📧 Support](https://delgadologic.tech/support)
