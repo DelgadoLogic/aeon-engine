@@ -4,7 +4,7 @@
 
 <br/>
 
-<img src="assets/aeon_icon.png" alt="Aeon Browser Icon" width="120"/>
+<img src="resources/images/icon_badge.png" alt="Aeon Browser Icon" width="120"/>
 
 # Aeon Browser
 

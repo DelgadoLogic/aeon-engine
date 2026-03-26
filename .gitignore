@@ -113,5 +113,7 @@ billing/
 BRAINSTORM.md
 Gemini_Generated_Image*.jpg
 *.jpg
+# Exception: allow committed installer preview
+!resources/images/installer_preview.jpg
 billing/
 assets/icons/raw/
