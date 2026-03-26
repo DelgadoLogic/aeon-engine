@@ -78,3 +78,11 @@ cmake_install.cmake
 # === Logs ===
 *.log
 crash_reports/
+
+# Rust build output
+router/target/
+*/target/
+*.d
+# Temp push scripts
+aeon_push_all.ps1
+push_to_github.ps1
