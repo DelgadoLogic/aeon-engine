@@ -86,3 +86,21 @@ router/target/
 # Temp push scripts
 aeon_push_all.ps1
 push_to_github.ps1
+
+# Build output logs
+build_*.txt
+build_resume*.txt
+
+# Local research cache (not source code)
+_research/
+research/
+
+# Local dist artifacts (uploaded to GCS, not committed)
+dist_beta/
+
+# Misc
+BRAINSTORM.md
+Gemini_Generated_Image*.jpg
+*.jpg
+billing/
+assets/icons/raw/

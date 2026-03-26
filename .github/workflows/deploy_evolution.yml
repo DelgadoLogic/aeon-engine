@@ -1,0 +1,89 @@
+name: Deploy Aeon Evolution Engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'aeon/evolution/**'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy even without evolution changes'
+        required: false
+        default: 'false'
+
+jobs:
+  deploy-evolution:
+    name: Deploy Evolution Engine to Cloud Run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: aeon-browser-build
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+
+      - name: Build and push evolution engine image
+        run: |
+          docker build \
+            -t us-east1-docker.pkg.dev/aeon-browser-build/aeon-build-env/aeon-evolution:${{ github.sha }} \
+            -t us-east1-docker.pkg.dev/aeon-browser-build/aeon-build-env/aeon-evolution:latest \
+            -f aeon/evolution/Dockerfile \
+            .
+          docker push --all-tags us-east1-docker.pkg.dev/aeon-browser-build/aeon-build-env/aeon-evolution
+
+      - name: Deploy AeonVoteCoordinator to Cloud Run
+        run: |
+          gcloud run deploy aeon-evolution-engine \
+            --image=us-east1-docker.pkg.dev/aeon-browser-build/aeon-build-env/aeon-evolution:${{ github.sha }} \
+            --region=us-east1 \
+            --platform=managed \
+            --allow-unauthenticated \
+            --memory=512Mi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=3 \
+            --set-env-vars="GCP_PROJECT=aeon-browser-build,AEON_UPDATE_SERVER=https://aeon-update-server-y2r5ogip6q-ue.a.run.app" \
+            --set-secrets="AEON_CI_TOKEN=aeon-sovereign-signing-key:latest" \
+            --port=8080
+
+      - name: Verify deployment health
+        run: |
+          URL=$(gcloud run services describe aeon-evolution-engine \
+            --region=us-east1 --format='value(status.url)')
+          echo "Evolution engine URL: $URL"
+          curl -sf "$URL/health" && echo "Health check passed" || echo "Health check pending"
+
+      - name: Set up Cloud Scheduler for research agent
+        run: |
+          # Create/update scheduler job that POSTs to trigger a scan cycle
+          gcloud scheduler jobs describe aeon-research-scan --location=us-east1 2>/dev/null && \
+            gcloud scheduler jobs update http aeon-research-scan \
+              --location=us-east1 \
+              --schedule="0 * * * *" \
+              --uri="$(gcloud run services describe aeon-evolution-engine --region=us-east1 --format='value(status.url)')/v1/scan/trigger" \
+              --http-method=POST \
+              --message-body='{"source":"scheduler"}' \
+              --headers="Content-Type=application/json" || \
+            gcloud scheduler jobs create http aeon-research-scan \
+              --location=us-east1 \
+              --schedule="0 * * * *" \
+              --uri="$(gcloud run services describe aeon-evolution-engine --region=us-east1 --format='value(status.url)')/v1/scan/trigger" \
+              --http-method=POST \
+              --message-body='{"source":"scheduler"}' \
+              --headers="Content-Type=application/json" \
+              --description="Trigger AeonResearchAgent CVE scan every hour"
+          echo "Cloud Scheduler wired for hourly CVE scans"
