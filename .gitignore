@@ -98,6 +98,17 @@ research/
 # Local dist artifacts (uploaded to GCS, not committed)
 dist_beta/
 
+# === CONFIDENTIAL — NEVER PUSH TO ANY REMOTE ===
+AEON_MASTER_PLAN.md
+AEON_SERVICES.md
+docs/UI_DESIGN_SPEC.md
+docs/INTERNAL_*
+docs/*_CONFIDENTIAL*
+*_MASTER_PLAN*.md
+*_CONFIDENTIAL*.md
+*.internal.md
+billing/
+
 # Misc
 BRAINSTORM.md
 Gemini_Generated_Image*.jpg
