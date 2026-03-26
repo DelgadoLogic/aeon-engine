@@ -22,6 +22,28 @@
 #include <thread>
 #include <atomic>
 
+// Internal extended task struct (maps to public DownloadItem for external callers)
+enum class DLStatus : uint8_t { Idle=0, Queued, Downloading, Paused, Complete, Error, Cancelled };
+
+struct DownloadTask {
+    uint64_t   id;
+    char       url[2048];
+    char       filename[512];
+    char       destPath[512];
+    char       dest_path[512];   // same as destPath, used by worker
+    char       error_msg[256];   // human-readable error string
+    uint64_t   totalBytes;
+    uint64_t   receivedBytes;
+    uint64_t   size;             // alias for totalBytes
+    uint64_t   received;         // alias for receivedBytes
+    LONGLONG   speed_bps;        // bytes/sec
+    int        eta_sec;          // time remaining
+    DLStatus   status;
+    int        errorCode;
+    HANDLE     hThread;
+    bool       cancelFlag;
+};
+
 #pragma comment(lib, "wininet.lib")
 
 namespace DownloadManager {
@@ -239,7 +261,7 @@ bool Init(const char* download_dir) {
     return g_hInternet != nullptr;
 }
 
-int StartDownload(const char* url, const char* filename_hint) {
+uint64_t StartDownload(const char* url, const char* filename_hint) {
     if (!url || !g_hInternet) return -1;
 
     std::string fname = filename_hint && filename_hint[0]

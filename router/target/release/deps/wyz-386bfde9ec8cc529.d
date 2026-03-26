@@ -1,0 +1,11 @@
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\wyz-386bfde9ec8cc529.d: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\bidi.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\comu.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\fmt.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\range.rs
+
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\libwyz-386bfde9ec8cc529.rlib: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\bidi.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\comu.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\fmt.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\range.rs
+
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\libwyz-386bfde9ec8cc529.rmeta: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\bidi.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\comu.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\fmt.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\range.rs
+
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\lib.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\bidi.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\comu.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\fmt.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wyz-0.5.1\src\range.rs:

@@ -13,6 +13,8 @@
 //   - Click: navigates to aeon://downloads
 
 #include "DownloadButton.h"
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
 #include <windowsx.h>
 #include <cmath>
 #include <cstdio>
@@ -125,7 +127,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
         // Tooltip
         {
-            HWND tip = CreateWindowExW(0,TOOLTIPS_CLASS,nullptr,WS_POPUP|TTS_ALWAYSTIP,
+            HWND tip = CreateWindowExW(0,L"tooltips_class32",nullptr,WS_POPUP|TTS_ALWAYSTIP,
                 0,0,0,0,hWnd,nullptr,g_hInst,nullptr);
             TOOLINFOW ti = {}; ti.cbSize=sizeof(ti); ti.uFlags=TTF_SUBCLASS|TTF_IDISHWND;
             ti.hwnd=hWnd; ti.uId=(UINT_PTR)hWnd; ti.lpszText=(LPWSTR)L"Downloads (Ctrl+J)";

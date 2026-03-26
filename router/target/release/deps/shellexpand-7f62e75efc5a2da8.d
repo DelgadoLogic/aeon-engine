@@ -1,0 +1,10 @@
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\shellexpand-7f62e75efc5a2da8.d: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\strings.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\wtraits.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\funcs.rs
+
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\libshellexpand-7f62e75efc5a2da8.rlib: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\strings.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\wtraits.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\funcs.rs
+
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\libshellexpand-7f62e75efc5a2da8.rmeta: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\strings.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\wtraits.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\funcs.rs
+
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\lib.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\strings.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\wtraits.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\shellexpand-3.1.2\src\funcs.rs:

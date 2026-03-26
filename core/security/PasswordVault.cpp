@@ -32,7 +32,7 @@
 // In production this is refactored into a VaultDB class. For v1.0 we vendor
 // sqlite3_exec calls directly — same pattern as HistoryEngine.cpp.
 extern "C" {
-    #include "../../history/sqlite3.h"
+    #include "../history/sqlite3.h"
 }
 #pragma comment(lib, "crypt32.lib")
 

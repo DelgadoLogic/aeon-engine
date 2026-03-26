@@ -18,6 +18,9 @@ extern "C" {
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <vector>
+#include <string>
+#include <algorithm>
 #include <ctime>
 #include <mutex>
 
@@ -120,8 +123,8 @@ void RecordVisit(const char* url, const char* title, const char* favicon_b64) {
         "VALUES (?1, ?2, ?3, 1, ?4) "
         "ON CONFLICT(url) DO UPDATE SET "
         "  title = excluded.title, "
-        "  visit_time = excluded.visit_time, "
-        "  visit_count = history.visit_count + 1, "
+        "  visit_time = excluded.visitTime, "
+        "  visit_count = history.visitCount + 1, "
         "  favicon_b64 = excluded.favicon_b64;";
 
     sqlite3_stmt* stmt = nullptr;
@@ -154,8 +157,8 @@ std::vector<HistoryEntry> GetRecent(int limit) {
         };
         strncpy_s(e.url,        col(0), sizeof(e.url)-1);
         strncpy_s(e.title,      col(1), sizeof(e.title)-1);
-        e.visit_time  = (LONGLONG)sqlite3_column_int64(stmt, 2);
-        e.visit_count = sqlite3_column_int(stmt, 3);
+        e.visitTime  = (LONGLONG)sqlite3_column_int64(stmt, 2);
+        e.visitCount = sqlite3_column_int(stmt, 3);
         out.push_back(e);
     }
     sqlite3_finalize(stmt);
@@ -175,11 +178,11 @@ std::vector<HistoryEntry> Search(const char* query) {
     ftsQuery += "\"";
 
     const char* sql =
-        "SELECT h.url, h.title, h.visit_time, h.visit_count "
+        "SELECT h.url, h.title, h.visitTime, h.visitCount "
         "FROM history h "
         "JOIN history_fts f ON h.id = f.rowid "
         "WHERE history_fts MATCH ? "
-        "ORDER BY h.visit_time DESC LIMIT 50;";
+        "ORDER BY h.visitTime DESC LIMIT 50;";
 
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(g_db, sql, -1, &stmt, nullptr);
@@ -193,8 +196,8 @@ std::vector<HistoryEntry> Search(const char* query) {
         };
         strncpy_s(e.url,   col(0), sizeof(e.url)-1);
         strncpy_s(e.title, col(1), sizeof(e.title)-1);
-        e.visit_time  = (LONGLONG)sqlite3_column_int64(stmt, 2);
-        e.visit_count = sqlite3_column_int(stmt, 3);
+        e.visitTime  = (LONGLONG)sqlite3_column_int64(stmt, 2);
+        e.visitCount = sqlite3_column_int(stmt, 3);
         out.push_back(e);
     }
     sqlite3_finalize(stmt);
@@ -221,8 +224,8 @@ void WipeAll() {
 bool IsPrivate() { return g_incognito; }
 
 // ─── Bookmarks ────────────────────────────────────────────────────────────────
-void AddBookmark(const char* url, const char* title, const char* folder) {
-    if (!g_db || !url) return;
+bool AddBookmark(const char* url, const char* title, const char* folder) {
+    if (!g_db || !url) return false;
     std::lock_guard<std::mutex> lock(g_mu);
 
     FILETIME ft; GetSystemTimeAsFileTime(&ft);
@@ -238,6 +241,16 @@ void AddBookmark(const char* url, const char* title, const char* folder) {
     sqlite3_bind_text(stmt, 2, title,  -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, folder ? folder : "Bookmarks", -1, SQLITE_TRANSIENT);
     sqlite3_bind_int64(stmt, 4, (sqlite3_int64)ms);
+    int rc = sqlite3_step(stmt); sqlite3_finalize(stmt);
+    return rc == SQLITE_DONE;
+}
+
+void DeleteBookmark(uint64_t id) {
+    if (!g_db) return;
+    std::lock_guard<std::mutex> lock(g_mu);
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(g_db, "DELETE FROM bookmarks WHERE id = ?;", -1, &stmt, nullptr);
+    sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id);
     sqlite3_step(stmt); sqlite3_finalize(stmt);
 }
 
@@ -250,8 +263,8 @@ void DeleteBookmark(const char* url) {
     sqlite3_step(stmt); sqlite3_finalize(stmt);
 }
 
-std::vector<BookmarkEntry> GetBookmarks() {
-    std::vector<BookmarkEntry> out;
+std::vector<Bookmark> GetBookmarks() {
+    std::vector<Bookmark> out;
     if (!g_db) return out;
     std::lock_guard<std::mutex> lock(g_mu);
     sqlite3_stmt* stmt = nullptr;
@@ -259,7 +272,7 @@ std::vector<BookmarkEntry> GetBookmarks() {
         "SELECT url, title, folder, added_time FROM bookmarks ORDER BY added_time DESC;",
         -1, &stmt, nullptr);
     while (sqlite3_step(stmt) == SQLITE_ROW) {
-        BookmarkEntry e = {};
+        Bookmark e = {};
         auto col = [&](int i) -> const char* {
             auto* t = sqlite3_column_text(stmt,i);
             return t ? reinterpret_cast<const char*>(t) : "";

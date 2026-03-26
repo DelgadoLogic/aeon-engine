@@ -1,68 +1,80 @@
+# =============================================================================
 # Aeon Browser — .gitignore
-# DelgadoLogic
+# Repo: aeon-engine (DelgadoLogic/aeon-engine)
+# Rule: Only our code goes in. Never upstream clones. Never build output.
+# =============================================================================
 
-# Build outputs
-/build/
-/bin/
-/obj/
-/dist/
-*.exe
-*.dll
-*.lib
+# === Upstream Research Repos (read-only reference, tracked in aeon-research) ===
+research/ai-engines/
+research/browser-agent/
+research/circumvention/
+research/distributed-compute/
+research/engine/
+research/federated/
+research/native-components/
+research/p2p/
+research/personal-ai/
+research/privacy_testing/
+research/self-improving/
+research/ui_logic/
+
+# === Chromium Build Output ===
+out/
+build/
+gen/
+*.obj
 *.pdb
-*.ilk
+*.lib
 *.exp
+*.ilk
 *.map
-*.ncb
-*.sdf
-*.aps
+*.idb
+*.ipdb
+*.ipch
+*.VC.db
+*.VC.VC.opendb
+
+# === Model / Dict Binaries (released via aeon-models / aeon-dicts) ===
+translate/models/**/*.ctm2
+spell/dicts/*.bdic
+
+# === Sovereign Keys — NEVER COMMIT ===
+sovereign/keys/
+sovereign/*.pem
+sovereign/*.key
+sovereign/*.ed25519
+*.private
+*.secret
+
+# === Windows System ===
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# === IDE / VS ===
+.vs/
+*.vcxproj.user
 *.suo
 *.user
-.vs/
+*.userosscache
+*.sln.docstates
+.vscode/
+*.code-workspace
+__pycache__/
+*.pyc
 
-# Rust build
-/router/target/
-Cargo.lock
+# === GN / Ninja ===
+.ninja_deps
+.ninja_log
+args.gn.bak
 
-# CMake
-CMakeCache.txt
+# === CMake ===
 CMakeFiles/
+CMakeCache.txt
 cmake_install.cmake
-CTestTestfile.cmake
-_deps/
 
-# SQLite amalgamation (vendor separately — too large for git)
-/history/sqlite3.c
-/history/sqlite3.h
-
-# WolfSSL (vendor separately)
-/retro/wolfssl/
-/tls/wolfssl/
-
-# Compiled retro tier
-/retro/*.obj
-/retro/*.map
-/retro/AEON16.EXE
-
-# OS / Editor artifacts
-Thumbs.db
-Desktop.ini
-.DS_Store
-*.swp
-*.orig
-*.bak
-
-# Publish artifacts
-/publish/
-
-# User data (never commit user data)
-*.db
-*.db-wal
-*.db-shm
-settings.json
-session.json
-crash_*.dmp
-AeonCrash*.log
-
-# Logs
+# === Logs ===
 *.log
+crash_reports/

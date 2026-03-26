@@ -1,3 +1,5 @@
+#define WIN32_LEAN_AND_MEAN
+#define _WINSOCKAPI_
 // AeonBrowser — CircumventionEngine.cpp
 // DelgadoLogic | Lead Network Engineer
 //
@@ -105,8 +107,8 @@ static bool SetDoHResolver(const char* resolverUrl) {
     fprintf(stdout, "[Circumvention] Setting DoH resolver: %s\n", resolverUrl);
     // TlsAbstraction::SetDoHResolver(resolverUrl);
     // For now: configure globally in settings and restart DNS thread
-    strncpy_s(g_settings.doh_resolver, resolverUrl,
-        sizeof(g_settings.doh_resolver) - 1);
+    strncpy_s(g_settings.doh_provider, resolverUrl,
+        sizeof(g_settings.doh_provider) - 1);
     return true;
 }
 

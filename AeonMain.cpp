@@ -2,32 +2,37 @@
 // DelgadoLogic
 //
 // Main entry point — Win32 WinMain.
-// Runs HardwareProbe, loads the right engine tier, starts NetworkSentinel,
-// then creates the BrowserChrome window.
+// Uses AeonProbe::RunProbe() for tier detection, TierDispatcher_LoadEngine() for
+// engine DLL loading, and AeonBridge::Init() for JS↔C++ communication.
 
 #include <windows.h>
+#include <dwmapi.h>
+#include <shlobj.h>
+#include <cstdio>
+
+#pragma comment(lib, "dwmapi.lib")
+
 #include "core/probe/HardwareProbe.h"
-#include "core/engine/TierDispatcher.h"
+#include "core/engine/AeonEngine_Interface.h"
 #include "core/engine/AeonBridge.h"
 #include "core/ui/BrowserChrome.h"
 #include "core/network/NetworkSentinel.h"
-#include "core/network/CircumventionEngine.h"
 #include "core/settings/SettingsEngine.h"
 #include "core/memory/TabSleepManager.h"
 #include "core/security/PasswordVault.h"
 #include "updater/AutoUpdater.h"
-#include <cstdio>
-#include <shlobj.h>
 
 #define AEON_WINDOW_CLASS L"AeonBrowserHost"
-#define AEON_TITLE        L"Aeon Browser — by DelgadoLogic"
+#define AEON_TITLE        L"Aeon Browser \u2014 by DelgadoLogic"
 
-// ─── Forward declarations ────────────────────────────────────────────────
+// Forward declarations
 LRESULT CALLBACK AeonWndProc(HWND, UINT, WPARAM, LPARAM);
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int nShowCmd) {
+// Declared in TierDispatcher.cpp — loads the engine DLL chain
+AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile);
 
-    // ── 0. Allocate debug console on Debug builds ──────────────────────
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
+
 #ifdef _DEBUG
     AllocConsole();
     FILE* f; freopen_s(&f, "CONOUT$", "w", stdout);
@@ -35,67 +40,52 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int nShowCmd
 #endif
 
     fprintf(stdout, "\n");
-    fprintf(stdout, "╔══════════════════════════════════════╗\n");
-    fprintf(stdout, "║  Aeon Browser  —  by DelgadoLogic    ║\n");
-    fprintf(stdout, "║  delgadologic.tech/aeon              ║\n");
-    fprintf(stdout, "╚══════════════════════════════════════╝\n\n");
+    fprintf(stdout, "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n");
+    fprintf(stdout, "\u2551  Aeon Browser  \u2014  by DelgadoLogic    \u2551\n");
+    fprintf(stdout, "\u2551  delgadologic.tech/aeon              \u2551\n");
+    fprintf(stdout, "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n");
 
-    // ── 1. Hardware probe — detect OS tier + CPU ───────────────────────
-    const SystemProfile* profile = HardwareProbe::Run();
-    fprintf(stdout, "[Boot] Tier: %s | OS: %s | CPU: %s | RAM: %d MB\n",
-        profile->tier_name, profile->os_name,
-        profile->has_sse2 ? "SSE2+" : "Legacy",
-        profile->ram_mb);
+    // 1. Hardware probe — detect OS tier + CPU
+    SystemProfile profile = {};
+    AeonTier tier = AeonProbe::RunProbe(profile);
+    fprintf(stdout, "[Boot] Tier: %s | OS: %u.%u.%u | Cores: %d | RAM: %.0f MB\n",
+        AeonProbe::TierName(tier),
+        profile.osMajor, profile.osMinor, profile.osBuild,
+        (int)profile.cpu.cores,
+        (double)profile.ramBytes / (1024.0 * 1024.0));
 
-    // ── 2. Load settings ───────────────────────────────────────────────
+    // 2. Load settings
     AeonSettings settings = SettingsEngine::Load();
 
-    // ── 3. Initialize Password Vault ───────────────────────────────────
-    char vaultPath[MAX_PATH];
-    char appData[MAX_PATH];
+    // 3. Initialize Password Vault
+    char appData[MAX_PATH] = {};
     SHGetFolderPathA(nullptr, CSIDL_APPDATA, nullptr, 0, appData);
-    _snprintf_s(vaultPath, sizeof(vaultPath), _TRUNCATE,
-        "%s\\DelgadoLogic\\Aeon\\vault.db", appData);
-    CreateDirectoryA(vaultPath, nullptr); // no-op if exists
-    // Trim trailing filename from dir creation (create parent dir only)
     char vaultDir[MAX_PATH];
-    strncpy_s(vaultDir, vaultPath, sizeof(vaultDir)-1);
-    char* lastSlash = strrchr(vaultDir, '\\');
-    if (lastSlash) { *lastSlash = '\0'; CreateDirectoryA(vaultDir, nullptr); }
+    _snprintf_s(vaultDir, sizeof(vaultDir), _TRUNCATE, "%s\\DelgadoLogic\\Aeon", appData);
+    CreateDirectoryA(vaultDir, nullptr);
+    char vaultPath[MAX_PATH];
+    _snprintf_s(vaultPath, sizeof(vaultPath), _TRUNCATE, "%s\\vault.db", vaultDir);
     PasswordVault::Init(vaultPath);
 
-    // ── 4. Load engine DLL for this tier ──────────────────────────────
-    AeonEngineVTable* engine = TierDispatcher::LoadEngine(profile);
+    // 4. Load rendering engine DLL for this tier
+    AeonEngineVTable* engine = TierDispatcher_LoadEngine(&profile);
     if (!engine) {
         MessageBoxA(nullptr,
             "Aeon could not load a rendering engine for your system.\n"
             "Please visit delgadologic.tech/aeon for troubleshooting.",
-            "Aeon Browser — Engine Error", MB_ICONERROR);
+            "Aeon Browser \u2014 Engine Error", MB_ICONERROR);
         return 1;
     }
 
-    // ── 5. Network Sentinel — auto-detect restriction + bypass ────────
-    //   This runs BEFORE drawing any UI so the first request is already
-    //   behind the best available bypass layer.
-    fprintf(stdout, "[Boot] Running Network Sentinel...\n");
-    auto netEnv = NetworkSentinel::Analyze();
-    NetworkSentinel::ApplyBestStrategy();
-    NetworkSentinel::StartMonitor(); // background re-probe every 30s
+    // 5. Tab Sleep Manager
+    TabSleepManager::Initialize((unsigned int)tier);
 
-    // If firewall mode was saved ON in settings, also engage CircumventionEngine
-    if (settings.firewall_mode && !netEnv.captive_portal) {
-        CircumventionEngine::Enable(settings.ss_uri);
-    }
-
-    // ── 6. Tab Sleep Manager ───────────────────────────────────────────
-    TabSleepManager::Start();
-
-    // ── 7. Auto-updater (background, silent) ──────────────────────────
+    // 6. Auto-updater (async background — starts immediately, non-blocking)
     if (settings.auto_update) {
         AutoUpdater::CheckAsync(settings.update_channel);
     }
 
-    // ── 8. Create main window ──────────────────────────────────────────
+    // 7. Create main window
     WNDCLASSEXW wc   = {};
     wc.cbSize        = sizeof(wc);
     wc.style         = CS_HREDRAW | CS_VREDRAW;
@@ -107,13 +97,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int nShowCmd
     wc.lpszClassName = AEON_WINDOW_CLASS;
     RegisterClassExW(&wc);
 
-    int W = GetSystemMetrics(SM_CXSCREEN) * 85 / 100;  // 85% of screen
+    int W = GetSystemMetrics(SM_CXSCREEN) * 85 / 100;
     int H = GetSystemMetrics(SM_CYSCREEN) * 85 / 100;
     int X = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
     int Y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
 
     // WS_EX_NOREDIRECTIONBITMAP: required for DWM Mica/Acrylic (Win11)
-    DWORD exStyle = (profile->tier >= OSTier::Modern)
+    DWORD exStyle = (profile.osMajor >= 10 && profile.osBuild >= 22000)
         ? WS_EX_NOREDIRECTIONBITMAP : 0;
 
     HWND hWnd = CreateWindowExW(
@@ -123,66 +113,58 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int nShowCmd
 
     if (!hWnd) return 1;
 
-    // Enable DWM Mica background on Windows 11
-    if (profile->tier >= OSTier::Modern) {
+    // Enable DWM Mica on Windows 11
+    if (profile.osBuild >= 22000) {
         MARGINS margins = { -1 };
         DwmExtendFrameIntoClientArea(hWnd, &margins);
-        // Mica: DWM_SYSTEMBACKDROP_MICA = 2
-        int backdropType = 2;
+        int backdropType = 2; // DWMSBT_MAINWINDOW (Mica)
         DwmSetWindowAttribute(hWnd, 38 /*DWMWA_SYSTEMBACKDROP_TYPE*/,
             &backdropType, sizeof(backdropType));
     }
 
-    // Store engine pointer in window data
+    // Store engine pointer in window USERDATA for WndProc
     SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(engine));
 
-    // ── AeonBridge — wire C++/JS bridge to this window ────────────────
-    // navigateFn: called from JS pages (settings, history, etc.) when
-    // window.aeonBridge.navigate(url) is invoked.
+    // 8. AeonBridge — wire JS↔C++ for all internal aeon:// pages
     AeonBridge::Init(hWnd, [](const char* url) {
-        // Post a WM_AEONBRIDGE navigate command to the UI thread
-        // so we don't navigate from an arbitrary thread.
         char* urlCopy = _strdup(url);
-        PostMessage(GetForegroundWindow(), WM_AEONBRIDGE,
-            BRIDGE_CMD_NAVIGATE, (LPARAM)urlCopy);
+        if (urlCopy)
+            PostMessage(GetForegroundWindow(), WM_AEONBRIDGE,
+                BRIDGE_CMD_NAVIGATE, (LPARAM)urlCopy);
     });
 
-    // Initialize browser chrome (draws the "A" badge, tab strip, nav bar)
-    BrowserChrome::Create(hWnd, profile, engine);
+    // 9. Browser chrome (tab strip, nav bar, WebView2 host)
+    BrowserChrome::Create(hWnd, &profile, engine);
 
-    // If captive portal detected — open it in a special tab immediately
-    if (NetworkSentinel::GetState().need_captive_portal) {
-        const char* portalUrl = NetworkSentinel::GetState().captive_portal_url;
-        if (engine && portalUrl[0]) {
-            engine->NewTab(hWnd, portalUrl);
-            fprintf(stdout, "[Boot] Captive portal tab opened: %s\n", portalUrl);
-        }
+    // Captive portal — open in first tab if detected
+    const NetworkSentinel::SentinelState& sentState = NetworkSentinel::GetState();
+    if (sentState.need_captive_portal && sentState.captive_portal_url[0]) {
+        if (engine) engine->NewTab(hWnd, sentState.captive_portal_url);
+        fprintf(stdout, "[Boot] Captive portal tab: %s\n", sentState.captive_portal_url);
     }
 
     ShowWindow(hWnd, nShowCmd);
     UpdateWindow(hWnd);
-
     fprintf(stdout, "[Boot] Ready.\n\n");
 
-    // ── 9. Message loop ────────────────────────────────────────────────
+    // 10. Message loop
     MSG msg = {};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
 
-    // ── 10. Cleanup ────────────────────────────────────────────────────
+    // 11. Cleanup
     NetworkSentinel::StopMonitor();
-    CircumventionEngine::Disable();
-    TabSleepManager::Stop();
+    TabSleepManager::Shutdown();
     PasswordVault::Lock();
-    if (engine) engine->Shutdown();
+    if (engine && engine->Shutdown) engine->Shutdown();
 
     fprintf(stdout, "[Boot] Aeon shutdown clean.\n");
     return (int)msg.wParam;
 }
 
-// ─── Window procedure ─────────────────────────────────────────────────────
+// Window procedure
 LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_PAINT: {
@@ -195,16 +177,16 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             return 0;
 
         case WM_ERASEBKGND:
-            return 1; // BrowserChrome handles background, prevent flicker
+            return 1;
 
         case WM_AEONBRIDGE: {
-            // Handle JS→C++ bridge messages posted from AeonBridge
             if ((int)wParam == BRIDGE_CMD_NAVIGATE) {
-                // lParam is a _strdup'd URL string
                 char* url = reinterpret_cast<char*>(lParam);
                 AeonEngineVTable* eng = reinterpret_cast<AeonEngineVTable*>(
                     GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                if (eng && url && url[0]) eng->Navigate(hWnd, url);
+                // Navigate signature: (tab_id, url, referrer)
+                if (eng && eng->Navigate && url && url[0])
+                    eng->Navigate(0, url, nullptr);
                 free(url);
             } else {
                 AeonBridge::HandleWmAeonBridge(wParam, lParam);

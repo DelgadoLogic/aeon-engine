@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aeon Browser — The Browser That Cannot Be Controlled</title>
+  <meta name="description" content="Aeon is the first browser that autonomously finds its own vulnerabilities, patches them, and distributes updates through a network no single company controls. Zero telemetry. Zero fingerprinting. Yours alone.">
+  <meta property="og:title" content="Aeon Browser — The Browser That Cannot Be Controlled">
+  <meta property="og:description" content="AI-powered. P2P distributed. Cryptographically sovereign. The browser that builds, patches, and improves itself.">
+  <meta property="og:image" content="https://aeonbrowser.com/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #04050a;
+      --bg2:       #080b14;
+      --bg3:       #0d1120;
+      --surface:   #111827;
+      --border:    rgba(99,130,255,0.12);
+      --accent:    #6382ff;
+      --accent2:   #a78bfa;
+      --glow:      rgba(99,130,255,0.25);
+      --text:      #e8eaf6;
+      --muted:     #8892b0;
+      --mono:      'JetBrains Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 48px;
+      height: 64px;
+      background: rgba(4,5,10,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+      text-decoration: none; color: var(--text);
+    }
+    .nav-logo .dot { width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+    .nav-links { display: flex; gap: 32px; }
+    .nav-links a { color: var(--muted); font-size: 14px; font-weight: 500;
+      text-decoration: none; transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: white; border: none;
+      padding: 8px 20px; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: opacity .2s, transform .15s;
+    }
+    .nav-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center;
+      padding: 120px 24px 80px;
+      position: relative; overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,130,255,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(167,139,250,0.08) 0%, transparent 60%);
+    }
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(70% 70% at 50% 0%, black, transparent);
+    }
+    .hero-content { position: relative; z-index: 1; max-width: 800px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(99,130,255,0.1); border: 1px solid var(--border);
+      border-radius: 100px; padding: 6px 16px; font-size: 13px;
+      font-weight: 500; color: var(--accent); margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .hero-badge .pulse {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); animation: pulse 2s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--glow); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 6px transparent; }
+    }
+    h1 {
+      font-size: clamp(48px, 8vw, 88px);
+      font-weight: 900;
+      line-height: 1.0;
+      letter-spacing: -3px;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+    h1 .gradient {
+      background: linear-gradient(135deg, #6382ff 0%, #a78bfa 50%, #60c8ff 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      font-size: 20px; color: var(--muted); margin-top: 24px;
+      max-width: 560px; margin-left: auto; margin-right: auto;
+      animation: fadeUp 0.7s 0.2s ease both;
+    }
+    .hero-actions {
+      display: flex; gap: 16px; justify-content: center;
+      margin-top: 40px; flex-wrap: wrap;
+      animation: fadeUp 0.7s 0.3s ease both;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white; border: none; padding: 14px 32px;
+      border-radius: 10px; font-size: 16px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      box-shadow: 0 0 30px rgba(99,130,255,0.35);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(99,130,255,0.55);
+    }
+    .btn-secondary {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border); padding: 14px 32px;
+      border-radius: 10px; font-size: 16px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: border-color .2s, background .2s;
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent); background: rgba(99,130,255,0.07);
+    }
+    .hero-note {
+      margin-top: 16px; font-size: 13px; color: var(--muted);
+      animation: fadeUp 0.7s 0.4s ease both;
+    }
+
+    /* ── Terminal demo ── */
+    .terminal-wrap {
+      margin-top: 72px; position: relative; z-index: 1;
+      animation: fadeUp 0.7s 0.45s ease both;
+    }
+    .terminal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 0;
+      max-width: 720px; margin: 0 auto;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,130,255,0.06);
+      overflow: hidden;
+    }
+    .terminal-bar {
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .terminal-bar .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .terminal-bar .dot:nth-child(1) { background: #ff5f57; }
+    .terminal-bar .dot:nth-child(2) { background: #febc2e; }
+    .terminal-bar .dot:nth-child(3) { background: #28c840; }
+    .terminal-bar .label { font-size: 12px; color: var(--muted); margin-left: 8px; font-family: var(--mono); }
+    .terminal-body { padding: 24px 28px; font-family: var(--mono); font-size: 13px; line-height: 1.9; }
+    .t-dim { color: #4a5568; }
+    .t-green { color: #68d391; }
+    .t-blue { color: #63b3ed; }
+    .t-purple { color: #b794f4; }
+    .t-yellow { color: #f6e05e; }
+    .t-red { color: #fc8181; }
+    .t-white { color: var(--text); }
+    .cursor { display: inline-block; width: 8px; height: 14px; background: var(--accent); animation: blink 1s step-end infinite; vertical-align: text-bottom; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 48px;
+      display: flex; justify-content: center; gap: 80px; flex-wrap: wrap;
+    }
+    .stat { text-align: center; }
+    .stat-number { font-size: 36px; font-weight: 800; color: var(--text); letter-spacing: -1px; }
+    .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .stat-number .accent { color: var(--accent); }
+
+    /* ── Features ── */
+    .section { padding: 100px 48px; max-width: 1200px; margin: 0 auto; }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+    .section-title { font-size: clamp(32px, 4vw, 52px); font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; }
+    .section-sub { font-size: 18px; color: var(--muted); margin-top: 16px; max-width: 520px; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px; margin-top: 64px;
+    }
+    .feature-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: border-color .25s, transform .2s;
+      position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute; top: -1px; left: 20px; right: 20px; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0; transition: opacity .3s;
+    }
+    .feature-card:hover { border-color: rgba(99,130,255,0.3); transform: translateY(-4px); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: rgba(99,130,255,0.1); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 20px;
+    }
+    .feature-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+    .feature-desc { font-size: 15px; color: var(--muted); line-height: 1.65; }
+
+    /* ── How it works ── */
+    .how-works { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .flow {
+      display: flex; flex-direction: column; gap: 0;
+      max-width: 680px; margin: 64px auto 0;
+    }
+    .flow-step {
+      display: flex; gap: 24px; position: relative; padding-bottom: 48px;
+    }
+    .flow-step:last-child { padding-bottom: 0; }
+    .flow-step:not(:last-child) .flow-line {
+      position: absolute; left: 19px; top: 44px; bottom: 0; width: 2px;
+      background: linear-gradient(180deg, var(--accent), transparent);
+    }
+    .flow-num {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--accent); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 800; flex-shrink: 0;
+      box-shadow: 0 0 20px var(--glow);
+    }
+    .flow-content { padding-top: 8px; }
+    .flow-content h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .flow-content p { font-size: 15px; color: var(--muted); }
+
+    /* ── Pro pricing ── */
+    .pricing-cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px; margin-top: 64px; max-width: 800px; margin-left: auto; margin-right: auto;
+    }
+    .pricing-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 40px 36px;
+      position: relative; transition: transform .2s;
+    }
+    .pricing-card.featured {
+      border-color: var(--accent);
+      background: linear-gradient(160deg, rgba(99,130,255,0.07), var(--bg2));
+      box-shadow: 0 0 60px rgba(99,130,255,0.1);
+    }
+    .pricing-card:hover { transform: translateY(-4px); }
+    .pricing-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--accent); color: white; font-size: 11px;
+      font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: 4px 16px; border-radius: 100px;
+    }
+    .pricing-tier { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+    .pricing-price { font-size: 52px; font-weight: 900; letter-spacing: -2px; }
+    .pricing-price span { font-size: 18px; font-weight: 500; color: var(--muted); }
+    .pricing-desc { font-size: 14px; color: var(--muted); margin-top: 8px; }
+    .pricing-features { list-style: none; margin: 28px 0; display: flex; flex-direction: column; gap: 12px; }
+    .pricing-features li { display: flex; align-items: center; gap: 12px; font-size: 15px; }
+    .pricing-features li::before { content: '✓'; color: var(--accent); font-weight: 700; }
+
+    /* ── Sovereignty section ── */
+    .sovereignty {
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99,130,255,0.06), transparent);
+      border-top: 1px solid var(--border);
+    }
+    .sovereignty-content {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px;
+      align-items: center; max-width: 1100px; margin: 0 auto;
+    }
+    .usb-visual {
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px;
+    }
+    .usb-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 32px;
+      font-family: var(--mono); font-size: 13px; line-height: 2;
+      box-shadow: 0 0 60px rgba(99,130,255,0.1), 0 32px 80px rgba(0,0,0,0.5);
+      width: 100%; max-width: 400px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--bg2); border-top: 1px solid var(--border);
+      padding: 48px; text-align: center;
+    }
+    footer p { color: var(--muted); font-size: 14px; }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .reveal {
+      opacity: 0; transform: translateY(32px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 768px) {
+      nav { padding: 0 20px; }
+      .nav-links { display: none; }
+      .section { padding: 64px 24px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .sovereignty-content { grid-template-columns: 1fr; gap: 40px; }
+      .stats-bar { gap: 40px; padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ── -->
+<nav>
+  <a class="nav-logo" href="/">
+    <span class="dot"></span>
+    Aeon Browser
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#pro">Pro</a>
+    <a href="https://github.com/aeonbrowser/aeon" target="_blank">GitHub</a>
+  </div>
+  <a class="nav-cta" href="#download" id="nav-download-btn">Download</a>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="pulse"></span>
+      Network online · 0 central servers
+    </div>
+    <h1>
+      The browser<br>
+      <span class="gradient">no one controls.</span>
+    </h1>
+    <p class="hero-sub">
+      Aeon finds its own vulnerabilities, patches them, and distributes
+      updates through a peer-to-peer network — with zero telemetry,
+      zero fingerprinting, and zero trust in anyone but you.
+    </p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="#download" id="hero-download-btn">
+        Download for Windows
+      </a>
+      <a class="btn-secondary" href="#how-it-works">
+        See how it works →
+      </a>
+    </div>
+    <p class="hero-note">Free · No account required · Open source</p>
+
+    <!-- Live terminal demo -->
+    <div class="terminal-wrap">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <span class="label">aeon:// — Autonomous Operations Log</span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+          <div><span class="t-dim">03:47:22</span> <span class="t-blue">AeonResearch</span> <span class="t-white">Scanning Chromium CVE database...</span></div>
+          <div><span class="t-dim">03:47:31</span> <span class="t-yellow">AeonResearch</span> <span class="t-white">Found: CVE-2025-4421 — V8 type confusion (Critical)</span></div>
+          <div><span class="t-dim">03:47:32</span> <span class="t-purple">AeonPatch   </span> <span class="t-white">Generating C++ patch via AeonMind...</span></div>
+          <div><span class="t-dim">03:48:01</span> <span class="t-green">AeonPatch   </span> <span class="t-white">Patch ready. Signing with master key...</span></div>
+          <div><span class="t-dim">03:48:02</span> <span class="t-green">AeonUpdate  </span> <span class="t-white">Emergency patch distributed to 847 peers ✓</span></div>
+          <div><span class="t-dim">03:48:02</span> <span class="t-dim">Silence     </span> <span class="t-white">User online — all operations paused</span></div>
+          <div><span class="t-dim">04:12:00</span> <span class="t-dim">Silence     </span> <span class="t-white">User idle — operations resumed</span></div>
+          <div><span class="t-dim">04:12:01</span> <span class="t-green">AutoUpdater </span> <span class="t-white">Patch installed silently. Browser protected. <span class="cursor"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-number"><span class="accent">0</span></div>
+    <div class="stat-label">Central servers</div>
+  </div>
+  <div class="stat">
+    <div class="stat-number"><span class="accent">0</span></div>
+    <div class="stat-label">Telemetry calls</div>
+  </div>
+  <div class="stat">
+    <div class="stat-number"><span class="accent">Ed25519</span></div>
+    <div class="stat-label">Update verification</div>
+  </div>
+  <div class="stat">
+    <div class="stat-number"><span class="accent">100%</span></div>
+    <div class="stat-label">Yours</div>
+  </div>
+</div>
+
+<!-- ── Features ── -->
+<section class="section" id="features">
+  <div class="reveal">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Built differently.<br>On purpose.</h2>
+    <p class="section-sub">Every design decision was a deliberate rejection of how browsers are normally built.</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card reveal">
+      <div class="feature-icon">🧠</div>
+      <div class="feature-title">AeonMind — Local AI</div>
+      <div class="feature-desc">A full LLM runs on your device. It answers questions, summarizes pages, and powers the omnibox — without any request ever leaving your machine.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🔬</div>
+      <div class="feature-title">Autonomous CVE Research</div>
+      <div class="feature-desc">A research agent scans 50+ security databases every 6 hours. When it finds something critical, Aeon patches itself before most browsers know the CVE exists.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🕸️</div>
+      <div class="feature-title">P2P Update Distribution</div>
+      <div class="feature-desc">Updates are signed, chunked, and distributed peer-to-peer. There's no update server to hack, seize, or take down. The network is the server.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">👁️</div>
+      <div class="feature-title">Fingerprint Randomization</div>
+      <div class="feature-desc">Every session presents a different browser fingerprint. Navigator, Canvas, WebGL, audio — all randomized. You look like a different person every time.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🔑</div>
+      <div class="feature-title">Sovereign Control</div>
+      <div class="feature-desc">The network has exactly one master key. One person — the user — can issue override commands from a USB drive, from anywhere on the planet.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🔇</div>
+      <div class="feature-title">Absolute Silence</div>
+      <div class="feature-desc">All background operations — research, compilation, patching, seeding — pause when you're active. You will never notice the network doing its work.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ── -->
+<section class="how-works" id="how-it-works">
+  <div class="section">
+    <div class="reveal" style="text-align:center; max-width:600px; margin:0 auto;">
+      <div class="section-label">Process</div>
+      <h2 class="section-title">How Aeon stays<br>ahead of threats</h2>
+    </div>
+    <div class="flow">
+      <div class="flow-step reveal">
+        <div class="flow-line"></div>
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <h3>Research agent scans 24/7</h3>
+          <p>Running on distributed compute, it continuously monitors CVE databases, security papers, and GitHub advisories for anything affecting Chromium, V8, or Blink.</p>
+        </div>
+      </div>
+      <div class="flow-step reveal">
+        <div class="flow-line"></div>
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <h3>AI generates the patch</h3>
+          <p>AeonMind analyzes the vulnerability and writes a targeted C++ patch. For non-critical features, a 48-hour peer vote determines if the change ships.</p>
+        </div>
+      </div>
+      <div class="flow-step reveal">
+        <div class="flow-line"></div>
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <h3>Signed and distributed</h3>
+          <p>The patch is signed with an Ed25519 master key. No unsigned binary can enter the network. Chunks are distributed peer-to-peer — no central server involved.</p>
+        </div>
+      </div>
+      <div class="flow-step reveal">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <h3>Silent install on your machine</h3>
+          <p>The update waits until you step away. It installs, verifies, and restarts components atomically. You come back to a browser that's already been patched.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pro Pricing ── -->
+<section class="section" id="pro">
+  <div class="reveal" style="text-align:center;">
+    <div class="section-label">Pricing</div>
+    <h2 class="section-title">Simple. Honest.</h2>
+    <p class="section-sub" style="margin:0 auto;">The free tier is genuinely good. Pro is for people who want more out of AeonMind.</p>
+  </div>
+
+  <div class="pricing-cards">
+    <div class="pricing-card reveal">
+      <div class="pricing-tier">Free · Always</div>
+      <div class="pricing-price">$0</div>
+      <div class="pricing-desc">No trial. No credit card. No expiry.</div>
+      <ul class="pricing-features">
+        <li>Full browser with all privacy features</li>
+        <li>AeonMind (50 queries/day)</li>
+        <li>P2P updates + auto-patching</li>
+        <li>Fingerprint randomization</li>
+        <li>AeonSearch (AI-enhanced)</li>
+      </ul>
+      <a class="btn-secondary" href="#download" style="display:block;text-align:center;" id="free-download-btn">Download Free</a>
+    </div>
+    <div class="pricing-card featured reveal">
+      <div class="pricing-badge">Most popular</div>
+      <div class="pricing-tier">Pro</div>
+      <div class="pricing-price">$4 <span>/month</span></div>
+      <div class="pricing-desc">Or $39/year — save 20%</div>
+      <ul class="pricing-features">
+        <li>Everything in Free</li>
+        <li>Unlimited AeonMind queries</li>
+        <li>Priority patch channel (48h early)</li>
+        <li>Premium LoRA model</li>
+        <li>Encrypted cloud settings sync</li>
+        <li>Hive contribution rewards</li>
+      </ul>
+      <a class="btn-primary" href="/pro" style="display:block;text-align:center;" id="pro-upgrade-btn">Upgrade to Pro</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Sovereignty ── -->
+<section class="sovereignty" id="sovereignty">
+  <div class="section">
+    <div class="sovereignty-content">
+      <div class="reveal">
+        <div class="section-label">Control</div>
+        <h2 class="section-title">You hold<br>the master key.</h2>
+        <p style="color:var(--muted);font-size:17px;margin-top:20px;line-height:1.7;">
+          The Aeon network has one root authority — you.
+          A USB drive contains an Argon2id-encrypted Ed25519 key.
+          Plug it into any machine on the planet and you have complete
+          override authority over the entire network.
+          <br><br>
+          Force a rollback. Pause AI research. Revoke a compromised peer.
+          Every command you sign is cryptographically logged. No command
+          can execute without your key.
+        </p>
+      </div>
+      <div class="usb-visual reveal">
+        <div class="usb-card">
+          <div class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+          <div class="t-blue">  ⚡ AEON SOVEREIGN CONTROL CENTER</div>
+          <div class="t-dim">     Network Authority Terminal v1.0</div>
+          <div class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+          <br>
+          <div><span class="t-dim">  Peers alive:  </span><span class="t-green">847</span></div>
+          <div><span class="t-dim">  Build workers:</span><span class="t-green"> 23</span></div>
+          <div><span class="t-dim">  Open votes:   </span><span class="t-yellow"> 1</span></div>
+          <div><span class="t-dim">  AI status:    </span><span class="t-green"> ACTIVE</span></div>
+          <br>
+          <div class="t-dim">  Commands:</div>
+          <div><span class="t-purple">  1</span><span class="t-dim"> Force rollback</span></div>
+          <div><span class="t-purple">  2</span><span class="t-dim"> Pause AI research</span></div>
+          <div><span class="t-purple">  3</span><span class="t-dim"> Emergency patch</span></div>
+          <div><span class="t-purple">  4</span><span class="t-dim"> Revoke peer</span></div>
+          <br>
+          <div class="t-dim">&gt; <span class="cursor" style="background:#6382ff"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Download ── -->
+<section class="section" id="download" style="text-align:center;">
+  <div class="reveal">
+    <div class="section-label">Download</div>
+    <h2 class="section-title">Get Aeon.</h2>
+    <p class="section-sub" style="margin:16px auto 40px;">
+      Windows 10+ · Free · ~120MB · No account required
+    </p>
+    <a class="btn-primary" href="/download/aeon_setup.exe" id="main-download-btn"
+       style="font-size:18px;padding:18px 48px;">
+      ↓ Download for Windows
+    </a>
+    <p style="margin-top:16px;font-size:13px;color:var(--muted);">
+      macOS and Linux builds coming soon ·
+      <a href="https://github.com/aeonbrowser/aeon" style="color:var(--accent);">Build from source</a>
+    </p>
+    <p style="margin-top:32px;font-size:13px;color:var(--muted);">
+      SHA-256: <span style="font-family:var(--mono)" id="sha-display">will be shown on release</span>
+    </p>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <p style="margin-bottom:12px;">
+    <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp;
+    <a href="/terms">Terms</a> &nbsp;·&nbsp;
+    <a href="https://github.com/aeonbrowser/aeon">GitHub</a> &nbsp;·&nbsp;
+    <a href="mailto:hello@aeonbrowser.com">Contact</a>
+  </p>
+  <p>
+    Aeon Browser is an independent fork of Chromium.
+    Not affiliated with Google. BSD Licensed.
+  </p>
+  <p style="margin-top:8px;font-size:12px;">
+    © 2025 Aeon Browser Project
+  </p>
+</footer>
+
+<script>
+  // ── Scroll reveal ──
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ── Animated terminal ──
+  const lines = [
+    ['03:47:22','t-dim','AeonResearch','t-blue','Scanning Chromium CVE database...'],
+    ['03:47:31','t-dim','AeonResearch','t-yellow','Found: CVE-2025-4421 — V8 type confusion (Critical)'],
+    ['03:47:32','t-dim','AeonPatch   ','t-purple','Generating C++ patch via AeonMind...'],
+    ['03:48:01','t-dim','AeonPatch   ','t-green','Patch ready. Signing with master key...'],
+    ['03:48:02','t-dim','AeonUpdate  ','t-green','Emergency patch distributed to 847 peers ✓'],
+    ['03:48:02','t-dim','Silence     ','t-dim','User online — all operations paused'],
+    ['04:12:00','t-dim','Silence     ','t-dim','User idle — operations resumed'],
+    ['04:12:01','t-dim','AutoUpdater ','t-green','Patch installed silently. Browser protected.'],
+  ];
+
+  function buildTerminal() {
+    const body = document.getElementById('terminal-body');
+    body.innerHTML = '';
+    let i = 0;
+    function addLine() {
+      if (i >= lines.length) {
+        setTimeout(() => { i = 0; buildTerminal(); }, 3000);
+        return;
+      }
+      const [time, , svc, svcClass, msg] = lines[i];
+      const div = document.createElement('div');
+      div.style.opacity = '0';
+      div.style.transition = 'opacity 0.4s';
+      div.innerHTML = `<span class="t-dim">${time}</span> <span class="${svcClass}">${svc}</span> <span class="t-white">${msg}${i === lines.length - 1 ? '<span class="cursor"></span>' : ''}</span>`;
+      body.appendChild(div);
+      requestAnimationFrame(() => { div.style.opacity = '1'; });
+      i++;
+      setTimeout(addLine, i === lines.length ? 800 : 600);
+    }
+    addLine();
+  }
+  buildTerminal();
+</script>
+
+</body>
+</html>

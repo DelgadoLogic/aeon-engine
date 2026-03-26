@@ -18,9 +18,12 @@
 //   - Saves via HistoryEngine::AddBookmark().
 
 #include "BookmarkToast.h"
-#include "../../history/HistoryEngine.h"
+#include "../history/HistoryEngine.h"
 #include <windowsx.h>
 #include <dwmapi.h>
+#include <string>
+#include <vector>
+#include <algorithm>
 #include <cstring>
 #include <cstdio>
 
@@ -92,16 +95,18 @@ static void CreateControls(HWND hWnd) {
     SendMessageW(g_folderCombo, WM_SETFONT, (WPARAM)g_fontMain, TRUE);
 
     // Populate folders from HistoryEngine
-    auto bms = HistoryEngine::GetBookmarks();
+    HistoryEngine::Bookmark bms_arr[256] = {};
+    int bms_count = HistoryEngine::GetBookmarks(bms_arr, 256);
     std::vector<std::string> seen;
     SendMessageW(g_folderCombo, CB_ADDSTRING, 0, (LPARAM)L"Bookmarks");
-    for (auto& b : bms) {
+    for (int _bi = 0; _bi < bms_count; _bi++) {
+        const auto& b = bms_arr[_bi];
         if (b.folder[0] && strcmp(b.folder, "Bookmarks") != 0) {
             std::string f = b.folder;
             if (std::find(seen.begin(), seen.end(), f) == seen.end()) {
                 seen.push_back(f);
                 wchar_t wf[128] = {};
-                MultiByteToWideChar(CP_UTF8,0,b.folder,-1,wf,127);
+                MultiByteToWideChar(CP_UTF8, 0, b.folder, -1, wf, 127);
                 SendMessageW(g_folderCombo, CB_ADDSTRING, 0, (LPARAM)wf);
             }
         }
@@ -214,11 +219,20 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             Hide();
             return 0;
         }
-        case IDC_REMOVE_BTN:
-            HistoryEngine::DeleteBookmark(g_url);
+        case IDC_REMOVE_BTN: {
+            // Find bookmark ID by URL, then delete by ID
+            HistoryEngine::Bookmark bms_arr[256] = {};
+            int cnt = HistoryEngine::GetBookmarks(bms_arr, 256);
+            for (int i = 0; i < cnt; i++) {
+                if (strcmp(bms_arr[i].url, g_url) == 0) {
+                    HistoryEngine::DeleteBookmark(bms_arr[i].id);
+                    break;
+                }
+            }
             if (g_removeCb) g_removeCb(g_url);
             Hide();
             return 0;
+        }
         }
         break;
 

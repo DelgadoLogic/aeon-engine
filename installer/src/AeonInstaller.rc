@@ -1,0 +1,59 @@
+; AeonInstaller.rc — Version metadata (metadata scrubbed of identifying info)
+; Compiled into the binary — sets File Properties visible in Windows Explorer
+
+#include <windows.h>
+
+// ── Version Info (scrubbed — no real author/company fingerprint) ──────────
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "Aeon Software\0"
+            VALUE "FileDescription",  "Aeon Browser\0"
+            VALUE "FileVersion",      "1.0.0\0"
+            VALUE "InternalName",     "AeonSetup\0"
+            VALUE "LegalCopyright",   "Copyright 2026\0"
+            VALUE "OriginalFilename", "AeonSetup.exe\0"
+            VALUE "ProductName",      "Aeon Browser\0"
+            VALUE "ProductVersion",   "1.0.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END
+
+// ── Manifest ── (requestedExecutionLevel = requireAdministrator for Program Files install)
+1 RT_MANIFEST BEGIN
+"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>\r\n"
+"<assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0"">\r\n"
+"  <assemblyIdentity\r\n"
+"    version=""1.0.0.0""\r\n"
+"    processorArchitecture=""amd64""\r\n"
+"    name=""AeonBrowser.Installer""\r\n"
+"    type=""win32""/>\r\n"
+"  <trustInfo xmlns=""urn:schemas-microsoft-com:asm.v3"">\r\n"
+"    <security>\r\n"
+"      <requestedPrivileges>\r\n"
+"        <requestedExecutionLevel level=""requireAdministrator"" uiAccess=""false""/>\r\n"
+"      </requestedPrivileges>\r\n"
+"    </security>\r\n"
+"  </trustInfo>\r\n"
+"  <compatibility xmlns=""urn:schemas-microsoft-com:compatibility.v1"">\r\n"
+"    <application>\r\n"
+"      <!-- Windows 10/11 -->\r\n"
+"      <supportedOS Id=""{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}""/>\r\n"
+"    </application>\r\n"
+"  </compatibility>\r\n"
+"</assembly>\r\n"
+END

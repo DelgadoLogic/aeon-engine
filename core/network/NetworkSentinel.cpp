@@ -1,3 +1,5 @@
+#define WIN32_LEAN_AND_MEAN
+#define _WINSOCKAPI_
 // AeonBrowser — NetworkSentinel.cpp
 // DelgadoLogic | Lead Network Security Engineer
 //

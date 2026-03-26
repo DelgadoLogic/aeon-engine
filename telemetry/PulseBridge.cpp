@@ -27,7 +27,7 @@
 //     Crash file stays in %TEMP% and retries next launch — never blocks startup.
 
 #include "PulseBridge.h"
-#include "../probe/HardwareProbe.h"
+#include "../core/probe/HardwareProbe.h"
 #include <windows.h>
 #include <wininet.h>
 #include <cstdio>

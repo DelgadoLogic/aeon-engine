@@ -33,6 +33,8 @@
 #include <mutex>
 #include <cstdio>
 #include <ctime>
+#define SLEEP_THRESHOLD_MS  (30 * 60 * 1000)
+#define SLEEP_WAKE_GRACE_MS  (10 * 1000)
 
 // ─── Configurable thresholds — auto-tuned to available RAM ───────────────────
 // 512MB or less  → 10 min  (legacy/low-RAM machines need aggressive sleep)

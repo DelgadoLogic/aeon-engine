@@ -1,0 +1,10 @@
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\log-0782fe8ea015b14e.d: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\macros.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\serde.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\__private_api.rs
+
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\liblog-0782fe8ea015b14e.rlib: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\macros.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\serde.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\__private_api.rs
+
+C:\Users\Manuel A Delgado\Desktop\AeonBrowser\router\target\release\deps\liblog-0782fe8ea015b14e.rmeta: C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\lib.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\macros.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\serde.rs C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\__private_api.rs
+
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\lib.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\macros.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\serde.rs:
+C:\Users\Manuel\ A\ Delgado\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.29\src\__private_api.rs:

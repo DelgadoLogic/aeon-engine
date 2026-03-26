@@ -12,7 +12,7 @@
 //   - Pulls live data from HistoryEngine::GetBookmarks()
 
 #include "BookmarkBar.h"
-#include "../../history/HistoryEngine.h"
+#include "../history/HistoryEngine.h"
 #include <windowsx.h>
 #include <vector>
 #include <string>
@@ -56,14 +56,15 @@ static RECT g_overflowRc = {};
 
 // ─── Load from HistoryEngine ──────────────────────────────────────────────────
 static void Reload(HDC measDC) {
-    auto bms = HistoryEngine::GetBookmarks();
+    HistoryEngine::Bookmark bms_arr[512] = {};
+    int bms_count = HistoryEngine::GetBookmarks(bms_arr, 512);
     g_items.clear();
 
     // Layout: measure text widths, place items left-to-right
     int x = 6;
     static const int MAX_LABEL = 140; // px max per item
 
-    for (auto& bm : bms) {
+    for (int _bi = 0; _bi < bms_count; _bi++) { const auto& bm = bms_arr[_bi];
         if (!bm.folder[0] || strcmp(bm.folder, "Bookmarks") == 0) {
             // Top-level items only — folders shown as collapsed entries
             BarItem bi = {};
@@ -81,7 +82,7 @@ static void Reload(HDC measDC) {
             SIZE sz = {};
             GetTextExtentPoint32W(measDC, bi.label.c_str(), (int)bi.label.size(), &sz);
             int w = sz.cx + ICON_W + ITEM_PAD * 2 + 4;
-            w = std::min(w, MAX_LABEL);
+            if (w > MAX_LABEL) w = MAX_LABEL;
 
             bi.rc = { x, (BAR_H - ITEM_H)/2, x + w, (BAR_H + ITEM_H)/2 };
             x += w + 2;
@@ -91,7 +92,7 @@ static void Reload(HDC measDC) {
 
     // Add unique folder names as collapsed entries
     std::vector<std::string> seen_folders;
-    for (auto& bm : bms) {
+    for (int _bi = 0; _bi < bms_count; _bi++) { const auto& bm = bms_arr[_bi];
         if (bm.folder[0] && strcmp(bm.folder, "Bookmarks") != 0) {
             std::string f = bm.folder;
             if (std::find(seen_folders.begin(), seen_folders.end(), f) == seen_folders.end()) {

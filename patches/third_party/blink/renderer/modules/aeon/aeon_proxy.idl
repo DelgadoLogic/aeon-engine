@@ -1,0 +1,63 @@
+// Copyright 2026 The Aeon Browser Authors
+// Aeon Browser Native API — IDL Interface Definition
+// Exposed on window.aeon for every Aeon browser page.
+
+[
+    Exposed=Window
+] interface AeonProxy {
+    // Identity
+    readonly attribute DOMString version;
+    readonly attribute DOMString build;
+
+    // Sub-namespaces
+    [SameObject] readonly attribute AeonAgentProxy agent;
+    [SameObject] readonly attribute AeonLLMProxy llm;
+    [SameObject] readonly attribute AeonPrivacyProxy privacy;
+    [SameObject] readonly attribute AeonMemoryProxy memory;
+    [SameObject] readonly attribute AeonHiveProxy hive;
+    [SameObject] readonly attribute AeonSelfProxy self;
+};
+
+// ── Agent Control ─────────────────────────────────────────────────────
+[Exposed=Window] interface AeonAgentProxy {
+    [CallWith=ScriptState] Promise<DOMString> run(DOMString task);
+    [CallWith=ScriptState] Promise<DOMString> queue(DOMString task);
+    [CallWith=ScriptState] Promise<DOMString> status();
+    [CallWith=ScriptState] Promise<boolean> stop();
+};
+
+// ── Local LLM (Ollama bridge) ──────────────────────────────────────────
+[Exposed=Window] interface AeonLLMProxy {
+    [CallWith=ScriptState] Promise<DOMString> complete(DOMString prompt);
+    [CallWith=ScriptState] Promise<DOMString> model();
+    attribute EventHandler ontoken;
+};
+
+// ── Privacy Control ────────────────────────────────────────────────────
+[Exposed=Window] interface AeonPrivacyProxy {
+    DOMString fingerprint();
+    boolean refresh();
+    DOMString mode();
+    boolean setMode(DOMString mode);
+};
+
+// ── Episodic Memory ────────────────────────────────────────────────────
+[Exposed=Window] interface AeonMemoryProxy {
+    [CallWith=ScriptState] Promise<boolean> store(DOMString key, DOMString value);
+    [CallWith=ScriptState] Promise<DOMString> recall(DOMString key);
+    [CallWith=ScriptState] Promise<DOMString> search(DOMString query);
+    [CallWith=ScriptState] Promise<boolean> forget(DOMString key);
+};
+
+// ── AeonHive P2P ───────────────────────────────────────────────────────
+[Exposed=Window] interface AeonHiveProxy {
+    [CallWith=ScriptState] Promise<unsigned long> peers();
+    [CallWith=ScriptState] Promise<DOMString> status();
+};
+
+// ── AeonSelf Metrics ───────────────────────────────────────────────────
+[Exposed=Window] interface AeonSelfProxy {
+    [CallWith=ScriptState] Promise<unsigned long> tasksCompleted();
+    [CallWith=ScriptState] Promise<DOMString> modelVersion();
+    [CallWith=ScriptState] Promise<double> accuracy();
+};

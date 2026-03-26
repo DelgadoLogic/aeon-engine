@@ -1,0 +1,88 @@
+--- a/third_party/blink/renderer/core/frame/navigator.cc
++++ b/third_party/blink/renderer/core/frame/navigator.cc
+@@ -30,6 +30,7 @@
+ #include "third_party/blink/renderer/core/frame/navigator.h"
+ #include "third_party/blink/renderer/core/frame/local_dom_window.h"
+ #include "third_party/blink/renderer/core/frame/local_frame.h"
++#include "chrome/browser/aeon/fingerprint_seed.h"
+
+ namespace blink {
+
+@@ -65,7 +66,14 @@ String Navigator::platform() const {
+
+ unsigned Navigator::hardwareConcurrency() const {
+-  return base::SysInfo::NumberOfProcessors();
++  int aeon_val = AeonFingerprintSeed::GetHardwareConcurrency();
++  if (aeon_val > 0) return static_cast<unsigned>(aeon_val);
++  return base::SysInfo::NumberOfProcessors();
+ }
+
+ double Navigator::deviceMemory() const {
+-  return GetDeviceMemory();
++  int aeon_val = AeonFingerprintSeed::GetDeviceMemory();
++  if (aeon_val > 0) return static_cast<double>(aeon_val);
++  return GetDeviceMemory();
+ }
+
+--- a/third_party/blink/renderer/modules/canvas/html_canvas_element.cc
++++ b/third_party/blink/renderer/modules/canvas/html_canvas_element.cc
+@@ -28,6 +28,7 @@
+ #include "third_party/blink/renderer/modules/canvas/html_canvas_element.h"
++#include "chrome/browser/aeon/fingerprint_seed.h"
+
+@@ -180,6 +181,14 @@ String HTMLCanvasElement::toDataURL(const String& mime_type,
++// Aeon: Add per-session noise to canvas pixel output
++// Called after every drawImage/fillRect/putImageData
++void HTMLCanvasElement::AeonAddCanvasNoise(unsigned char* pixels, size_t len) {
++  for (size_t i = 0; i < len; i += 4) {
++    int8_t noise = AeonFingerprintSeed::GetCanvasNoise(i);
++    pixels[i]   = std::clamp(pixels[i]   + noise, 0, 255);  // R
++    pixels[i+1] = std::clamp(pixels[i+1] + noise, 0, 255);  // G
++    pixels[i+2] = std::clamp(pixels[i+2] + noise, 0, 255);  // B
++    // Alpha untouched
++  }
++}
+
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+@@ -30,6 +30,7 @@
+ #include "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h"
++#include "chrome/browser/aeon/fingerprint_seed.h"
+
+@@ -620,10 +621,20 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+   switch (pname) {
+     case GL_RENDERER:
+-      return WebGLAny(script_state, String(extensions_util_->GetRendererString()));
++    {
++      std::string aeon_renderer = AeonFingerprintSeed::GetWebGLRenderer();
++      String renderer = aeon_renderer.empty()
++          ? String(extensions_util_->GetRendererString())
++          : String(aeon_renderer);
++      return WebGLAny(script_state, renderer);
++    }
+     case GL_VENDOR:
+-      return WebGLAny(script_state, String(extensions_util_->GetVendorString()));
++    {
++      std::string aeon_vendor = AeonFingerprintSeed::GetWebGLVendor();
++      String vendor = aeon_vendor.empty()
++          ? String(extensions_util_->GetVendorString())
++          : String(aeon_vendor);
++      return WebGLAny(script_state, vendor);
++    }
+
+--- a/chrome/browser/ui/webui/chrome_web_ui_controller_factory.cc
++++ b/chrome/browser/ui/webui/chrome_web_ui_controller_factory.cc
+@@ -100,6 +100,7 @@
++#include "chrome/browser/aeon/webui/aeon_dashboard_ui.h"
++#include "chrome/common/webui_url_constants.h"
+
+@@ -280,6 +281,12 @@ WebUIController* ChromeWebUIControllerFactory::NewWebUI(
++  // Aeon internal pages
++  if (host == chrome::kChromeUIAeonDashboardHost)
++    return &NewWebUI<AeonDashboardUI>(web_ui);
++  if (host == chrome::kChromeUIAeonHiveHost)
++    return &NewWebUI<AeonDashboardUI>(web_ui);  // Reuses dashboard, routed by URL
++  if (host == chrome::kChromeUIAeonMemoryHost)
++    return &NewWebUI<AeonDashboardUI>(web_ui);
++  if (host == chrome::kChromeUIAeonSelfHost)
++    return &NewWebUI<AeonDashboardUI>(web_ui);

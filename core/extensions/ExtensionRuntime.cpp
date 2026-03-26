@@ -29,6 +29,9 @@
 #include "ExtensionRuntime.h"
 #include "../probe/HardwareProbe.h"
 #include <windows.h>
+#include <wincrypt.h>
+#include <dpapi.h>
+#pragma comment(lib, "crypt32.lib")
 #include <cstdio>
 
 // ---------------------------------------------------------------------------

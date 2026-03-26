@@ -1,0 +1,20 @@
+# =============================================================================
+# CODEOWNERS — Aeon Browser (aeon-engine)
+# Any PR touching these paths requires Owner approval before merge.
+# =============================================================================
+
+# Sovereign key infrastructure — OWNER ONLY, no exceptions
+/sovereign/                @Chronolapse411
+
+# Core IAeonComponent interface — breaking this breaks every component
+/core/                     @Chronolapse411
+
+# Build pipeline — GN configs, Chromium patches
+/patches/                  @Chronolapse411
+/build/                    @Chronolapse411
+
+# Hive backbone
+/hive/                     @Chronolapse411
+
+# Everything else — owner still required for now (solo project)
+*                          @Chronolapse411

@@ -1,0 +1,17 @@
+import("//build/config/features.gni")
+import("//third_party/blink/renderer/modules/modules.gni")
+
+blink_modules_sources("aeon") {
+  sources = [
+    "aeon_proxy.cc",
+    "aeon_proxy.h",
+    "aeon_proxy.idl",
+  ]
+
+  deps = [
+    "//chrome/browser/aeon:fingerprint_seed",
+    "//third_party/blink/renderer/bindings/core/v8:v8",
+    "//third_party/blink/renderer/core",
+    "//third_party/blink/renderer/platform",
+  ]
+}

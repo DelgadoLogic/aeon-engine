@@ -81,29 +81,30 @@ static const int URLBAR_PAD  = 148; // URL bar starts here
 static const int URLBAR_END  = 120; // pixels from right edge (for icon buttons)
 
 // ---------------------------------------------------------------------------
-// Per-tab state (mirrors AeonEngineVTable's tab model)
+// Per-tab state
 // ---------------------------------------------------------------------------
 struct ChromeTab {
     unsigned int  id;
     std::string   url;
     std::string   title;
     bool          loading;
-    RECT          tabRect;  // computed during paint
+    RECT          tabRect;
 };
 
 // ---------------------------------------------------------------------------
-// BrowserChrome implementation
+// BrowserChrome internal state (renamed from BrowserChrome to avoid
+// collision with the BrowserChrome namespace declared in BrowserChrome.h)
 // ---------------------------------------------------------------------------
 
-struct BrowserChrome {
+struct ChromeState {
     HWND                hwnd;
-    HWND                hUrlBar;     // Edit control for URL entry
-    HWND                hContent;    // child HWND for engine viewport
+    HWND                hUrlBar;
+    HWND                hContent;
 
     std::vector<ChromeTab> tabs;
     int                 activeTab;
-    int                 hoverTab;    // -1 = none
-    int                 hoverBtn;    // 0=none 1=back 2=fwd 3=ref 4=tor 5=dl
+    int                 hoverTab;
+    int                 hoverBtn;
 
     AeonEngineVTable*   engine;
     AeonSettings        settings;
@@ -172,7 +173,7 @@ static void DrawLogoBadge(HDC hdc, int x, int y) {
 // ---------------------------------------------------------------------------
 // Paint nav bar (back/fwd/refresh + URL bar + right icons)
 // ---------------------------------------------------------------------------
-static void PaintNavBar(BrowserChrome* ch, HDC hdc, int width) {
+static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     // Nav bar background
     RECT navR = { 0, 0, width, NAV_HEIGHT };
     FillRectColor(hdc, navR, CLR_BG_PRIMARY);
@@ -247,7 +248,7 @@ static void PaintNavBar(BrowserChrome* ch, HDC hdc, int width) {
 // ---------------------------------------------------------------------------
 // Paint tab strip
 // ---------------------------------------------------------------------------
-static void PaintTabStrip(BrowserChrome* ch, HDC hdc, int width) {
+static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
     RECT tabStrip = { 0, NAV_HEIGHT, width, NAV_HEIGHT + TAB_HEIGHT };
     FillRectColor(hdc, tabStrip, RGB(10, 11, 17)); // slightly darker than nav
 
@@ -311,7 +312,7 @@ static void PaintTabStrip(BrowserChrome* ch, HDC hdc, int width) {
 // ---------------------------------------------------------------------------
 // Full chrome paint
 // ---------------------------------------------------------------------------
-static void PaintChrome(BrowserChrome* ch) {
+static void PaintChrome(ChromeState* ch) {
     RECT rc;
     GetClientRect(ch->hwnd, &rc);
     int W = rc.right;
@@ -339,7 +340,7 @@ static void PaintChrome(BrowserChrome* ch) {
 namespace BrowserChrome {
 
 void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine) {
-    BrowserChrome* ch = new BrowserChrome();
+    ChromeState* ch = new ChromeState();
     ch->profile    = profile;
     ch->engine     = engine;
     ch->activeTab  = -1;
@@ -386,18 +387,18 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
         // 3. Start AutoUpdater background poller
         //    Polls update.delgadologic.tech once every 24 hours.
         //    Downloads + verifies + silently installs if update is available.
-        AutoUpdater::StartPoller();
+        AutoUpdater::CheckAsync("stable");
     }).detach();
 }
 
 void OnPaint(HWND hwnd) {
-    BrowserChrome* ch = reinterpret_cast<BrowserChrome*>(
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
     if (ch) PaintChrome(ch);
 }
 
 void OnSize(HWND hwnd, int w, int h) {
-    BrowserChrome* ch = reinterpret_cast<BrowserChrome*>(
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
     if (!ch) return;
     PaintChrome(ch);
