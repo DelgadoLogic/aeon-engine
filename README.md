@@ -1,350 +1,283 @@
 <div align="center">
 
-![Aeon Browser by DelgadoLogic](resources/images/banner.png)
+<img src="resources/images/banner.png" alt="Aeon Browser — The Sovereign Browser by DelgadoLogic" width="100%"/>
 
-<br><br>
+<br/>
 
-![Aeon Icon](resources/images/icon_medium.png)
+<img src="assets/aeon_icon.png" alt="Aeon Browser Icon" width="120"/>
 
 # Aeon Browser
 
-**The browser that works everywhere. Windows 3.1 to Windows 11.**
+**The sovereign browser. No telemetry. No upstream CVEs. No exceptions.**
 
-*Zero inherited vulnerabilities. Our DNA. Our code. Our rules.*
+*Built from scratch by [DelgadoLogic](https://github.com/DelgadoLogic) · Windows 3.1 → Windows 11 → Every Platform*
 
-<br>
+<br/>
 
-[![Build](https://img.shields.io/badge/build-in%20development-orange?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/DelgadoLogic/AeonBrowser)
-[![License](https://img.shields.io/badge/license-proprietary-red?style=for-the-badge)](LICENSE)
-[![By DelgadoLogic](https://img.shields.io/badge/by-DelgadoLogic-6c63ff?style=for-the-badge)](https://delgadologic.tech)
-[![Platform](https://img.shields.io/badge/platform-Windows%203.1%20→%2011-0078d4?style=for-the-badge&logo=windows&logoColor=white)](https://delgadologic.tech/aeon)
-[![Ships with LogicFlow](https://img.shields.io/badge/ships%20with-LogicFlow-a78bfa?style=for-the-badge)](https://delgadologic.tech/logicflow)
+[![Version](https://img.shields.io/badge/version-0.1.0--foundation-blue?style=flat-square&logo=github)](https://github.com/DelgadoLogic/aeon-engine/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%203.1%20%E2%86%92%2011-blueviolet?style=flat-square)](https://github.com/DelgadoLogic/aeon-engine)
+[![Telemetry](https://img.shields.io/badge/telemetry-ZERO-brightgreen?style=flat-square)](https://github.com/DelgadoLogic/aeon-engine)
+[![License](https://img.shields.io/badge/license-Proprietary-red?style=flat-square)](LICENSE)
+[![AI Engine](https://img.shields.io/badge/AI-phi--3--mini%20%28local%20only%29-orange?style=flat-square)](docs/AI_DESIGN.md)
 
 </div>
 
 ---
 
-## ✨ What is Aeon?
+## What Is Aeon?
 
-Aeon is a **from-scratch web browser** built by [DelgadoLogic](https://delgadologic.tech).
+Aeon is a **ground-up browser** — not a Chromium skin, not a Firefox fork. Every component is written from first principles with one objective: **you own your browsing, completely**.
 
-We studied the best browsers ever made — **Chromium, Firefox, Arc, Brave, Vivaldi, Waterfox, Mypal, Supermium** — and rewrote everything from the ground up. No forks. No inherited CVEs. No compromises.
-
-It ships bundled inside the **[LogicFlow](https://delgadologic.tech/logicflow)** installer, runs on everything from a 1994 Pentium 66 running Windows 3.11 to a modern gaming rig on Windows 11, and brings full TLS 1.3, Tor, I2P, and ad-blocking to every machine.
+No Google DNS resolvers phoning home. No Safe Browsing cloud calls. No sync servers we don't control. No inherited vulnerability debt from upstream. And uniquely: **it runs on everything** — from a 1994 Windows 3.1 machine to your latest Windows 11 PC.
 
 ---
 
-## 🖥️ UI Preview
+## Screenshots
 
-![Aeon Browser UI — dark mode new tab page](resources/images/ui_mockup.png)
+<div align="center">
 
-*Aeon Browser — dark mode new tab page with aurora background, live clock, and speed dial*
+<img src="resources/images/ui_mockup.png" alt="Aeon Browser New Tab — Glassmorphism Dark UI" width="85%"/>
 
----
+*New Tab Page · Deep space dark mode · Glassmorphism speed dial · Private search*
 
-## 🖱️ App Menu (Three-Dot Menu)
+<br/><br/>
 
-![Aeon Browser App Menu](resources/images/app_menu.png)
+<img src="resources/images/app_menu.png" alt="Aeon Browser App Menu — Firewall Mode, Network Sentinel" width="45%"/>
 
-*Aeon's Chrome-style app menu — includes 🔥 Firewall Mode and 🛡 Network Sentinel quick-access*
+*App Menu · Firewall Mode · Network Sentinel · Zero-telemetry by default*
 
----
+<br/><br/>
 
-## 🏆 Why Aeon vs the Competition
+<img src="resources/images/installer_preview.jpg" alt="Aeon Installer — Hardening your digital perimeter" width="75%"/>
 
-| Feature | Aeon | Chrome | Firefox | Brave | Edge |
-|---------|------|--------|---------|-------|------|
-| Works on Windows 3.1 | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Works on Windows XP | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Works on Windows Vista/7 | ✅ | ❌ | ⚠️ | ❌ | ❌ |
-| Zero upstream CVEs | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Built-in Tor | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Built-in I2P | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Native ad-blocker (no extension) | ✅ | ❌ | ❌ | ✅ | ❌ |
-| FTP + Magnet + Torrent download | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Gemini/Gopher support | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Auto captive portal detection | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| GFW / firewall bypass (built-in) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| DoH with ECH (SNI hidden from DPI) | ✅ | ⚠️ | ⚠️ | ❌ | ❌ |
-| RAM-pressure-aware tab sleep | ✅ | ❌ | ❌ | ❌ | ⚠️ |
-| Password vault (DPAPI) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Ships with system optimizer | ✅ | ❌ | ❌ | ❌ | ❌ |
+*Installer · Ed25519-signed sovereign manifest · "Hardening your digital perimeter"*
+
+</div>
 
 ---
 
-## 🎯 Target Platform Matrix
+## Core Philosophy — AeonDNA
 
-| Tier | OS | Renderer | TLS | RAM Idle |
-|------|----|----------|-----|---------|
-| **Pro** | Windows 10 / 11 | Blink shim | Native TLS 1.3 | ~150 MB |
-| **Modern** | Windows 8 / 8.1 | Blink shim | Native TLS 1.3 | ~120 MB |
-| **Extended** | Windows Vista / 7 | Gecko (light) | Schannel unlock | ~80 MB |
-| **XP-Hi** | Windows XP + SSE2 | Blink (XP build) | WolfSSL | ~60 MB |
-| **XP-Lo** | Windows XP (no SSE2) | Gecko (no SSE2) | WolfSSL | ~45 MB |
-| **2000** | Windows 2000 | HTML4 GDI (`aeon_html4.dll`) | WolfSSL | ~30 MB |
-| **9x** | Windows 95/98/ME | HTML4 GDI (`aeon_html4.dll`) | WolfSSL 32-bit | ~20 MB |
-| **Win16** | Windows 3.1 / 3.11 | HTML4 GDI 16-bit | WolfSSL 16-bit | ~6 MB |
-
-> **How does it know which tier to use?**  
-> `HardwareProbe.cpp` runs at startup, detects your OS, CPU, and RAM.  
-> The `TierDispatcher` loads the right engine DLL automatically. Zero config needed.
+| Principle | What It Means |
+|-----------|--------------|
+| 🛡 **Sovereignty** | No Google, Microsoft, or third-party cloud calls by default. Ever. |
+| 🌍 **Universality** | 8 hardware tiers covering every Windows version ever shipped |
+| 🤖 **Autonomy** | 6-agent Evolution Engine patches CVEs while you sleep |
+| 🔐 **Privacy by Architecture** | Zero-knowledge sync · Local AI only · P2P collective intelligence |
+| 🔗 **Zero CVE Inheritance** | Built from scratch — no upstream vulnerability debt |
 
 ---
 
-## 🌐 Protocol Support
+## Key Features
 
-Aeon is the **only browser** that supports all of these natively:
+### 🌐 Runs On Everything — 8-Tier Engine System
+
+Aeon auto-detects your hardware at launch and loads the right engine automatically.
+
+| Tier | Platform | Renderer | TLS |
+|------|----------|----------|-----|
+| **Pro** | Windows 10 / 11 | Stripped Blink (no Google DNA) | TLS 1.3 native |
+| **Modern** | Windows 8 / 8.1 | Stripped Blink | TLS 1.3 native |
+| **Extended** | Windows Vista / 7 | Gecko (light build) | Schannel unlocked |
+| **XP-Hi** | Windows XP (SSE2) | Blink XP build | WolfSSL |
+| **XP-Lo** | Windows XP (no SSE2) | Gecko no-SSE2 | WolfSSL |
+| **Win2000** | Windows 2000 | HTML4 GDI engine | WolfSSL |
+| **Win9x** | Windows 95 / 98 / ME | HTML4 GDI 32-bit | WolfSSL 32-bit |
+| **Win16** | Windows 3.1 / 3.11 | HTML4 GDI 16-bit | WolfSSL 16-bit |
+
+---
+
+### 🔒 Privacy Stack
 
 ```
-https://  http://  tor://  .onion    ← Clear web + Tor dark web
-gemini:// gopher://                  ← Alternative internet protocols  
-ftp://    ftps://                    ← File transfer (download only)
-magnet:   torrent:                   ← BitTorrent downloads (NO seeding)
-ipfs://   ipns://                    ← Decentralized web
-i2p://    .i2p                       ← I2P anonymous network
-file://                              ← Local file viewer
-aeon://                              ← Internal pages (newtab, settings, etc.)
+All traffic → Rust Protocol Router (aeon_router.dll)
+├── 14 schemes: https, tor://, i2p://, gemini://, ipfs://, magnet:, aeon://...
+├── DNS: DoH cascade — Cloudflare ECH → Quad9 → NextDNS (no system DNS)
+└── CircumventionEngine:
+    ├── GoodbyeDPI  — SNI fragmentation, evades deep packet inspection
+    ├── zapret      — TCP window manipulation
+    ├── ECH         — hides destination domain from ISP/DPI
+    └── Tor meek    — last resort bridge if all else is blocked
 ```
+
+- **Network Sentinel** — real-time per-domain firewall rule enforcement
+- **Firewall Mode** — whitelist-only; nothing gets through unless you explicitly allow it
+- **Built-in Ad Blocker** — updated via sovereign P2P, no cloud dependency
+- **Fingerprint Protection** — Canvas, WebGL, Audio randomized every session
 
 ---
 
-## 🌍 DNS & Network Bypass
+### 🤖 Autonomous Evolution Engine — The Browser That Patches Itself
 
-Aeon automatically detects your network environment and adapts — **zero configuration**.
+While you browse, six AI agents run silently in the background:
 
-| Environment | DNS Strategy | Bypass Active |
-|---|---|---|
-| 🏠 Home / Open | DoH cascade (Cloudflare→Google→Quad9→NextDNS) | None needed |
-| ☕ Coffee Shop / Hotel | System DNS (portal phase) → DoH (after auth) | Auto-detects & opens portal tab |
-| 🏢 Corporate | DoH external + System DNS for internal (`.corp`, `.local`) | CDN fronting for filtered categories |
-| 🏫 School / University | Full DoH (overrides forced DNS filter) | SNI fragmentation via GoodbyeDPI |
-| 🇨🇳 National Firewall (GFW, RKN, etc.) | Cloudflare **ECH** → ODoH relay → Tor meek | GoodbyeDPI + full circumvention stack |
-| ✈️ Airplane WiFi | DoH (6s timeout, 1 retry, 30-min cache) | Captive portal detection |
-| 🏛️ Government / Military | DoH fast-fail (2s) → System DNS | None (respects gov security posture) |
-| 🛰️ Metered (satellite) | DoH (bandwidth-save mode) | Minimal retries |
+| Agent | Role |
+|-------|------|
+| **Research Agent** | Monitors NVD, GitHub Advisories, arXiv, CISA KEV 24/7 for new CVEs |
+| **Patch Writer** | CodeLlama generates C++ fixes for vulnerabilities targeting our codebase |
+| **Vote Coordinator** | 66% of AeonHive peers must approve a patch before it applies |
+| **Build Worker** | Donates idle CPU to the P2P Ninja build mesh — gets faster with more users |
+| **Self Trainer** | Weekly LoRA fine-tune on GCP — AI improves its own patch quality every Sunday |
+| **Silence Policy** | Pauses ALL background tasks when CPU > 15% or you're actively using your machine |
 
-**Key techniques (researched from GoodbyeDPI, zapret, dnscrypt-proxy):**
-- **ECH** (Encrypted Client Hello) — hides the domain name from DPI even inside TLS
-- **SNI fragmentation** — splits TLS ClientHello across TCP segments so DPI can't read the SNI
-- **TTL-limited decoy packets** — confuses inline DPI hardware
-- **DNS-over-HTTPS on port 443** — looks identical to regular web traffic
-- **Split-horizon detection** — internal corporate/gov domains always use system DNS
-- **NIPR/SIPR detection** — if no public routes exist, air-gap mode activates silently
-
-> **Government/Military note:** Aeon does **not** attempt Tor or GoodbyeDPI on `.mil`/`.gov` networks. It uses a fast DoH probe (2s timeout), then falls back to system DNS gracefully. No aggressive bypass that could trigger endpoint security alerts.
+**The self-improvement loop:** More users → better peer voting → better training data → smarter patches → more secure browser → more users. It compounds automatically.
 
 ---
 
-## 🔒 Security Architecture
+### 🧠 AI That Browses For You — Agent Mode
+
+Aeon doesn't just have an AI sidebar — it can **do things on the web for you**.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     AEON SECURITY MODEL                     │
-├─────────────────┬───────────────────────────────────────────┤
-│ TLS             │ WolfSSL (legacy) or OS-native Schannel    │
-│ DNS             │ DoH cascade — Cloudflare ECH, Quad9, DoT  │
-│                 │ Split-horizon for corporate/gov/mil       │
-│ Tracking        │ EasyList engine — native C++, not JS ext  │
-│ Fingerprint     │ Canvas + WebGL + Audio randomization       │
-│ Privacy         │ GPC header injected on every request       │
-│ Passwords       │ Windows DPAPI (CryptProtectData)           │
-│ Tor             │ Embedded Arti (Rust) — no Tor Browser dep │
-│ I2P             │ i2pd child process — transit tunnels OFF   │
-│ Captive Portal  │ Auto-detected via NCSI probe, auto-open   │
-│ DPI Bypass      │ GoodbyeDPI/zapret (SNI frag, TTL tricks)  │
-│ Updates         │ WinTrust Authenticode + SHA-256 verify     │
-│ Sandbox         │ Renderer process isolation per tab         │
-└─────────────────┴───────────────────────────────────────────┘
+You:  "Find me the cheapest flight from Miami to NYC next Friday"
+Aeon: → Opens comparison tabs silently in background
+      → Reads pages directly (native Blink DOM — no screenshot hacks)
+      → Compares results, extracts data
+      → "Frontier $89 · Spirit $92 · JetBlue $156 — want me to book Frontier?"
 ```
 
-**Zero inherited CVEs.** Aeon is not a Chromium fork or Firefox fork.  
-We studied them and wrote our own from scratch.
+Unlike other AI browsers that use slow, unreliable computer-vision hacks, Aeon reads the DOM directly through a native Blink bridge — the same way DevTools does it. **100× more reliable. No cloud. No vision API costs.**
+
+**Privacy contract:** Agent Mode never reports your browsing. The model runs locally (phi-3-mini 4-bit). Nothing leaves your machine.
 
 ---
 
-## 🏗️ Architecture Overview
+### 🧩 AeonHive — The P2P Network That Gets Faster With Users
+
+Every Aeon installation is a node. The more people use Aeon, the more powerful it gets for everyone:
 
 ```
-AeonBrowser/
-├── core/                      ← C++ Browser Host Process
-│   ├── probe/                 HardwareProbe   — OS + CPU + Tier detection
-│   ├── engine/                TierDispatcher  — loads right engine DLL per OS
-│   ├── ui/                    EraChrome       — Mica (Win11) / Win32 (Legacy) UI
-│   │   ├── AppMenu.cpp        Chrome-style three-dot popup (custom GDI)
-│   │   ├── BookmarkBar.cpp    Native child strip + folder submenus
-│   │   ├── BookmarkToast.cpp  Star-button "Bookmark added" popup
-│   │   └── DownloadButton.cpp Animated toolbar progress indicator
-│   ├── network/
-│   │   ├── NetworkSentinel.cpp  Auto network classification (6 env types)
-│   │   ├── CircumventionEngine  GoodbyeDPI + Tor + meek bypass stack
-│   │   └── DnsResolver.cpp    DoH cascade, split-horizon, ECH, air-gap
-│   ├── tls/                   TlsAbstraction  — WolfSSL / Schannel / TLS 1.3
-│   ├── security/              PasswordVault   — DPAPI encrypted vault
-│   ├── settings/              SettingsEngine  — JSON + HKLM two-tier config
-│   ├── session/               SessionManager  — crash recovery + tab restore
-│   ├── history/               HistoryEngine   — SQLite WAL + FTS5 + bookmarks
-│   ├── download/              DownloadManager — WinINet multi-thread + resume
-│   ├── crash/                 CrashHandler    — minidump + telemetry queue
-│   └── memory/                TabSleepManager — RAM-pressure-aware idle suspend
-│                                                (≤512MB→10min, ≤2GB→20min, 2GB+→30min)
-│
-├── router/                    ← Rust Protocol Router (aeon_router.dll)
-│   └── src/
-│       ├── router.rs          14-protocol scheme dispatcher
-│       ├── downloader.rs      Download manager (NO seeding, compile-time)
-│       ├── tor.rs             Arti Tor client (embedded, no Tor Browser)
-│       └── gemini.rs          Gemini + Gopher handlers
-│
-├── privacy/
-│   └── ContentBlocker.cpp     EasyList/uBlock engine, DoH, GPC, fingerprint guard
-│
+100 users    → anchor nodes carry all load            → builds ~normal speed
+1,000 users  → 100 donate idle CPU                    → builds 3× faster
+10,000 users → 500 donate idle CPU                    → builds 15× faster
+100,000 users→ network self-sustaining                → infrastructure cost → $0
+```
+
+Contributing CPU earns **Aeon Credits** — redeemable for Pro subscription time, priority updates, and future compute tokens.
+
+---
+
+### 🔄 Sovereign Updates — Ed25519 Signed, Always Verified
+
+No update is ever blindly trusted. Every release is:
+
+1. **Built** in our isolated GCP Cloud Build environment
+2. **Signed** with our Ed25519 master key (stored in GCP Secret Manager — never on disk)
+3. **Distributed** P2P via AeonHive (BitTorrent-style — cheap, fast, resilient)
+4. **Verified** by your installed Aeon — SHA-256 + Ed25519 before anything runs
+
+SHA-256 mismatch or invalid signature? Update is silently rejected. No user prompt. No risk.
+
+---
+
+## Platform Roadmap
+
+```
+✅ Phase 1 — Windows (2026)         All 8 tiers: Win3.1 → Win11
+🟡 Phase 2 — Linux   (Q3 2026)      x86_64 + ARM64 · AppImage · .deb · .rpm
+🟡 Phase 3 — Android (Q1 2027)      Privacy Shell (fast) → Sovereign Engine
+🔴 Phase 4 — macOS   (Q2 2027)      Cocoa UI · AppStore + direct dist
+🔴 Phase 5 — iOS     (Q4 2027)      WebKit renderer + full Aeon network layer
+🔴 Phase 6 — AeonHive Sovereign     Fully self-sustaining P2P infrastructure
+```
+
+**Android strategy:** Phase 3A ships a Privacy Shell fast (Aeon UI + network layer over Android WebView). Phase 3B replaces it with our own stripped-Blink engine. We're also targeting Android 4.x — a massive underserved market in emerging economies that nobody else supports.
+
+---
+
+## Project Structure
+
+```
+aeon-engine/
+├── aeon/
+│   ├── config/                   # GN build config — all Google APIs zeroed
+│   │   ├── args.gn               # Sovereign build flags
+│   │   └── AeonFeatures.h/.cc    # Feature adopt/strip + Finch override
+│   ├── shield/
+│   │   └── AeonShield.cc         # NetworkDelegate — blocks GCP endpoints
+│   ├── workspace/
+│   │   └── AeonWorkspace.h       # Split-screen tab engine
+│   ├── agent/
+│   │   └── AeonWebMCP.h          # WebMCP local-only bridge (AeonAgent)
+│   └── evolution/                # Autonomous Evolution Engine (Python/FastAPI)
+│       ├── aeon_research_agent.py
+│       ├── aeon_patch_writer.py
+│       ├── aeon_vote_coordinator.py
+│       ├── aeon_build_worker.py
+│       ├── aeon_self_cloud_trainer.py
+│       └── aeon_silence_policy.py
+├── router/                       # Rust protocol router (aeon_router.dll)
 ├── updater/
-│   └── AutoUpdater.cpp        WinTrust Authenticode + SHA-256 + delta patch
-│
-├── telemetry/
-│   └── PulseBridge.cpp        Category-level only, opt-out, shared with LogicFlow
-│
-├── retro/                     ← Legacy Tier (Win9x / 2000 / 3.x)
-│   ├── aeon_html4.c           GDI HTML4/CSS2 renderer — zero deps, single-file C
-│   ├── aeon_html4.h           C ABI DLL header (AEON_HTML4_API_VERSION = 1)
-│   ├── aeon16.c               16-bit WinMain for Win3.x
-│   └── wolfssl_bridge.c       WinSock 1.1 + WolfSSL TLS 1.3 (16-bit)
-│
-├── installer/
-│   ├── AeonBrowser.iss        Inno Setup 6.2 — all 4 tiers, multilingual
-│   └── build_installer.ps1   8-step CI: cargo→cmake→icon→filters→sign→ISCC→manifest
-│
+│   └── AutoUpdater.cpp           # P2P chunk distribution + Ed25519 verify
+├── assets/
+│   └── aeon_icon.png             # Master brand icon
+├── installer/                    # NSIS/Inno Setup sovereign installer
+│   └── assets/
+│       └── installer_reference.jpg
 ├── resources/
-│   ├── filters/
-│   │   ├── easylist.txt       Bundled EasyList snapshot (auto-updated by CI)
-│   │   ├── easyprivacy.txt    EasyPrivacy snapshot
-│   │   ├── ublock_base.txt    uBlock Origin base filters
-│   │   ├── ublock_privacy.txt uBlock Origin privacy filters
-│   │   ├── annoyances.txt     Fanboy Annoyances (cookie banners)
-│   │   ├── aeon_extra.txt     Aeon-specific additions (highest priority)
-│   │   └── download_filterlists.ps1  Updater script (24h cache, strips comments)
-│   ├── icons/
-│   │   └── build_icon.ps1     Multi-size ICO bake (ImageMagick or System.Drawing)
-│   └── newtab/newtab.html     aeon://newtab — aurora + clock + speed dial
-│
-└── _research/                 ← Reference repos (for technique analysis only)
-    ├── GoodbyeDPI/            SNI fragmentation, TTL tricks, HTTP header mangling
-    ├── zapret/                Russian TSPU desync, TCP window manipulation
-    └── dnscrypt-proxy/        DoH provider list, ODoH relay structure
+│   └── images/                   # Documentation images
+├── docs/
+│   └── UI_DESIGN_SPEC.md         # Canonical glassmorphism UI standard (internal)
+└── .github/workflows/            # CI/CD — GCP Cloud Build → Cloud Run deploy
 ```
 
 ---
 
-## 🖼️ Icon Pack
+## Building Aeon
 
-| Small | Medium | Large |
-|-------|--------|-------|
-| ![16px icon](resources/images/icon_small.png) | ![Medium icon](resources/images/icon_medium.png) | ![Large icon](resources/images/icon_large.png) |
-| 16 / 32px | 48 / 64px | 128 / 256px |
+> Full builds require the `aeon-build-env` Docker image from our Artifact Registry.  
+> The evolution engine and router can be built independently.
 
-*All sizes baked into a single `Aeon.ico` using `resources/icons/build_icon.ps1`*
-
----
-
-## 🚀 Building
-
-### Requirements
-- **MSVC 2022** (x64 for Pro/Modern, x86 for XP tiers)
-- **Rust 1.75+** (`cargo` for router DLL)
-- **CMake 3.22+**
-- **Inno Setup 6.2+** (`iscc.exe` for installer)
-- **Open Watcom 2.0** (16-bit Win3.x retro tier only)
-
-### Quick Build (Pro tier — Windows 10/11)
-```powershell
-# Build Rust router
-cd router && cargo build --release && cd ..
-
-# Configure + build C++ core
-cmake -B build -DAEON_TARGET_TIER=Pro -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
-
-# Build icons
-powershell -File resources/icons/build_icon.ps1
-
-# (Optional) Download fresh filter lists
-powershell -File resources/filters/download_filterlists.ps1
+### Evolution Engine (open build)
+```bash
+cd aeon/evolution
+pip install -r requirements.txt
+uvicorn aeon_vote_coordinator:app --host 0.0.0.0 --port 8080
 ```
 
-### Full Installer Build (CI)
-```powershell
-# Builds everything: Rust + C++ + icons + filters + signs + Inno Setup + SHA-256 manifest
-powershell -File installer/build_installer.ps1 -Version 1.0.0 -Tier Pro -Channel stable
+### Rust Router (open build)
+```bash
+cd router
+cargo build --release
+# Output: router/target/release/aeon_router.dll (Windows)
+#         router/target/release/libAeonRouter.so (Linux)
 ```
 
-### All Tiers
-```powershell
-cmake -B build -DAEON_TARGET_TIER=Extended   # Vista/7
-cmake -B build -DAEON_TARGET_TIER=XPHi       # XP + SSE2
-cmake -B build -DAEON_TARGET_TIER=Retro      # Win9x/2000 (builds aeon_html4.dll)
-
-# 16-bit (Win3.x) — requires Open Watcom 2.0
-cd retro && wmake
+### Full Browser Engine (requires build env)
+```bash
+docker pull us-east1-docker.pkg.dev/aeon-browser-build/aeon-build-env/builder:latest
+docker run --rm -v $(pwd):/work aeon-builder ninja -C out/Release
 ```
 
 ---
 
-## 🔧 Telemetry & Privacy
+## Security
 
-| Data collected | ✅/❌ |
-|---|---|
-| OS tier (e.g., "WinXP-HiSpec") | ✅ Anonymous |
-| RAM bucket (<512MB / 512MB-2GB / 2GB+) | ✅ Anonymous |
-| Crash reports (path only, no content) | ✅ Anonymous |
-| Browser locale | ✅ Anonymous |
-| URLs visited | ❌ Never |
-| Search queries | ❌ Never |
-| Form data / passwords | ❌ Never |
-| IP address | ❌ Never |
-| Device identifiers | ❌ Never |
+**Found a vulnerability?** Do not open a public issue.
 
-**Opt out:** `HKLM\SOFTWARE\DelgadoLogic\Aeon\TelemetryEnabled = 0`  
-*(Same registry key as LogicFlow — one opt-out covers everything by DelgadoLogic)*
+📧 `security@delgadologic.com`  
+🔑 PGP key: `delgadologic.com/pgp`
+
+We triage all reports within **48 hours**. Critical CVEs are patched via the Evolution Engine — the fix is peer-voted, signed, and distributed within 24 hours of confirmation.
 
 ---
 
-## 📦 Releases
+## License
 
-Aeon Browser ships inside the **[LogicFlow installer](https://delgadologic.tech/logicflow)**.  
-It can also be installed as a standalone browser.
+Aeon Browser is **proprietary software** owned by DelgadoLogic.  
+Source is provided for audit transparency and community contribution only.  
+Redistribution, resale, or derivative commercial products are prohibited without explicit written permission.
 
-| Channel | Cadence | Audience |
-|---------|---------|---------|
-| **Stable** | Monthly | Everyone |
-| **Beta** | Bi-weekly | Power users |
-| **Nightly** | Daily | Developers |
-
-Updates are delivered via `update.delgadologic.tech` — verified with **Authenticode** signature + **SHA-256** hash before installation. Delta patches minimize download size.
+See [LICENSE](LICENSE) for full terms.
 
 ---
 
-## 📄 License
+<div align="center">
 
-**Proprietary — © 2026 DelgadoLogic. All rights reserved.**
+**Built with sovereignty in mind.**
 
-Reference codebases were studied for architectural patterns only. No code was copied.  
-Third-party component licenses:
+*© 2026 DelgadoLogic · Manuel A. Delgado · All Rights Reserved*
 
-| Component | License | Integration |
-|-----------|---------|-------------|
-| WolfSSL | GPLv2 + commercial | Separate DLL |
-| Arti (Tor) | MIT/Apache 2.0 | Rust crate |
-| i2pd | BSD 3-clause | Child process |
-| SQLite3 | Public domain | Vendored amalgamation |
-| GoodbyeDPI | MIT | Bundled binary (research basis) |
-| Zapret | MIT | Research basis only |
+[DelgadoLogic GitHub](https://github.com/DelgadoLogic) · [Report a Bug](https://github.com/DelgadoLogic/aeon-engine/issues) · [Security Policy](SECURITY.md)
 
----
-
-![Aeon Icon](resources/images/icon_medium.png)
-
-**Aeon Browser by DelgadoLogic**
-
-*Timeless. From Windows 3.1 to Windows 11.*
-
-[🌐 delgadologic.tech](https://delgadologic.tech) · [📦 LogicFlow](https://delgadologic.tech/logicflow) · [🐛 Issues](https://github.com/DelgadoLogic/AeonBrowser/issues) · [📧 Support](https://delgadologic.tech/support)
+</div>
