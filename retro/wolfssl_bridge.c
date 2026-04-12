@@ -82,13 +82,14 @@ void wolfssl_cleanup(void) {
 /* Parse host and path from "https://host/path" or "http://host/path" */
 static void parse_url(const char* url, char* host, char* path, int* port, int* is_https) {
     const char* p = url;
+    int i;
     *is_https = 0;
     *port     = 80;
     if (strncmp(p, "https://", 8) == 0) { *is_https = 1; *port = 443; p += 8; }
     else if (strncmp(p, "http://",  7) == 0)               p += 7;
 
     /* Extract host (up to '/' or ':' or end) */
-    int i = 0;
+    i = 0;
     while (*p && *p != '/' && *p != ':' && i < 255) host[i++] = *p++;
     host[i] = '\0';
 
@@ -99,15 +100,24 @@ static void parse_url(const char* url, char* host, char* path, int* port, int* i
 
 /* Perform plain HTTP GET via WinSock 1.1 */
 int http_get(const char* url, char* buf, int buf_len) {
-    char host[256] = {0}, path[256] = {0};
-    int  port = 80, is_https = 0;
+    char host[256], path[256];
+    int  port, is_https;
+    struct hostent FAR* he;
+    SOCKET sock;
+    struct sockaddr_in sa;
+    char req[512];
+    int total, r;
+
+    memset(host, 0, sizeof(host));
+    memset(path, 0, sizeof(path));
+    port = 80; is_https = 0;
     parse_url(url, host, path, &port, &is_https);
 
-    struct hostent FAR* he = gethostbyname(host);
+    he = gethostbyname(host);
     if (!he) return 0;
 
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in sa = {0};
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port   = htons((u_short)port);
     memcpy(&sa.sin_addr, he->h_addr, he->h_length);
@@ -116,32 +126,52 @@ int http_get(const char* url, char* buf, int buf_len) {
         closesocket(sock); return 0;
     }
 
-    char req[512];
     wsprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Aeon/1.0\r\n\r\n",
         path, host);
     send(sock, req, lstrlen(req), 0);
 
-    int total = 0, r;
+    total = 0;
     while ((r = recv(sock, buf + total, buf_len - total - 1, 0)) > 0)
         total += r;
     buf[total] = '\0';
     closesocket(sock);
+
+    /* Strip HTTP response headers (find \r\n\r\n boundary) */
+    {
+        char* body = strstr(buf, "\r\n\r\n");
+        if (body) {
+            body += 4;
+            total = total - (int)(body - buf);
+            memmove(buf, body, total + 1);
+        }
+    }
     return total;
 }
 
 /* HTTPS via WolfSSL 16-bit */
 int wolfssl_get(const char* url, char* buf, int buf_len) {
-    if (!g_hWolfSSL || !pfnMethod) return 0; /* No WolfSSL — offline mode */
+    char host[256], path[256];
+    int  port, is_https;
+    struct hostent FAR* he;
+    SOCKET sock;
+    struct sockaddr_in sa;
+    void* ctx;
+    void* ssl;
+    char req[512];
+    int total, r;
 
-    char host[256] = {0}, path[256] = {0};
-    int  port = 443, is_https = 0;
+    if (!g_hWolfSSL || !pfnMethod) return 0; /* No WolfSSL - offline mode */
+
+    memset(host, 0, sizeof(host));
+    memset(path, 0, sizeof(path));
+    port = 443; is_https = 0;
     parse_url(url, host, path, &port, &is_https);
 
-    struct hostent FAR* he = gethostbyname(host);
+    he = gethostbyname(host);
     if (!he) return 0;
 
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in sa = {0};
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port   = htons((u_short)port);
     memcpy(&sa.sin_addr, he->h_addr, he->h_length);
@@ -151,42 +181,62 @@ int wolfssl_get(const char* url, char* buf, int buf_len) {
     }
 
     /* TLS handshake via WolfSSL */
-    void* ctx = pfnCtxNew(pfnMethod());
-    void* ssl = pfnNew(ctx);
+    ctx = pfnCtxNew(pfnMethod());
+    ssl = pfnNew(ctx);
     pfnSetFd(ssl, (int)sock);
 
     if (pfnConnect(ssl) != 1) {
         pfnFree(ssl); pfnCtxFree(ctx); closesocket(sock); return 0;
     }
 
-    char req[512];
     wsprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Aeon/1.0\r\n\r\n",
         path, host);
     pfnWrite(ssl, req, lstrlen(req));
 
-    int total = 0, r;
+    total = 0;
     while ((r = pfnRead(ssl, buf + total, buf_len - total - 1)) > 0)
         total += r;
     buf[total] = '\0';
 
     pfnFree(ssl); pfnCtxFree(ctx); closesocket(sock);
+
+    /* Strip HTTP response headers */
+    {
+        char* body = strstr(buf, "\r\n\r\n");
+        if (body) {
+            body += 4;
+            total = total - (int)(body - buf);
+            memmove(buf, body, total + 1);
+        }
+    }
     return total;
 }
 
 /* Gemini: TLS + "URL\r\n" + read response */
 int gemini_get(const char* url, char* buf, int buf_len) {
+    char host[256], path[256];
+    int  port, dummy;
+    struct hostent FAR* he;
+    SOCKET sock;
+    struct sockaddr_in sa;
+    void* ctx;
+    void* ssl;
+    char req[512];
+    int total, r;
+
     if (!g_hWolfSSL || !pfnMethod) return 0;
 
-    char host[256] = {0}, path[256] = {0};
-    int  port = 1965, dummy = 0;
+    memset(host, 0, sizeof(host));
+    memset(path, 0, sizeof(path));
+    port = 1965; dummy = 0;
     parse_url(url, host, path, &port, &dummy);
     port = 1965; /* Gemini always 1965 */
 
-    struct hostent FAR* he = gethostbyname(host);
+    he = gethostbyname(host);
     if (!he) return 0;
 
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in sa = {0};
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port   = htons(1965);
     memcpy(&sa.sin_addr, he->h_addr, he->h_length);
@@ -195,19 +245,18 @@ int gemini_get(const char* url, char* buf, int buf_len) {
         closesocket(sock); return 0;
     }
 
-    void* ctx = pfnCtxNew(pfnMethod());
-    void* ssl = pfnNew(ctx);
+    ctx = pfnCtxNew(pfnMethod());
+    ssl = pfnNew(ctx);
     pfnSetFd(ssl, (int)sock);
     if (pfnConnect(ssl) != 1) {
         pfnFree(ssl); pfnCtxFree(ctx); closesocket(sock); return 0;
     }
 
     /* Gemini request: just the URL + CRLF */
-    char req[512];
     lstrcpy(req, url); lstrcat(req, "\r\n");
     pfnWrite(ssl, req, lstrlen(req));
 
-    int total = 0, r;
+    total = 0;
     while ((r = pfnRead(ssl, buf + total, buf_len - total - 1)) > 0)
         total += r;
     buf[total] = '\0';
