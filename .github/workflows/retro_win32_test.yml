@@ -98,8 +98,9 @@ jobs:
       - name: Wine Runtime Test
         working-directory: retro
         run: |
-          export WINEPREFIX=/tmp/wine_test
+          export WINEPREFIX="$HOME/.wine_aeon"
           export WINEDEBUG=-all
+          mkdir -p "$WINEPREFIX"
           wine wineboot --init 2>/dev/null || true
           sleep 2
 
@@ -110,9 +111,12 @@ jobs:
           timeout 60 wine ./tls_test.exe 2>&1 | tee wine_output.txt || RESULT=$?
 
           echo ""
+          # Check for the AEON result marker (set by tls_test.c)
           if grep -q "AEON_TEST_RESULT=PASS" wine_output.txt; then
             echo "TIER1_RESULT=PASS"
             echo "tier1_status=pass" >> $GITHUB_ENV
+            # Extract test counts for the summary
+            grep "Test Results:" wine_output.txt || true
           elif grep -q "AEON_TEST_RESULT=FAIL" wine_output.txt; then
             echo "TIER1_RESULT=FAIL"
             echo "tier1_status=fail" >> $GITHUB_ENV
@@ -120,10 +124,10 @@ jobs:
           else
             echo "TIER1_RESULT=INCONCLUSIVE (exit=$RESULT)"
             echo "tier1_status=inconclusive" >> $GITHUB_ENV
-            # URL parsing tests should always pass even without network
-            if [ "$RESULT" = "0" ]; then
-              echo "Exit code 0 — treating as pass"
-            fi
+            # Binary may return non-zero for network test failures.
+            # URL parsing tests should always pass even without network,
+            # so AEON_TEST_RESULT=PASS should still appear if binary ran.
+            echo "No result marker found — binary may have crashed or Wine failed."
           fi
 
       - name: Upload Build Artifacts
@@ -177,6 +181,7 @@ jobs:
           Write-Host " Tier 5c: Native Windows Execution"
           Write-Host " OS: $([System.Environment]::OSVersion)"
           Write-Host " Arch: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
+          Write-Host " Runner: $env:RUNNER_OS / $env:RUNNER_ARCH"
           Write-Host "=========================================="
           Write-Host ""
 
@@ -196,22 +201,24 @@ jobs:
             Write-Host $stderr
           }
           Write-Host "--- exit code: $($proc.ExitCode) ---"
+          Write-Host ""
 
-          # Parse result
+          # Parse result — AEON_TEST_RESULT is the authority.
+          # The binary returns exit code 1 when network tests fail (expected on CI)
+          # but sets AEON_TEST_RESULT=PASS if URL parsing tests all pass.
           if ($output -match "AEON_TEST_RESULT=PASS") {
-            Write-Host ""
+            # Extract test counts
+            if ($output -match 'Test Results: (\d+)/(\d+) passed') {
+              Write-Host "Passed: $($Matches[1])/$($Matches[2]) tests"
+            }
             Write-Host "TIER5C_RESULT=PASS"
           } elseif ($output -match "AEON_TEST_RESULT=FAIL") {
-            Write-Host ""
             Write-Host "TIER5C_RESULT=FAIL"
             exit 1
           } else {
-            Write-Host ""
             Write-Host "TIER5C_RESULT=INCONCLUSIVE (exit=$($proc.ExitCode))"
-            # URL parsing tests (4 tests) should always pass
-            if ($proc.ExitCode -eq 0) {
-              Write-Host "Exit code 0 - treating as pass"
-            }
+            Write-Host "No AEON_TEST_RESULT marker found — binary may have crashed."
+            # Don't fail hard — crash is different from test failure
           }
 
       - name: Upload Windows Test Results
