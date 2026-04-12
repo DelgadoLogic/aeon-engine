@@ -1,0 +1,71 @@
+# AeonBrowser retro — 32-bit DLL Makefile (Open Watcom)
+# DelgadoLogic
+#
+# BUILD REQUIREMENTS:
+#   - Open Watcom 2.0 (https://github.com/open-watcom/open-watcom-v2)
+#   - Windows SDK headers (included in OW2)
+#
+# USAGE:
+#   wmake -f makefile_32bit           → builds aeon_html4.dll (32-bit Win9x/2000)
+#   wmake -f makefile_32bit clean     → removes build artifacts
+#
+# NOTE: This builds the DLL that TierDispatcher loads on Win9x/2000/NT4.
+# BearSSL files are compiled individually to avoid static symbol collisions.
+#
+# -za99 = partial C99 mode (required for BearSSL's 'static inline' + stdint.h)
+
+CC      = wcc386
+LINK    = wlink
+CFLAGS  = -bt=nt -d2 -W3 -wx -za99 -DAEON_HTML4_BUILD -I..\core\engine -Ibearssl/inc -Ibearssl/src
+TARGET  = aeon_html4.dll
+
+# Application objects
+APP_OBJS = aeon_html4.obj aeon_html4_adapter.obj bearssl_bridge.obj
+
+all: $(TARGET)
+
+# Link all objects into DLL
+$(TARGET): $(APP_OBJS) bearssl_lib
+	$(LINK) NAME $(TARGET) &
+	    SYSTEM nt_dll INITINSTANCE TERMINSTANCE &
+	    OPTION MAP &
+	    OPTION IMPLIB=aeon_html4.lib &
+	    LIBRARY kernel32.lib &
+	    LIBRARY user32.lib &
+	    LIBRARY gdi32.lib &
+	    LIBRARY wsock32.lib &
+	    LIBRARY advapi32.lib &
+	    FILE { $(APP_OBJS) } &
+	    LIBRARY bearssl.lib
+
+# Application source targets
+aeon_html4.obj: aeon_html4.c aeon_html4.h
+	$(CC) $(CFLAGS) aeon_html4.c
+
+aeon_html4_adapter.obj: aeon_html4_adapter.c aeon_html4.h ..\core\engine\AeonEngine_Interface.h bearssl_bridge.h
+	$(CC) $(CFLAGS) aeon_html4_adapter.c
+
+bearssl_bridge.obj: bearssl_bridge.c bearssl_bridge.h trust_anchors.h bearssl/inc/bearssl.h
+	$(CC) $(CFLAGS) bearssl_bridge.c
+
+# BearSSL static library — compile each file individually
+bearssl_lib: .SYMBOLIC
+	@if not exist bearssl_obj mkdir bearssl_obj
+	for %f in (bearssl\src\codec\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\ec\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\hash\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\int\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\kdf\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\mac\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\rand\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\rsa\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\settings.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\ssl\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\symcipher\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	for %f in (bearssl\src\x509\*.c) do $(CC) -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src -fo=bearssl_obj\ %f
+	wlib -n bearssl.lib bearssl_obj\*.obj
+
+clean:
+	del *.obj *.map *.lib $(TARGET) 2>NUL
+	if exist bearssl_obj del bearssl_obj\*.obj 2>NUL
+	if exist bearssl_obj rmdir bearssl_obj 2>NUL

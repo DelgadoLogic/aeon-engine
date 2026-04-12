@@ -1,0 +1,13 @@
+# Cloud Build ignore — only upload what's needed for build
+.git
+*.dll
+*.exe
+*.lib
+*.o
+*.obj
+*.map
+*.err
+bearssl_obj/
+tools/
+*.iso
+*.qcow2
