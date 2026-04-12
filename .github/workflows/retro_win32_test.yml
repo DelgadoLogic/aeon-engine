@@ -48,18 +48,45 @@ jobs:
           echo "INCLUDE=/opt/watcom/h:/opt/watcom/h/nt:/opt/watcom/h/nt/directx:/opt/watcom/h/win" >> $GITHUB_ENV
           echo "LIB=/opt/watcom/lib386/nt:/opt/watcom/lib386:/opt/watcom/lib286/win:/opt/watcom/lib286" >> $GITHUB_ENV
 
-      - name: Build BearSSL + aeon_html4.dll
-        working-directory: retro
-        run: sh build_full.sh
-
-      - name: Build tls_test.exe
+      - name: Build BearSSL + tls_test.exe
         working-directory: retro
         run: |
+          set -e
+          echo "=== Phase 1: BearSSL Library ==="
+          mkdir -p bearssl_obj
+          COMPILED=0; SKIPPED=0; ERRORS=0
+          for src in $(find bearssl/src -name '*.c' | sort); do
+            base=$(basename "$src" .c)
+            case "$base" in
+              *_x86ni*|*_pclmul*|*_pwr8*|*_sse2*|ghash_pclmul) SKIPPED=$((SKIPPED+1)); continue ;;
+              ec_c25519_m62|ec_c25519_m64|ec_p256_m62|ec_p256_m64) SKIPPED=$((SKIPPED+1)); continue ;;
+              *_ct64*|aes_ct64*|poly1305_ctmulq) SKIPPED=$((SKIPPED+1)); continue ;;
+              i62_modpow2|rsa_i62_*) SKIPPED=$((SKIPPED+1)); continue ;;
+            esac
+            if wcc386 -bt=nt -za99 -Ibearssl/inc -Ibearssl/src -fo="bearssl_obj/${base}.o" "$src" > /dev/null 2>&1; then
+              COMPILED=$((COMPILED+1))
+            else
+              echo "  FAIL: $src"; ERRORS=$((ERRORS+1))
+            fi
+          done
+          echo "BearSSL: $COMPILED compiled, $SKIPPED skipped, $ERRORS errors"
+          [ $ERRORS -gt 0 ] && { echo "FATAL: BearSSL failed"; exit 1; }
+          wlib -n -q bearssl.lib bearssl_obj/*.o
+          echo "bearssl.lib: $(ls -la bearssl.lib | awk '{print $5}') bytes"
+
+          echo ""
+          echo "=== Phase 2: Bridge + Test Binary ==="
+          wcc386 -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src bearssl_bridge.c
+          echo "  bearssl_bridge.o OK"
           wcc386 -bt=nt -za99 -W3 -Ibearssl/inc -Ibearssl/src tls_test.c
+          echo "  tls_test.o OK"
+
+          echo ""
+          echo "=== Phase 3: Link tls_test.exe ==="
           wlink NAME tls_test.exe SYSTEM nt FILE tls_test.o FILE bearssl_bridge.o LIBRARY bearssl.lib LIBRARY kernel32.lib LIBRARY wsock32.lib
           echo ""
           echo "--- Build Artifacts ---"
-          ls -la tls_test.exe aeon_html4.dll 2>/dev/null || true
+          ls -la tls_test.exe bearssl.lib 2>/dev/null || true
 
       - name: Install Wine
         run: |
@@ -106,7 +133,6 @@ jobs:
           name: retro-build-linux
           path: |
             retro/tls_test.exe
-            retro/aeon_html4.dll
             retro/wine_output.txt
           retention-days: 14
 
