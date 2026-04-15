@@ -1,0 +1,46 @@
+---
+title: "Introducing the Aeon Browser Dev Portal"
+description: "The official developer documentation site for Aeon Browser is now live at aeonbrowser.dev. Here's what to expect."
+slug: introducing-dev-portal
+authors: [delgadologic]
+tags: [release, infrastructure]
+date: 2026-04-13
+---
+
+# Introducing the Aeon Browser Dev Portal
+
+Today we're launching **aeonbrowser.dev** — the official developer documentation hub for Aeon Browser. This site will serve as the central resource for everything technical about Aeon: architecture documentation, API references, build guides, and engineering deep-dives.
+
+{/* truncate */}
+
+## Why a Dedicated Dev Site?
+
+Aeon Browser isn't a simple Chromium reskin. We're building a privacy-first, AI-native browser with a custom engine architecture. That level of ambition requires comprehensive, well-organized documentation — not just for external contributors, but for our own development velocity.
+
+**browseaeon.com** remains our product-facing site (downloads, features, marketing). **aeonbrowser.dev** is for developers — the people who want to understand *how* Aeon works, contribute to the codebase, or build extensions for the platform.
+
+## What's Here
+
+- **Architecture docs** covering the Aeon Engine, browser shell, and Chromium integration layer
+- **Build guides** for getting Aeon compiling from source on Windows
+- **API reference** (coming soon) for the extensions API and engine interfaces
+- **This dev blog** for engineering updates, release notes, and technical deep-dives
+
+## The Tech Stack
+
+This site is built with [Docusaurus 3](https://docusaurus.io/) and deployed to Firebase Hosting. It's part of the Aeon monorepo, making it easy to keep docs in sync with code changes.
+
+## What's Next
+
+We'll be publishing regular engineering updates here as we reach key milestones:
+
+- **Engine Integration** — Wiring the C++ browser shell to `aeon_engine.dll`
+- **Privacy Engine** — Built-in ad blocking and tracker prevention
+- **AI Bridge** — Gemini integration for intelligent browsing features
+- **Extensions API** — Manifest V3 compatibility layer with Aeon-specific extensions
+
+Follow the progress here, or star us on [GitHub](https://github.com/AeonBrowserDev/aeon-browser).
+
+---
+
+*Built different. Browse different.*

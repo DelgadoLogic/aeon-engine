@@ -35,6 +35,9 @@
 #include <vector>
 
 #ifdef _WIN32
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
 #endif
@@ -252,7 +255,7 @@ LoadedModel* AeonTranslateImpl::GetOrLoadModel(
     const char* src_lang, const char* tgt_lang)
 {
     std::string key = std::string(src_lang) + "_" + std::string(tgt_lang);
-    std::lock_guard<std::mutex> lk(models_mutex);
+    std::unique_lock<std::mutex> lk(models_mutex);
 
     auto it = models.find(key);
     if (it != models.end()) {
@@ -260,9 +263,10 @@ LoadedModel* AeonTranslateImpl::GetOrLoadModel(
         return it->second.get();
     }
 
-    // Try loading from disk
-    lk.~lock_guard(); // manual unlock before recursive call
-    // (In real impl: use unique_lock + condition variable)
+    // Release lock before LoadModelFile — it may take a long time
+    // and callers should not be blocked during disk I/O
+    lk.unlock();
+
     if (LoadModelFile(src_lang, tgt_lang)) {
         std::lock_guard<std::mutex> lk2(models_mutex);
         auto it2 = models.find(key);

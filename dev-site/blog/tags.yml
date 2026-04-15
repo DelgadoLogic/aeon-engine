@@ -1,0 +1,20 @@
+release:
+  label: Release
+  description: Official release announcements
+  permalink: /tags/release
+engineering:
+  label: Engineering
+  description: Technical deep-dives and architecture decisions
+  permalink: /tags/engineering
+privacy:
+  label: Privacy
+  description: Privacy features and research
+  permalink: /tags/privacy
+ai:
+  label: AI
+  description: AI integration and capabilities
+  permalink: /tags/ai
+infrastructure:
+  label: Infrastructure
+  description: Build systems, CI/CD, and deployment
+  permalink: /tags/infrastructure

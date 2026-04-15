@@ -10,9 +10,10 @@
 ### `aeon_engine.dll`
 **What it is:** Our Chromium fork compiled as a DLL. The rendering engine that powers the entire browser.
 Chromium provides Blink (HTML/CSS rendering), V8 (JavaScript), and WebGL. We strip Google's telemetry and replace the network stack with our own Rust router. Every website on Earth renders correctly because it is Blink under the hood.
-**Status:** 🟡 Build in progress at `C:\chromium\src\out\AeonRelease\`
-**Produced by:** `ninja -C out\AeonRelease chrome`
-**Output file:** `chrome.dll` → renamed to `aeon_engine.dll`
+**Status:** 🟢 Built (v20 — 269.5 MB, 57,303 targets, 0 failures) — April 12, 2026
+**Produced by:** `ninja -C out\AeonRelease chrome` on GCP VM `n2-standard-32`
+**Output file:** `chrome.dll` → renamed to `aeon_engine.dll` (269.5 MB)
+**Location:** `C:\AeonEngine\engine_package\` (local) + `gs://aeon-sovereign-artifacts/` (cloud backup)
 **Google code removed:** Safe Browsing, Sync, Crashpad, UMA metrics, Rappor, Google APIs, sign-in, optimization guide cloud calls
 **Cost to run:** $0 (compiled locally, redistributed with installer)
 **Dependencies:** VS BuildTools 2022, depot_tools, ATL stub (`C:\chromium\atl_stub\`)
@@ -39,7 +40,7 @@ Built by studying and then replacing `llama.cpp` + `ggml`. Runs quantized 3B par
 - `.onion` URL routing (Tor integration — works in any tab, not a separate window)
 - `ipfs://` and `magnet:` URLs natively
 - CircumventionEngine integration (GoodbyeDPI, zapret, DPI bypass)
-**Status:** 🟢 Built, integrated
+**Status:** 🟡 Core binary built; routing logic designed, integration with `aeon_engine.dll` shell pending
 **Cost to run:** $0 (compiled into `Aeon.exe`, runs locally)
 
 ---
@@ -300,6 +301,47 @@ Aeon:   optimization_guide/ → Local Aeon Cache (stays on device)
 
 ---
 
+## LIVE INFRASTRUCTURE SERVICES (April 14, 2026)
+
+### Cloud Run Services (`aeon-browser-build` project)
+| Service | Purpose | Region | Status |
+|---------|---------|--------|--------|
+| `aeon-update-server` | Sovereign update manifests (`/v1/update/{product}/{channel}`) | us-east1 | 🟢 Live |
+| `aeon-ai-scanner` | CVE/threat intelligence scanning | us-central1 | 🟢 Live |
+| `aeon-dns` | Sovereign DoH resolver | us-central1 | 🟢 Live |
+| `aeon-relay` | Encrypted WebSocket tunnel relay | us-central1 | 🟢 Live |
+| `aeon-evolution-engine` | Autonomous patch system (dual-region) | us-central1, us-east1 | 🟢 Live |
+
+### Domain Infrastructure
+| Domain | Backend | Status |
+|--------|---------|--------|
+| `delgadologic.tech` | Firebase Hosting (`manuel-portfolio-2026`) | 🟢 HTTP 200 |
+| `www.delgadologic.tech` | Firebase Hosting (CNAME) | 🟢 HTTP 200 |
+| `status.delgadologic.tech` | Firebase Hosting | 🟢 HTTP 200 |
+| `api.delgadologic.tech` | Firebase Hosting (API portal) | 🟢 HTTP 200 |
+| `docs.delgadologic.tech` | Firebase Hosting (docs) | 🟢 HTTP 200 |
+| `audit.delgadologic.tech` | Firebase Hosting (Command Center) | 🟢 HTTP 200 |
+| `aeon.delgadologic.tech` | Firebase Hosting (`aeon-browser-delgado`) | 🟢 HTTP 200 |
+| `browseaeon.com` | Firebase Hosting (consumer brand) | 🟢 HTTP 200 |
+| `aeonbrowse.com` | Firebase Hosting (secondary alias) | 🟢 HTTP 200 |
+
+### GCS Buckets
+| Bucket | Role | Access |
+|--------|------|--------|
+| `aeon-sovereign-artifacts` | Engine builds, signed manifests, private CI artifacts | Private |
+| `aeon-public-dist` | Installer downloads, public release binaries | Public CDN |
+
+### Update Server Routes
+| Route | Response |
+|-------|----------|
+| `/health` | Service health check |
+| `/v1/update/logicflow/stable` | LogicFlow v1.0.0 manifest (Ed25519 signed) ✅ |
+| `/v1/update/aeon/stable` | Aeon stable channel (no release yet) |
+| `/v1/update/aeon/nightly` | Aeon nightly channel (no release yet) |
+| `/v1/manifest/publish` | CI publish endpoint (Bearer auth + GCP Secret Manager) |
+
+---
+
 ## REVENUE MODEL
 
 | Stream | Description | Potential |
@@ -379,4 +421,4 @@ Aeon:   optimization_guide/ → Local Aeon Cache (stays on device)
 
 ---
 
-*Last Updated: March 2026 | DelgadoLogic / Aeon Browser*
+*Last Updated: April 14, 2026 | DelgadoLogic / Aeon Browser*

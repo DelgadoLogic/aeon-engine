@@ -1,7 +1,7 @@
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
 
-set IDIR=C:\Users\Manuel A Delgado\Desktop\AeonBrowser\installer
+set IDIR=C:\Users\Manuel A Delgado\Desktop\DelgadoLogic\Products\AeonBrowser\installer
 set SRC=%IDIR%\src
 set BIN=%IDIR%\bin
 set OBJ=%IDIR%\obj
@@ -18,7 +18,7 @@ cl.exe /nologo /W3 /O2 /std:c++17 /EHsc /DUNICODE /D_UNICODE /DWIN32 /DNDEBUG /F
 if errorlevel 1 ( echo CL FAILED & goto done )
 
 echo [3/3] Link...
-link.exe /nologo /SUBSYSTEM:WINDOWS /MACHINE:X64 /OUT:"%BIN%\AeonSetup.exe" "%OBJ%\AeonInstaller.obj" "%OBJ%\AeonInstaller.res" gdiplus.lib shell32.lib shlwapi.lib user32.lib gdi32.lib ole32.lib kernel32.lib advapi32.lib
+link.exe /nologo /SUBSYSTEM:WINDOWS /MACHINE:X64 /OUT:"%BIN%\AeonSetup.exe" "%OBJ%\AeonInstaller.obj" "%OBJ%\AeonInstaller.res" gdiplus.lib shell32.lib shlwapi.lib user32.lib gdi32.lib ole32.lib kernel32.lib advapi32.lib wininet.lib
 if errorlevel 1 ( echo LINK FAILED & goto done )
 
 echo.

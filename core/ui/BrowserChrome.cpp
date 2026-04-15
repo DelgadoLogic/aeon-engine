@@ -51,6 +51,7 @@
 #include "../../updater/AutoUpdater.h"
 #include "../../core/network/NetworkSentinel.h"
 #include "../../core/network/DnsResolver.h"
+#include "../../core/engine/AeonBridge.h"
 
 #pragma comment(lib, "dwmapi.lib")
 
@@ -100,6 +101,7 @@ struct ChromeState {
     HWND                hwnd;
     HWND                hUrlBar;
     HWND                hContent;
+    HFONT               hUrlFont;  // URL bar font — stored to prevent GDI leak
 
     std::vector<ChromeTab> tabs;
     int                 activeTab;
@@ -126,9 +128,11 @@ static void FillRectColor(HDC hdc, const RECT& r, COLORREF c) {
 static void DrawRoundRect(HDC hdc, const RECT& r, int rx, COLORREF fill, COLORREF stroke) {
     HBRUSH br = CreateSolidBrush(fill);
     HPEN   pn = CreatePen(PS_SOLID, 1, stroke);
-    SelectObject(hdc, br);
-    SelectObject(hdc, pn);
+    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, br);
+    HPEN   oldPn = (HPEN)SelectObject(hdc, pn);
     RoundRect(hdc, r.left, r.top, r.right, r.bottom, rx, rx);
+    SelectObject(hdc, oldBr);
+    SelectObject(hdc, oldPn);
     DeleteObject(br);
     DeleteObject(pn);
 }
@@ -363,6 +367,11 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
         RECT rc; GetClientRect(parent, &rc);
         engine->SetViewport(t.id, parent, 0, CHROME_H,
             rc.right, rc.bottom - CHROME_H);
+
+        // Inject AeonBridge bootstrap into every new document
+        // (queued inside the DLL until WebView2 is ready)
+        std::string bridgeJs = AeonBridge::BuildInjectionScript();
+        engine->InjectEarlyJS(t.id, bridgeJs.c_str());
     }
 
     ch->hwnd = parent;
@@ -384,10 +393,8 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
         NetworkSentinel::ApplyBestStrategy();
         NetworkSentinel::StartMonitor(); // re-checks every 30s
 
-        // 3. Start AutoUpdater background poller
-        //    Polls update.delgadologic.tech once every 24 hours.
-        //    Downloads + verifies + silently installs if update is available.
-        AutoUpdater::CheckAsync("stable");
+        // 3. AutoUpdater: already started by AeonMain::WinMain
+        //    No additional call needed here.
     }).detach();
 }
 
@@ -402,10 +409,617 @@ void OnSize(HWND hwnd, int w, int h) {
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
     if (!ch) return;
     PaintChrome(ch);
-    if (ch->engine && ch->activeTab >= 0) {
+
+    // Resize URL bar edit control if visible
+    if (ch->hUrlBar && IsWindowVisible(ch->hUrlBar)) {
+        RECT rc; GetClientRect(hwnd, &rc);
+        int urlLeft  = URLBAR_PAD + 4;
+        int urlRight = rc.right - URLBAR_END - 4;
+        MoveWindow(ch->hUrlBar, urlLeft, 8, urlRight - urlLeft, NAV_HEIGHT - 16, TRUE);
+    }
+
+    if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
         auto& t = ch->tabs[ch->activeTab];
         ch->engine->SetViewport(t.id, hwnd, 0, CHROME_H, w, h - CHROME_H);
     }
 }
 
+// ---------------------------------------------------------------------------
+// URL bar constants
+// ---------------------------------------------------------------------------
+#define IDC_URLBAR 9001
+static WNDPROC g_OrigUrlBarProc = nullptr;
+
+// Sub-class proc for URL bar EDIT — intercepts Enter/Escape
+static LRESULT CALLBACK UrlBarSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_KEYDOWN) {
+        if (wParam == VK_RETURN) {
+            // Send the URL bar text as a navigation command
+            HWND parent = GetParent(hWnd);
+            SendMessageW(parent, WM_COMMAND,
+                MAKEWPARAM(IDC_URLBAR, EN_CHANGE + 100), (LPARAM)hWnd);
+            return 0;
+        }
+        if (wParam == VK_ESCAPE) {
+            // Cancel editing — hide URL bar
+            ShowWindow(hWnd, SW_HIDE);
+            SetFocus(GetParent(hWnd));
+            return 0;
+        }
+    }
+    if (msg == WM_KILLFOCUS) {
+        // Hide when focus leaves
+        ShowWindow(hWnd, SW_HIDE);
+        ChromeState* ch = reinterpret_cast<ChromeState*>(
+            GetWindowLongPtr(GetParent(hWnd), GWLP_USERDATA));
+        if (ch) { ch->urlFocused = false; PaintChrome(ch); }
+    }
+    return CallWindowProcW(g_OrigUrlBarProc, hWnd, msg, wParam, lParam);
+}
+
+// Create (or show) the URL bar edit control
+static void ActivateUrlBar(ChromeState* ch, bool selectAll = true) {
+    RECT rc; GetClientRect(ch->hwnd, &rc);
+    int urlLeft  = URLBAR_PAD + 4;
+    int urlRight = rc.right - URLBAR_END - 4;
+
+    if (!ch->hUrlBar) {
+        ch->hUrlBar = CreateWindowExA(
+            0, "EDIT", "",
+            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            urlLeft, 8, urlRight - urlLeft, NAV_HEIGHT - 16,
+            ch->hwnd, (HMENU)(UINT_PTR)IDC_URLBAR, nullptr, nullptr);
+
+        // Style the edit control — create font once, store in ChromeState
+        if (!ch->hUrlFont) {
+            ch->hUrlFont = CreateFontA(-14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+                ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, "Segoe UI");
+        }
+        SendMessageA(ch->hUrlBar, WM_SETFONT, (WPARAM)ch->hUrlFont, TRUE);
+
+        // Subclass to intercept Enter/Escape
+        g_OrigUrlBarProc = (WNDPROC)SetWindowLongPtr(
+            ch->hUrlBar, GWLP_WNDPROC, (LONG_PTR)UrlBarSubclassProc);
+    }
+
+    // Position and show
+    MoveWindow(ch->hUrlBar, urlLeft, 8, urlRight - urlLeft, NAV_HEIGHT - 16, TRUE);
+
+    // Populate with current URL
+    const char* url = "about:blank";
+    if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+        url = ch->tabs[ch->activeTab].url.c_str();
+    SetWindowTextA(ch->hUrlBar, url);
+
+    ShowWindow(ch->hUrlBar, SW_SHOW);
+    SetFocus(ch->hUrlBar);
+    if (selectAll)
+        SendMessageA(ch->hUrlBar, EM_SETSEL, 0, -1);
+
+    ch->urlFocused = true;
+    PaintChrome(ch);
+}
+
+// Navigate to the URL currently in the edit control
+static void CommitUrlBar(ChromeState* ch) {
+    if (!ch->hUrlBar) return;
+    char buf[2048] = {};
+    GetWindowTextA(ch->hUrlBar, buf, sizeof(buf));
+
+    ShowWindow(ch->hUrlBar, SW_HIDE);
+    SetFocus(ch->hwnd);
+    ch->urlFocused = false;
+
+    if (buf[0] == '\0') return;
+
+    std::string url = buf;
+
+    // Auto-prepend https:// if no scheme present
+    if (url.find("://") == std::string::npos && url.find("aeon://") != 0) {
+        // If it looks like a domain (has a dot), navigate; otherwise search
+        if (url.find('.') != std::string::npos || url.find("localhost") == 0) {
+            url = "https://" + url;
+        } else {
+            // Treat as search query (Bing — monetized via partner code)
+            std::string encoded;
+            for (char c : url) {
+                if (c == ' ') encoded += '+';
+                else encoded += c;
+            }
+            url = "https://www.bing.com/search?q=" + encoded;
+        }
+    }
+
+    // Update tab state
+    if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+        auto& t = ch->tabs[ch->activeTab];
+        t.url = url;
+        t.loading = true;
+        if (ch->engine) ch->engine->Navigate(t.id, url.c_str(), nullptr);
+    }
+
+    PaintChrome(ch);
+    fprintf(stdout, "[Chrome] Navigate: %s\n", url.c_str());
+}
+
+// ---------------------------------------------------------------------------
+// Hit-test: returns button ID or -1 for empty area
+// IDs: 1=back, 2=fwd, 3=refresh, 4=urlbar, 5..8=right icons, 10=min, 11=max, 12=close
+//      100+i = tab i, 200+i = tab i close button
+// ---------------------------------------------------------------------------
+int HitTest(HWND hwnd, int x, int y) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return -1;
+
+    RECT rc; GetClientRect(hwnd, &rc);
+    int W = rc.right;
+
+    // Nav bar region (y < NAV_HEIGHT)
+    if (y < NAV_HEIGHT) {
+        // Logo badge
+        if (x >= BTN_LOGO_X && x < BTN_LOGO_X + BTN_LOGO_W) return 0;
+        // Back
+        if (x >= BTN_BACK_X && x < BTN_BACK_X + BTN_BACK_W) return 1;
+        // Forward
+        if (x >= BTN_FWD_X && x < BTN_FWD_X + BTN_FWD_W) return 2;
+        // Refresh
+        if (x >= BTN_REF_X && x < BTN_REF_X + BTN_REF_W) return 3;
+        // URL bar
+        if (x >= URLBAR_PAD && x < W - URLBAR_END) return 4;
+        // Window controls
+        if (x >= W - 90 && x < W - 60) return 10; // minimize
+        if (x >= W - 60 && x < W - 30) return 11; // maximize
+        if (x >= W - 30) return 12;                // close
+        // Right icons area
+        if (x >= W - URLBAR_END) return 5;
+        return -1; // Empty nav bar = draggable
+    }
+
+    // Tab strip region (NAV_HEIGHT <= y < CHROME_H)
+    if (y < CHROME_H) {
+        for (int i = 0; i < (int)ch->tabs.size(); i++) {
+            const RECT& tr = ch->tabs[i].tabRect;
+            if (x >= tr.left && x < tr.right && y >= tr.top && y < tr.bottom) {
+                // Close button on tab?
+                if (x >= tr.right - 18) return 200 + i;
+                return 100 + i;
+            }
+        }
+        // "+" new tab button
+        int tabX = 8;
+        int tabCount = max(1, (int)ch->tabs.size());
+        int tabW = min(200, max(80, (W - 60) / tabCount));
+        int addX = 8 + (int)ch->tabs.size() * (tabW + 4) + 4;
+        if (x >= addX && x < addX + 22) return 50; // new tab
+        return -1;
+    }
+
+    return -1; // Content area
+}
+
+// ---------------------------------------------------------------------------
+// Helper: create new tab
+// ---------------------------------------------------------------------------
+static void CreateNewTab(ChromeState* ch, const char* url = "aeon://newtab") {
+    if (!ch->engine) return;
+    ChromeTab t;
+    t.id = ch->engine->NewTab(ch->hwnd, url);
+    t.url = url;
+    t.title = "New Tab";
+    t.loading = false;
+    ch->tabs.push_back(t);
+    ch->activeTab = (int)ch->tabs.size() - 1;
+
+    // Set viewport
+    RECT rc; GetClientRect(ch->hwnd, &rc);
+    ch->engine->SetViewport(t.id, ch->hwnd, 0, CHROME_H,
+        rc.right, rc.bottom - CHROME_H);
+    ch->engine->FocusTab(t.id);
+
+    // Inject AeonBridge bootstrap into every new document
+    std::string bridgeJs = AeonBridge::BuildInjectionScript();
+    ch->engine->InjectEarlyJS(t.id, bridgeJs.c_str());
+
+    PaintChrome(ch);
+    fprintf(stdout, "[Chrome] New tab #%u: %s\n", t.id, url);
+}
+
+// ---------------------------------------------------------------------------
+// Mouse event handlers
+// ---------------------------------------------------------------------------
+void OnLButtonDown(HWND hwnd, int x, int y) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    int hit = HitTest(hwnd, x, y);
+    RECT rc; GetClientRect(hwnd, &rc);
+
+    switch (hit) {
+        case 1: // Back
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ch->engine->GoBack(ch->tabs[ch->activeTab].id);
+            break;
+
+        case 2: // Forward
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ch->engine->GoForward(ch->tabs[ch->activeTab].id);
+            break;
+
+        case 3: // Refresh
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ch->engine->Reload(ch->tabs[ch->activeTab].id, 0);
+            break;
+
+        case 4: // URL bar clicked
+            ActivateUrlBar(ch);
+            break;
+
+        case 10: // Minimize
+            ShowWindow(hwnd, SW_MINIMIZE);
+            break;
+
+        case 11: // Maximize / Restore
+            ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+            break;
+
+        case 12: // Close
+            DestroyWindow(hwnd);
+            break;
+
+        case 50: // New tab button
+            CreateNewTab(ch);
+            break;
+
+        default:
+            // Tab click (100+i)
+            if (hit >= 200) {
+                // Close tab button
+                int idx = hit - 200;
+                if (idx >= 0 && idx < (int)ch->tabs.size()) {
+                    if (ch->engine) ch->engine->CloseTab(ch->tabs[idx].id);
+                    ch->tabs.erase(ch->tabs.begin() + idx);
+                    if (ch->tabs.empty()) {
+                        // Last tab closed — open new tab
+                        CreateNewTab(ch);
+                    } else {
+                        if (ch->activeTab >= (int)ch->tabs.size())
+                            ch->activeTab = (int)ch->tabs.size() - 1;
+                        if (ch->engine)
+                            ch->engine->FocusTab(ch->tabs[ch->activeTab].id);
+                    }
+                    PaintChrome(ch);
+                }
+            } else if (hit >= 100) {
+                // Switch to tab
+                int idx = hit - 100;
+                if (idx >= 0 && idx < (int)ch->tabs.size() && idx != ch->activeTab) {
+                    ch->activeTab = idx;
+                    if (ch->engine) {
+                        ch->engine->FocusTab(ch->tabs[idx].id);
+                        ch->engine->SetViewport(ch->tabs[idx].id, hwnd, 0, CHROME_H,
+                            rc.right, rc.bottom - CHROME_H);
+                    }
+                    PaintChrome(ch);
+                }
+            }
+            break;
+    }
+}
+
+void OnLButtonUp(HWND hwnd, int x, int y) {
+    (void)hwnd; (void)x; (void)y;
+}
+
+void OnMouseMove(HWND hwnd, int x, int y) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    int oldHover = ch->hoverTab;
+    ch->hoverTab = -1;
+
+    if (y >= NAV_HEIGHT && y < CHROME_H) {
+        for (int i = 0; i < (int)ch->tabs.size(); i++) {
+            const RECT& tr = ch->tabs[i].tabRect;
+            if (x >= tr.left && x < tr.right && y >= tr.top && y < tr.bottom) {
+                ch->hoverTab = i;
+                break;
+            }
+        }
+    }
+
+    if (ch->hoverTab != oldHover) {
+        PaintChrome(ch);
+    }
+}
+
+// WM_COMMAND from URL bar EDIT
+void OnCommand(HWND hwnd, int id, int notifyCode, HWND ctlHwnd) {
+    (void)ctlHwnd;
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    if (id == IDC_URLBAR && notifyCode == EN_CHANGE + 100) {
+        // Enter key pressed in URL bar
+        CommitUrlBar(ch);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts — standard browser accelerators
+// Returns true if handled (caller should NOT pass to DefWindowProc).
+// ---------------------------------------------------------------------------
+bool OnKeyDown(HWND hwnd, WPARAM vk, LPARAM lParam) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return false;
+
+    bool ctrl  = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    bool shift = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+    bool alt   = (GetKeyState(VK_MENU)    & 0x8000) != 0;
+    (void)lParam;
+
+    // --- Ctrl+T: New tab ---
+    if (ctrl && !shift && !alt && vk == 'T') {
+        CreateNewTab(ch);
+        return true;
+    }
+
+    // --- Ctrl+W: Close current tab ---
+    if (ctrl && !shift && !alt && vk == 'W') {
+        if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+            if (ch->engine)
+                ch->engine->CloseTab(ch->tabs[ch->activeTab].id);
+            ch->tabs.erase(ch->tabs.begin() + ch->activeTab);
+            if (ch->tabs.empty()) {
+                CreateNewTab(ch);
+            } else {
+                if (ch->activeTab >= (int)ch->tabs.size())
+                    ch->activeTab = (int)ch->tabs.size() - 1;
+                if (ch->engine)
+                    ch->engine->FocusTab(ch->tabs[ch->activeTab].id);
+            }
+            PaintChrome(ch);
+        }
+        return true;
+    }
+
+    // --- Ctrl+L / F6: Focus URL bar ---
+    if ((ctrl && !shift && !alt && vk == 'L') || vk == VK_F6) {
+        ActivateUrlBar(ch);
+        return true;
+    }
+
+    // --- Ctrl+R / F5: Refresh ---
+    if ((ctrl && !shift && !alt && vk == 'R') || vk == VK_F5) {
+        if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+            ch->engine->Reload(ch->tabs[ch->activeTab].id, 0);
+        return true;
+    }
+
+    // --- Ctrl+Shift+R / Shift+F5: Hard refresh (cache bypass) ---
+    if ((ctrl && shift && !alt && vk == 'R') || (shift && vk == VK_F5)) {
+        if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+            ch->engine->Reload(ch->tabs[ch->activeTab].id, 1);
+        return true;
+    }
+
+    // --- Ctrl+Tab / Ctrl+Shift+Tab: Cycle tabs ---
+    if (ctrl && !alt && vk == VK_TAB) {
+        int n = (int)ch->tabs.size();
+        if (n > 1) {
+            if (shift)
+                ch->activeTab = (ch->activeTab - 1 + n) % n;
+            else
+                ch->activeTab = (ch->activeTab + 1) % n;
+            if (ch->engine)
+                ch->engine->FocusTab(ch->tabs[ch->activeTab].id);
+            PaintChrome(ch);
+        }
+        return true;
+    }
+
+    // --- Ctrl+1..9: Switch to tab N (Ctrl+9 = last tab) ---
+    if (ctrl && !shift && !alt && vk >= '1' && vk <= '9') {
+        int idx = (vk == '9') ? (int)ch->tabs.size() - 1 : (int)(vk - '1');
+        if (idx >= 0 && idx < (int)ch->tabs.size() && idx != ch->activeTab) {
+            ch->activeTab = idx;
+            if (ch->engine)
+                ch->engine->FocusTab(ch->tabs[ch->activeTab].id);
+            PaintChrome(ch);
+        }
+        return true;
+    }
+
+    // --- Alt+Left: Back ---
+    if (alt && !ctrl && vk == VK_LEFT) {
+        if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+            ch->engine->GoBack(ch->tabs[ch->activeTab].id);
+        return true;
+    }
+
+    // --- Alt+Right: Forward ---
+    if (alt && !ctrl && vk == VK_RIGHT) {
+        if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+            ch->engine->GoForward(ch->tabs[ch->activeTab].id);
+        return true;
+    }
+
+    return false; // Not handled — pass to DefWindowProc
+}
+
+// ---------------------------------------------------------------------------
+// Engine callback helpers — safely update tab state from engine events
+// ---------------------------------------------------------------------------
+void UpdateTabTitle(HWND hwnd, unsigned int tab_id, const char* title) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+    for (auto& t : ch->tabs) {
+        if (t.id == tab_id) {
+            t.title = title ? title : "";
+            break;
+        }
+    }
+    InvalidateRect(hwnd, nullptr, FALSE);
+}
+
+void UpdateTabUrl(HWND hwnd, unsigned int tab_id, const char* url) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+    for (auto& t : ch->tabs) {
+        if (t.id == tab_id) {
+            t.url = url ? url : "";
+            break;
+        }
+    }
+    InvalidateRect(hwnd, nullptr, FALSE);
+}
+
+void SetTabLoaded(HWND hwnd, unsigned int tab_id) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+    for (auto& t : ch->tabs) {
+        if (t.id == tab_id) {
+            t.loading = false;
+            break;
+        }
+    }
+    InvalidateRect(hwnd, nullptr, FALSE);
+}
+
+// ---------------------------------------------------------------------------
+// Agent Control API — programmatic access for AeonAgentPipe
+// ---------------------------------------------------------------------------
+
+int GetTabCount(HWND hwnd) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return 0;
+    return (int)ch->tabs.size();
+}
+
+bool GetTabInfo(HWND hwnd, int index,
+                unsigned int* outId, char* outUrl, int urlLen,
+                char* outTitle, int titleLen, bool* outActive) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch || index < 0 || index >= (int)ch->tabs.size()) return false;
+
+    const auto& t = ch->tabs[index];
+    if (outId)    *outId = t.id;
+    if (outUrl)   _snprintf_s(outUrl, urlLen, _TRUNCATE, "%s", t.url.c_str());
+    if (outTitle) _snprintf_s(outTitle, titleLen, _TRUNCATE, "%s", t.title.c_str());
+    if (outActive) *outActive = (index == ch->activeTab);
+    return true;
+}
+
+int GetActiveTabIndex(HWND hwnd) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return -1;
+    return ch->activeTab;
+}
+
+unsigned int CreateTab(HWND hwnd, const char* url) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch || !ch->engine) return 0;
+
+    const char* targetUrl = (url && url[0]) ? url : "aeon://newtab";
+    ChromeTab t;
+    t.id = ch->engine->NewTab(ch->hwnd, targetUrl);
+    t.url = targetUrl;
+    t.title = "New Tab";
+    t.loading = false;
+    ch->tabs.push_back(t);
+    ch->activeTab = (int)ch->tabs.size() - 1;
+
+    RECT rc; GetClientRect(ch->hwnd, &rc);
+    ch->engine->SetViewport(t.id, ch->hwnd, 0, CHROME_H,
+        rc.right, rc.bottom - CHROME_H);
+    ch->engine->FocusTab(t.id);
+
+    // Inject AeonBridge bootstrap
+    std::string bridgeJs = AeonBridge::BuildInjectionScript();
+    ch->engine->InjectEarlyJS(t.id, bridgeJs.c_str());
+
+    PaintChrome(ch);
+    fprintf(stdout, "[Agent] New tab #%u: %s\n", t.id, targetUrl);
+    return t.id;
+}
+
+bool CloseTabById(HWND hwnd, unsigned int tabId) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return false;
+
+    for (int i = 0; i < (int)ch->tabs.size(); i++) {
+        if (ch->tabs[i].id == tabId) {
+            if (ch->engine) ch->engine->CloseTab(tabId);
+            ch->tabs.erase(ch->tabs.begin() + i);
+            if (ch->tabs.empty()) {
+                CreateTab(hwnd, nullptr);
+            } else {
+                if (ch->activeTab >= (int)ch->tabs.size())
+                    ch->activeTab = (int)ch->tabs.size() - 1;
+                if (ch->engine)
+                    ch->engine->FocusTab(ch->tabs[ch->activeTab].id);
+            }
+            PaintChrome(ch);
+            fprintf(stdout, "[Agent] Closed tab #%u\n", tabId);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FocusTabById(HWND hwnd, unsigned int tabId) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return false;
+
+    for (int i = 0; i < (int)ch->tabs.size(); i++) {
+        if (ch->tabs[i].id == tabId) {
+            ch->activeTab = i;
+            if (ch->engine) {
+                ch->engine->FocusTab(tabId);
+                RECT rc; GetClientRect(hwnd, &rc);
+                ch->engine->SetViewport(tabId, hwnd, 0, CHROME_H,
+                    rc.right, rc.bottom - CHROME_H);
+            }
+            PaintChrome(ch);
+            fprintf(stdout, "[Agent] Focused tab #%u\n", tabId);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NavigateTab(HWND hwnd, unsigned int tabId, const char* url) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch || !ch->engine || !url || !url[0]) return false;
+
+    for (auto& t : ch->tabs) {
+        if (t.id == tabId) {
+            t.url = url;
+            t.loading = true;
+            ch->engine->Navigate(tabId, url, nullptr);
+            PaintChrome(ch);
+            fprintf(stdout, "[Agent] Navigate tab #%u: %s\n", tabId, url);
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace BrowserChrome
+
+

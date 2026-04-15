@@ -37,34 +37,146 @@
 // ---------------------------------------------------------------------------
 // Native AdBlock — EasyList-compatible C++ filter engine
 // ---------------------------------------------------------------------------
+// Supports:
+//   ||domain.com^       — block all requests matching domain
+//   @@||domain.com^     — whitelist override (takes priority)
+//   ##.css-selector     — global CSS element hiding (future)
+//   domain##.selector   — per-site CSS element hiding (future)
+//
+// Performance: O(1) amortized via unordered_set for domain lookups.
+// Memory: ~4MB for full EasyList (~80k rules) — well within budget.
+// ---------------------------------------------------------------------------
 
-// Pattern storage — we load filter lists from our install dir
-// Format: EasyList / AdBlock Plus compatible ## and || syntax
-static char** g_BlockPatterns = nullptr;
-static int    g_PatternCount  = 0;
+#include <unordered_set>
+#include <mutex>
+#include <fstream>
+#include <string>
+
+static std::unordered_set<std::string> g_BlockDomains;   // ||domain^ rules
+static std::unordered_set<std::string> g_AllowDomains;   // @@||domain^ rules
+static std::vector<std::string>        g_CSSRules;       // ##.selector rules
+static std::mutex                      g_FilterMutex;
+static int                             g_TotalRulesLoaded = 0;
+
+// Extract the domain/host from a URL (strips scheme + path)
+// e.g. "https://ads.doubleclick.net/pagead?id=123" → "ads.doubleclick.net"
+static std::string ExtractHost(const char* url) {
+    const char* p = url;
+    if (strncmp(p, "https://", 8) == 0) p += 8;
+    else if (strncmp(p, "http://", 7) == 0) p += 7;
+    else if (strncmp(p, "wss://", 6) == 0) p += 6;
+    else if (strncmp(p, "ws://", 5) == 0) p += 5;
+    const char* end = strpbrk(p, "/?#:");
+    return end ? std::string(p, end) : std::string(p);
+}
 
 namespace NativeAdBlock {
 
 void LoadFilterList(const char* path) {
-    // TODO: Parse AdBlock Plus filter syntax from path
-    // Key filter types:
-    //   ||example.com^         — block all requests to domain
-    //   @@||example.com^       — whitelist override
-    //   ##.ad-banner           — CSS element hiding
-    //   example.com##.spinner  — per-site element hiding
-    fprintf(stdout, "[NativeAdBlock] Loading filter list: %s\n", path);
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        fprintf(stderr, "[NativeAdBlock] Cannot open filter list: %s\n", path);
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_FilterMutex);
+    int loaded = 0;
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines, comments, and header
+        if (line.empty() || line[0] == '!' || line[0] == '[') continue;
+
+        // Whitelist rule: @@||domain^
+        if (line.size() > 4 && line[0] == '@' && line[1] == '@' &&
+            line[2] == '|' && line[3] == '|') {
+            // Extract domain — strip @@|| prefix and ^ suffix
+            size_t start = 4;
+            size_t end = line.find('^', start);
+            if (end == std::string::npos) end = line.size();
+            std::string domain = line.substr(start, end - start);
+            // Skip rules with path separators (complex rules not yet supported)
+            if (domain.find('/') != std::string::npos) continue;
+            if (!domain.empty()) {
+                g_AllowDomains.insert(domain);
+                loaded++;
+            }
+            continue;
+        }
+
+        // Block rule: ||domain^
+        if (line.size() > 2 && line[0] == '|' && line[1] == '|') {
+            size_t start = 2;
+            size_t end = line.find('^', start);
+            if (end == std::string::npos) end = line.find('$', start);
+            if (end == std::string::npos) end = line.size();
+            std::string domain = line.substr(start, end - start);
+            // Skip complex rules with paths (v2 feature)
+            if (domain.find('/') != std::string::npos) continue;
+            if (!domain.empty()) {
+                g_BlockDomains.insert(domain);
+                loaded++;
+            }
+            continue;
+        }
+
+        // CSS element hiding: ##.selector
+        if (line.find("##") != std::string::npos) {
+            size_t pos = line.find("##");
+            std::string selector = line.substr(pos + 2);
+            if (!selector.empty()) {
+                g_CSSRules.push_back(selector);
+                loaded++;
+            }
+            continue;
+        }
+    }
+
+    g_TotalRulesLoaded += loaded;
+    fprintf(stdout, "[NativeAdBlock] Loaded %d rules from: %s (total: %d)\n",
+        loaded, path, g_TotalRulesLoaded);
 }
 
 bool ShouldBlock(const char* url) {
-    // O(n) check against loaded patterns
-    // TODO: implement Aho-Corasick for O(1) amortized matching
-    (void)url;
-    return false; // TODO: real matching
+    if (!url || !url[0]) return false;
+
+    std::string host = ExtractHost(url);
+    if (host.empty()) return false;
+
+    std::lock_guard<std::mutex> lock(g_FilterMutex);
+
+    // Check whitelist first (@@|| rules take priority)
+    if (g_AllowDomains.count(host)) return false;
+
+    // Check exact domain match
+    if (g_BlockDomains.count(host)) return true;
+
+    // Check parent domain matches (e.g. block "ads.example.com" if
+    // rule says "||example.com^" — subdomain matching)
+    std::string domain = host;
+    while (true) {
+        size_t dot = domain.find('.');
+        if (dot == std::string::npos || dot == domain.size() - 1) break;
+        domain = domain.substr(dot + 1);
+        if (g_AllowDomains.count(domain)) return false;
+        if (g_BlockDomains.count(domain)) return true;
+    }
+
+    return false;
 }
 
 void HideElements(HWND, const char* /*url*/) {
-    // Inject CSS element hiding rules via engine's IPC
-    // Each engine tier exposes a "InjectCSS" message
+    // CSS element hiding injection — delegated to engine's InjectCSS
+    // The engine calls this after page load; we return combined CSS rules
+    // TODO: Wire to AeonEngine_InjectCSS_t via TabState callback
+}
+
+int GetBlockedCount() {
+    std::lock_guard<std::mutex> lock(g_FilterMutex);
+    return (int)g_BlockDomains.size();
+}
+
+int GetTotalRules() {
+    return g_TotalRulesLoaded;
 }
 
 } // namespace NativeAdBlock
@@ -89,10 +201,13 @@ bool StoreCredential(const char* origin, const char* user, const char* pass) {
             GetLastError());
         return false;
     }
-    // TODO: Store (origin, user, out.pbData, out.cbData) into SQLite
+    // DPAPI encryption succeeded — credential is valid and encryptable.
+    // Cannot persist yet: SQLite credential store not implemented.
     LocalFree(out.pbData);
-    (void)origin; (void)user;
-    return true;
+    fprintf(stderr, "[NativePassMgr] DPAPI encrypt OK for '%s@%s' — "
+        "SQLite storage not yet implemented, credential NOT persisted.\n",
+        user, origin);
+    return false; // Signal to caller: credential was NOT saved
 }
 
 } // namespace NativePassMgr

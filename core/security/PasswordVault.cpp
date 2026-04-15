@@ -20,7 +20,7 @@
 // DPAPI blob for portability. For v1.0 we stay pure DPAPI for simplicity.
 
 #include "PasswordVault.h"
-#include "../../history/HistoryEngine.h"
+#include "../history/HistoryEngine.h"
 #include <windows.h>
 #include <wincrypt.h>
 #include <cstdio>
@@ -221,8 +221,16 @@ void WipeAll() {
 }
 
 void Lock() {
-    // In future: zero all decrypted in-memory credential caches
-    fprintf(stdout, "[Vault] Vault locked (session keys cleared).\n");
+    // Close the database handle — prevents any further queries until re-init.
+    // All g_db-guarded functions (Save, Find, Delete, ListOrigins) will
+    // early-return false/0 once g_db is nullptr.
+    if (g_db) {
+        sqlite3_close(g_db);
+        g_db = nullptr;
+    }
+    // Zero the cached vault path so it can't be re-opened without explicit Init()
+    SecureZeroMemory(g_vaultPath, sizeof(g_vaultPath));
+    fprintf(stdout, "[Vault] Vault locked — DB closed, session keys cleared.\n");
 }
 
 } // namespace PasswordVault

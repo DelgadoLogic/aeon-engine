@@ -3,6 +3,7 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <vector>
 
 namespace DownloadManager {
 
@@ -20,33 +21,40 @@ namespace DownloadManager {
         char         url[2048];
         char         filename[512];
         char         destPath[512];
+        char         error_msg[256];
         uint64_t     totalBytes;
         uint64_t     receivedBytes;
+        int64_t      speed_bps;
+        int          eta_sec;
         DownloadState state;
         int          errorCode;    // 0 = no error
     };
 
-    // Initialize with download directory
-    bool Init(const char* downloadDir);
+    // Initialize with download directory (nullptr = default ~/Documents/Downloads/Aeon)
+    bool Init(const char* downloadDir = nullptr);
 
     // Start a download; returns item ID (0 on failure)
-    uint64_t StartDownload(const char* url, const char* suggestedFilename);
+    uint64_t StartDownload(const char* url, const char* suggestedFilename = nullptr);
 
-    // Control
-    bool Pause(uint64_t id);
-    bool Resume(uint64_t id);
-    bool Cancel(uint64_t id);
+    // Control — all accept int id to match .cpp implementation
+    void Pause(int id);
+    void Resume(int id);
+    void Cancel(int id);
+    void Remove(int id);
 
-    // Query
-    int  GetAll(DownloadItem* out, int maxCount);
-    bool GetItem(uint64_t id, DownloadItem* out);
+    // Query — returns full snapshot of all tasks
+    std::vector<DownloadItem> GetAll();
 
     // Housekeeping
     void ClearCompleted();
 
-    // Open folder in Explorer
-    void ShowInFolder(uint64_t id);
+    // Explorer integration
+    void RevealInExplorer(int id);
+    void OpenFile(int id);
     void OpenDownloadFolder();
+
+    // Directory
+    const char* GetDownloadDir();
 
     void Shutdown();
 

@@ -79,10 +79,31 @@ cmake_install.cmake
 *.log
 crash_reports/
 
-# Rust build output
+# Rust build output (any depth)
 router/target/
 */target/
+**/target/
 *.d
+
+# CEF / WebView2 Engine Runtime (distributed via release, not source)
+engine/aeon_engine/
+engine/*.zip
+
+# Retro build artifacts
+retro/*.o
+retro/*.exe
+retro/*.iso
+retro/*.img
+
+# Binary blobs
+*.dll
+*.exe
+*.bin
+*.pak
+*.zip
+*.iso
+*.img
+!resources/**
 # Temp push scripts
 aeon_push_all.ps1
 push_to_github.ps1
@@ -99,6 +120,7 @@ research/
 dist_beta/
 
 # === CONFIDENTIAL — NEVER PUSH TO ANY REMOTE ===
+internal_docs/
 AEON_MASTER_PLAN.md
 AEON_SERVICES.md
 docs/UI_DESIGN_SPEC.md
@@ -108,6 +130,18 @@ docs/*_CONFIDENTIAL*
 *_CONFIDENTIAL*.md
 *.internal.md
 billing/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Service account keys — NEVER COMMIT
+sa.json
+*.sa.json
+
+# Build output directories
+dist_pro/
+cloud_build_output/
 
 # Misc
 BRAINSTORM.md

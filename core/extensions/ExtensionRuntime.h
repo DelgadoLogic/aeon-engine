@@ -15,6 +15,8 @@ namespace NativeAdBlock {
     void LoadFilterList(const char* path);
     bool ShouldBlock(const char* url);
     void HideElements(HWND hwnd, const char* url);
+    int  GetBlockedCount();   // Number of domain-block rules loaded
+    int  GetTotalRules();     // Total rules across all filter lists
 }
 
 namespace NativePassMgr {

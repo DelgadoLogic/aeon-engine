@@ -65,6 +65,20 @@ AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile) {
         HMODULE hMod = LoadLibraryA(path);
         if (!hMod) { fprintf(stdout, "[Tier] Missing: %s\n", candidates[i].dllName); continue; }
 
+        // ── ABI version check (REQUIRED before touching vtable) ──────────
+        auto abiFn = reinterpret_cast<AeonEngine_AbiVersion_t>(
+            GetProcAddress(hMod, "AeonEngine_AbiVersion"));
+        if (!abiFn) {
+            fprintf(stderr, "[Tier] %s: no AbiVersion export — rejecting\n", candidates[i].dllName);
+            FreeLibrary(hMod); continue;
+        }
+        int dllAbi = abiFn();
+        if (dllAbi != AEON_ENGINE_ABI_VERSION) {
+            fprintf(stderr, "[Tier] %s: ABI mismatch (DLL=%d, core=%d) — rejecting\n",
+                    candidates[i].dllName, dllAbi, AEON_ENGINE_ABI_VERSION);
+            FreeLibrary(hMod); continue;
+        }
+
         auto createFn = reinterpret_cast<AeonEngineVTable*(*)()>(
             GetProcAddress(hMod, "AeonEngine_Create"));
         if (!createFn) { FreeLibrary(hMod); continue; }
@@ -72,7 +86,8 @@ AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile) {
         AeonEngineVTable* e = createFn();
         if (!e) { FreeLibrary(hMod); continue; }
 
-        fprintf(stdout, "[Tier] Engine: %s (%s)\n", candidates[i].dllName, candidates[i].desc);
+        fprintf(stdout, "[Tier] Engine: %s (%s) [ABI v%d]\n",
+                candidates[i].dllName, candidates[i].desc, dllAbi);
         return e;
     }
     fprintf(stderr, "[Tier] FATAL: no engine for tier %d\n", (int)profile->tier);

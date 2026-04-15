@@ -192,17 +192,24 @@ void AeonSpellImpl::WorkerLoop() {
                 task_queue.pop();
             }
 
-            std::lock_guard<std::mutex> lk(lang_mutex);
-            auto it = languages.find(task.lang_code);
-            if (it == languages.end()) {
-                // Language not loaded — return empty list
-                task.callback(task.word, {});
-                continue;
+            std::vector<AeonSpellSuggestion> suggestions;
+            bool lang_found = false;
+            {
+                std::lock_guard<std::mutex> lk(lang_mutex);
+                auto it = languages.find(task.lang_code);
+                if (it != languages.end()) {
+                    lang_found = true;
+                    suggestions = GenerateSuggestions(
+                        task.word, *it->second, task.max_suggestions);
+                }
             }
-
-            auto suggestions = GenerateSuggestions(
-                task.word, *it->second, task.max_suggestions);
-            task.callback(task.word, std::move(suggestions));
+            // Fire callback AFTER mutex release — prevents deadlock
+            // if callback re-enters AeonSpell (e.g. IsCorrect, LoadLanguage)
+            if (lang_found) {
+                task.callback(task.word, std::move(suggestions));
+            } else {
+                task.callback(task.word, {});
+            }
         }
     }
 }

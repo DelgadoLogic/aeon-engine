@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="ag" x1="12" y1="4" x2="36" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#6382ff"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield outline -->
+  <path d="M24 3 L42 13 L42 28 Q42 38 24 45 Q6 38 6 28 L6 13 Z"
+        stroke="url(#ag)" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+  <!-- Stylized A with interlocking loop -->
+  <path d="M24 11 L15 35 L18.5 35 L20.5 29.5 L27.5 29.5 L29.5 35 L33 35 Z M21.5 26.5 L24 16.5 L26.5 26.5 Z"
+        fill="url(#ag)"/>
+  <!-- Loop at bottom of A -->
+  <ellipse cx="24" cy="32" rx="5" ry="4.5"
+           stroke="url(#ag)" stroke-width="2" fill="none"/>
+</svg>

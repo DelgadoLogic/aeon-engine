@@ -19,6 +19,7 @@
 //     Button is greyed out when IPC pipe "\\.\pipe\LFAgent" is unavailable.
 
 #include "EraChrome.h"
+#include "BrowserChrome.h"
 #include "../probe/HardwareProbe.h"
 
 #include <windows.h>
@@ -107,6 +108,11 @@ static LRESULT CALLBACK ModernWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             EndPaint(h, &ps);
             return 0;
         }
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+            if (BrowserChrome::OnKeyDown(h, w, l))
+                return 0;
+            break;
     }
     return DefWindowProcW(h, m, w, l);
 }

@@ -33,6 +33,9 @@ set(AEON_TARGET_TIER "Pro" CACHE STRING
 
 message(STATUS "Aeon Browser build tier: ${AEON_TARGET_TIER}")
 
+# Version string — used by AutoUpdater
+add_compile_definitions(AEON_VERSION="${PROJECT_VERSION}")
+
 # Tier-specific preprocessor defines
 if(AEON_TARGET_TIER STREQUAL "Pro" OR AEON_TARGET_TIER STREQUAL "Modern")
     add_compile_definitions(AEON_TIER_MODERN AEON_BLINK_ENGINE)
@@ -77,14 +80,19 @@ set(CORE_SOURCES
     core/tls/TlsAbstraction.cpp
     core/crash/CrashHandler.cpp
     core/extensions/ExtensionRuntime.cpp
+    core/billing/OmniLicense.cpp
+    core/aeon_component.cpp
     updater/AutoUpdater.cpp
     privacy/ContentBlocker.cpp
     telemetry/PulseBridge.cpp
+    ai/aeon_tab_intelligence.cpp
+    ai/aeon_journey_analytics.cpp
+    core/agent/AeonAgentPipe.cpp
 )
 
 # SQLite3 — vendor, single-threaded (browser is single-process)
 set_source_files_properties(core/history/sqlite3.c PROPERTIES
-    COMPILE_DEFINITIONS "SQLITE_THREADSAFE=0"
+    COMPILE_DEFINITIONS "SQLITE_THREADSAFE=0;SQLITE_ENABLE_FTS5"
 )
 
 add_executable(Aeon WIN32 ${CORE_SOURCES})
@@ -95,6 +103,9 @@ target_link_libraries(Aeon
     dwmapi uxtheme dbghelp
     crypt32     # DPAPI — password vault
     winhttp     # Corporate proxy detection + captive portal probe
+    wininet     # WinInet — update manifest fetch
+    wintrust    # Authenticode verification
+    bcrypt      # SHA-256 for update integrity
     iphlpapi    # IP adapter info
     ws2_32      # Winsock
 )
@@ -113,6 +124,8 @@ add_custom_command(TARGET Aeon POST_BUILD
         "${CMAKE_SOURCE_DIR}/resources/pages/bookmarks.html"
         "${CMAKE_SOURCE_DIR}/resources/pages/passwords.html"
         "${CMAKE_SOURCE_DIR}/resources/pages/crash.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/diagnostics.html"
+        "${CMAKE_SOURCE_DIR}/resources/pages/drm-info.html"
         "$<TARGET_FILE_DIR:Aeon>/pages/"
     COMMENT "[Aeon] Copying HTML resources to output"
 )

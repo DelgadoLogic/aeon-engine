@@ -54,6 +54,11 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "bcrypt.lib")
 
+// Ed25519 magic constant — available in SDK 10.0.20348+, define fallback for older SDKs
+#ifndef BCRYPT_EDDSA_PUBLIC_GENERIC_MAGIC
+#define BCRYPT_EDDSA_PUBLIC_GENERIC_MAGIC 0x47444445  // 'EDDG'
+#endif
+
 namespace AutoUpdater {
 
 namespace fs = std::filesystem;
@@ -135,6 +140,111 @@ static bool ComputeFileSHA256(const std::wstring& path, std::string& out_hex) {
         sprintf_s(hex + i*2, 3, "%02x", hashBuf[i]);
     out_hex = hex;
     return true;
+}
+
+// ── Ed25519 manifest verification via BCrypt ──────────────────────────────────
+//
+// The update manifest is signed with our Ed25519 private key (held in
+// Google Secret Manager, never leaves the build server). The 32-byte
+// public key is embedded here. Replace AEON_ED25519_PUBKEY_HEX at build
+// time with the real key via -D flag or config header.
+//
+// Signed message = "version|sha256|chunk0,chunk1,...,chunkN"
+// Signature     = hex-encoded 64-byte Ed25519 signature in manifest.signature
+
+#ifndef AEON_ED25519_PUBKEY_HEX
+// PLACEHOLDER — CI must override this. If it ships, VerifyManifestSignature
+// will reject all manifests (correct fail-closed behavior).
+#define AEON_ED25519_PUBKEY_HEX \
+    "0000000000000000000000000000000000000000000000000000000000000000"
+#endif
+
+static bool HexDecode(const char* hex, std::vector<BYTE>& out) {
+    size_t len = strlen(hex);
+    if (len % 2 != 0) return false;
+    out.resize(len / 2);
+    for (size_t i = 0; i < len; i += 2) {
+        char byte_str[3] = { hex[i], hex[i+1], '\0' };
+        char* end = nullptr;
+        unsigned long val = strtoul(byte_str, &end, 16);
+        if (end != byte_str + 2) return false;
+        out[i / 2] = (BYTE)val;
+    }
+    return true;
+}
+
+static bool VerifyManifestSignature(const UpdateManifest& m) {
+    if (m.signature.empty()) {
+        fprintf(stderr, "[AutoUpdater] Manifest has no signature — REJECTED\n");
+        return false;
+    }
+
+    // 1. Reconstruct the signed message: "version|sha256|chunk0,chunk1,..."
+    std::string message = m.version + "|" + m.sha256 + "|";
+    for (size_t i = 0; i < m.chunk_urls.size(); i++) {
+        if (i > 0) message += ",";
+        message += m.chunk_urls[i];
+    }
+
+    // 2. Decode public key and signature from hex
+    std::vector<BYTE> pubkey_raw, sig_raw;
+    if (!HexDecode(AEON_ED25519_PUBKEY_HEX, pubkey_raw) || pubkey_raw.size() != 32) {
+        fprintf(stderr, "[AutoUpdater] Invalid Ed25519 public key compile-time constant\n");
+        return false;
+    }
+    if (!HexDecode(m.signature.c_str(), sig_raw) || sig_raw.size() != 64) {
+        fprintf(stderr, "[AutoUpdater] Invalid Ed25519 signature in manifest (expected 128 hex chars)\n");
+        return false;
+    }
+
+    // 3. Import the public key into BCrypt
+    //    BCrypt Ed25519 key blob format:
+    //    BCRYPT_KEY_BLOB_HEADER (magic=0x4B455931 "1EKB"? — we use BCRYPT_ECCPUBLIC_BLOB)
+    //    For Ed25519: the blob is BCRYPT_ECCKEY_BLOB + 32 bytes of raw public key
+    BCRYPT_ALG_HANDLE hAlg = nullptr;
+    NTSTATUS st = BCryptOpenAlgorithmProvider(&hAlg, L"Ed25519", nullptr, 0);
+    if (!BCRYPT_SUCCESS(st)) {
+        // Ed25519 not available (pre-1809 Windows). Fail-closed.
+        fprintf(stderr, "[AutoUpdater] Ed25519 not supported on this OS (need Win10 1809+) — REJECTED\n");
+        return false;
+    }
+
+    // Build the BCRYPT_ECCKEY_BLOB for Ed25519 (32-byte public key)
+    // Structure: { ULONG Magic, ULONG cbKey, BYTE key[cbKey] }
+    struct {
+        BCRYPT_ECCKEY_BLOB header;
+        BYTE key[32];
+    } keyBlob;
+    keyBlob.header.dwMagic = BCRYPT_EDDSA_PUBLIC_GENERIC_MAGIC;
+    keyBlob.header.cbKey   = 32;
+    memcpy(keyBlob.key, pubkey_raw.data(), 32);
+
+    BCRYPT_KEY_HANDLE hKey = nullptr;
+    st = BCryptImportKeyPair(hAlg, nullptr, BCRYPT_ECCPUBLIC_BLOB,
+                             &hKey, (PUCHAR)&keyBlob, sizeof(keyBlob), 0);
+    if (!BCRYPT_SUCCESS(st)) {
+        fprintf(stderr, "[AutoUpdater] Ed25519 key import failed (0x%08X) — REJECTED\n", (unsigned)st);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        return false;
+    }
+
+    // 4. Verify signature
+    st = BCryptVerifySignature(hKey, nullptr,
+                               (PUCHAR)message.data(), (ULONG)message.size(),
+                               sig_raw.data(), (ULONG)sig_raw.size(), 0);
+
+    BCryptDestroyKey(hKey);
+    BCryptCloseAlgorithmProvider(hAlg, 0);
+
+    if (BCRYPT_SUCCESS(st)) {
+        fprintf(stdout, "[AutoUpdater] Ed25519 signature VERIFIED for v%s\n",
+                m.version.c_str());
+        return true;
+    } else {
+        fprintf(stderr, "[AutoUpdater] Ed25519 signature INVALID (0x%08X) — REJECTING manifest\n",
+                (unsigned)st);
+        return false;
+    }
 }
 
 // ── Manifest fetch (HTTPS, silent) ───────────────────────────────────────────
@@ -303,8 +413,9 @@ static std::string GetStagingDir() {
     std::wstring path = std::wstring(appdata) + L"\\Aeon\\staging";
     CoTaskMemFree(appdata);
     fs::create_directories(path);
-    std::string narrow(path.begin(), path.end());
-    return narrow;
+    char narrow[MAX_PATH];
+    WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, narrow, MAX_PATH, nullptr, nullptr);
+    return std::string(narrow);
 }
 
 // ── Main download loop ────────────────────────────────────────────────────────
@@ -383,7 +494,10 @@ static bool DownloadUpdate(const UpdateManifest& manifest,
     // Write ready marker (read by cold-start logic)
     std::string marker = g_staging_dir + "\\update_ready.txt";
     FILE* mf; fopen_s(&mf, marker.c_str(), "w");
-    if (mf) { fprintf(mf, "%s\n%s\n", manifest.version.c_str(), final_path.c_str()); fclose(mf); }
+    if (mf) {
+        fprintf(mf, "%s\n%s\n", manifest.version.c_str(), final_path.c_str());
+        fclose(mf);
+    }
 
     g_state = UpdateState::ReadyToInstall;
     fprintf(stdout, "[AutoUpdater] Update staged. Will install on next cold start.\n");
@@ -400,7 +514,7 @@ void CheckAndInstallStagedUpdate() {
     if (!mf) return; // No staged update
     
     char version[64]={}, path[MAX_PATH]={};
-    fscanf_s(mf, "%63s\n%259s", version, sizeof(version), path, sizeof(path));
+    fscanf_s(mf, "%63s\n%259s", version, (unsigned)sizeof(version), path, (unsigned)sizeof(path));
     fclose(mf);
     
     if (!path[0]) return;
@@ -409,7 +523,7 @@ void CheckAndInstallStagedUpdate() {
     wchar_t wPath[MAX_PATH];
     MultiByteToWideChar(CP_ACP, 0, path, -1, wPath, MAX_PATH);
     
-    if (!GetFileAttributesW(wPath) != INVALID_FILE_ATTRIBUTES) return;
+    if (GetFileAttributesW(wPath) == INVALID_FILE_ATTRIBUTES) return;
 
     fprintf(stdout, "[AutoUpdater] Applying staged update %s on cold start\n", version);
     
@@ -443,6 +557,7 @@ void CheckAndInstallStagedUpdate() {
 // ── Background poller ─────────────────────────────────────────────────────────
 
 void StartBackgroundPoller(std::vector<std::string> known_peers) {
+    g_running = true;  // Must be set BEFORE thread launch — thread reads on entry
     std::thread([peers = std::move(known_peers)]() mutable {
         // Run at IDLE priority — never competes with user tasks
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_IDLE);
@@ -456,6 +571,11 @@ void StartBackgroundPoller(std::vector<std::string> known_peers) {
             if (g_state != UpdateState::Downloading) {
                 UpdateManifest manifest;
                 if (FetchManifest(manifest)) {
+                    // ── GATE: Verify Ed25519 signature before trusting ANY field ──
+                    if (!VerifyManifestSignature(manifest)) {
+                        fprintf(stderr, "[AutoUpdater] Untrusted manifest — skipping cycle\n");
+                        // Don't continue — fall through to sleep
+                    } else {
                     // Check if this is actually newer
                     int cMaj=0,cMin=0,cPat=0, nMaj=0,nMin=0,nPat=0;
                     sscanf_s(CURRENT_VERSION, "%d.%d.%d", &cMaj, &cMin, &cPat);
@@ -477,16 +597,14 @@ void StartBackgroundPoller(std::vector<std::string> known_peers) {
                             fprintf(stderr, "[AutoUpdater] Download failed\n");
                         }
                     }
+                    } // else (signature verified)
                 }
             }
-            
             // Check every 6 hours
             for (int i = 0; i < 360 && g_running.load(); i++)
                 Sleep(60000); // 1 minute sleeps (responsive to shutdown)
         }
     }).detach();
-    
-    g_running = true;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

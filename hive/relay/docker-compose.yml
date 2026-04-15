@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # The primary P2P node running Iroh for the bit-torrent style update chunks
+  aeon-relay:
+    image: n0computer/iroh:latest
+    container_name: aeon-hive-relay
+    restart: unless-stopped
+    command: ["start", "--metrics-addr", "0.0.0.0:9090"]
+    network_mode: "host"
+    volumes:
+      - ./data/iroh:/data
+    environment:
+      - RUST_LOG=info
+
+  # Nginx fallback for old clients / initial bootstraps over HTTPS (DoH + standard chunk fetch)
+  fallback-cdn:
+    image: nginx:alpine
+    container_name: aeon-nginx-fallback
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/cdn:/usr/share/nginx/html:ro
+
+  # Prometheus exporter to monitor bandwidth donated to the Aeon Network
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: aeon-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"

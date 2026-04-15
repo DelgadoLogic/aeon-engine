@@ -22,6 +22,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdio.h>  /* snprintf / _snprintf */
+
+/* OW2 doesn't prototype _snprintf — it's a Microsoft CRT extension.
+   Map to snprintf which OW2 does support in C99 mode (-za99). */
+#ifndef _snprintf
+#define _snprintf snprintf
+#endif
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 #define MAX_TOKENS  4096
@@ -87,8 +94,8 @@ static HFONT MakeFont(int pt, int bold, int italic, int underline) {
         underline ? TRUE       : FALSE,
         FALSE, DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY,
-        DEFAULT_PITCH, "Segoe UI");
+        DEFAULT_QUALITY,  /* ClearType not available on Win9x RTM */
+        DEFAULT_PITCH, "Tahoma");  /* Tahoma: Win2000+, GDI falls back on Win9x */
 }
 
 static void SelectCurFont(void) {
@@ -121,15 +128,21 @@ static void RenderWord(const char* word) {
 
     // Underline for links
     if (g_RS.inLink || g_RS.underline) {
-        HPEN pen = CreatePen(PS_SOLID, 1, LINK_COLOR);
-        HPEN op  = (HPEN)SelectObject(g_RS.hdc, pen);
+        HPEN pen;
+        HPEN op;
+        pen = CreatePen(PS_SOLID, 1, LINK_COLOR);
+        op  = (HPEN)SelectObject(g_RS.hdc, pen);
         MoveToEx(g_RS.hdc, g_RS.x, g_RS.y + sz.cy - 1, NULL);
         LineTo  (g_RS.hdc, g_RS.x + sz.cx, g_RS.y + sz.cy - 1);
         SelectObject(g_RS.hdc, op); DeleteObject(pen);
 
         // Register link hit-rect
         if (g_RS.inLink && g_RS.linkCount < 128) {
-            RECT lr = { g_RS.x, g_RS.y, g_RS.x + sz.cx, g_RS.y + sz.cy };
+            RECT lr;
+            lr.left   = g_RS.x;
+            lr.top    = g_RS.y;
+            lr.right  = g_RS.x + sz.cx;
+            lr.bottom = g_RS.y + sz.cy;
             g_RS.links[g_RS.linkCount].rc = lr;
             strncpy(g_RS.links[g_RS.linkCount].href, g_RS.linkHref, MAX_STR-1);
             g_RS.linkCount++;
@@ -148,7 +161,8 @@ static void FlushLine(void) {
 static void RenderText(const char* text) {
     char word[MAX_STR] = {0};
     int  wi = 0;
-    for (const char* p = text; ; p++) {
+    const char* p;
+    for (p = text; ; p++) {
         if (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\0') {
             if (wi > 0) {
                 word[wi] = '\0';
@@ -183,13 +197,16 @@ static void HandleOpenTag(const Token* t) {
     } else if (strcmp(t->tag, "br")==0) {
         FlushLine();
     } else if (strcmp(t->tag, "hr")==0) {
+        HPEN hrpen;
+        HPEN hrop;
+        int hry;
         FlushLine();
-        HPEN pen = CreatePen(PS_SOLID, 1, RGB(0x2a,0x28,0x55));
-        HPEN op  = (HPEN)SelectObject(g_RS.hdc, pen);
-        int y = g_RS.y + 6;
-        MoveToEx(g_RS.hdc, MARGIN_X, y, NULL);
-        LineTo(g_RS.hdc, g_RS.clip.right - MARGIN_X, y);
-        SelectObject(g_RS.hdc, op); DeleteObject(pen);
+        hrpen = CreatePen(PS_SOLID, 1, RGB(0x2a,0x28,0x55));
+        hrop  = (HPEN)SelectObject(g_RS.hdc, hrpen);
+        hry = g_RS.y + 6;
+        MoveToEx(g_RS.hdc, MARGIN_X, hry, NULL);
+        LineTo(g_RS.hdc, g_RS.clip.right - MARGIN_X, hry);
+        SelectObject(g_RS.hdc, hrop); DeleteObject(hrpen);
         g_RS.y += 14;
     } else if (strcmp(t->tag, "p")==0) {
         FlushLine(); g_RS.y += 6;
@@ -222,12 +239,15 @@ static void ToLower(char* s) {
 }
 
 static void GetAttr(const char* tagbuf, const char* attr, char* out, int len) {
-    char search[64]; _snprintf(search, sizeof(search), "%s=\"", attr);
-    const char* p = strstr(tagbuf, search);
+    char search[64];
+    const char* p;
+    int i;
+    _snprintf(search, sizeof(search), "%s=\"", attr);
+    p = strstr(tagbuf, search);
     if (!p) { p = strstr(tagbuf, attr); if (p) p += strlen(attr)+1; }
     if (!p) { out[0]='\0'; return; }
     p += strlen(search);
-    int i=0;
+    i=0;
     while (*p && *p!='"' && i<len-1) out[i++]=*p++;
     out[i]='\0';
 }
@@ -239,28 +259,35 @@ static void TokenizeAndRender(const char* html) {
 
     while (*p) {
         if (*p == '<') {
-            // Collect tag body
+            /* Collect tag body */
+            int i;
+            BOOL closing;
+            Token t;
+            int j, k;
+
             p++;
-            int i=0; BOOL closing = FALSE;
+            i=0; closing = FALSE;
             if (*p=='/') { closing=TRUE; p++; }
             while (*p && *p!='>' && i<MAX_STR-1) buf[i++]=*p++;
             buf[i]='\0';
             if (*p=='>') p++;
 
-            // Extract tag name
-            Token t = {0};
-            int j=0;
-            for (int k=0; buf[k] && buf[k]!=' ' && j<31; k++) t.tag[j++]=buf[k];
+            /* Extract tag name */
+            memset(&t, 0, sizeof(t));
+            j=0;
+            for (k=0; buf[k] && buf[k]!=' ' && j<31; k++) t.tag[j++]=buf[k];
             t.tag[j]='\0'; ToLower(t.tag);
 
-            // Skip script/style content
+            /* Skip script/style content */
             if (strcmp(t.tag,"script")==0 || strcmp(t.tag,"style")==0) {
-                char end[16]; _snprintf(end,sizeof(end),"</%s>",t.tag);
-                const char* ep = strstr(p, end);
+                char end[16];
+                const char* ep;
+                _snprintf(end,sizeof(end),"</%s>",t.tag);
+                ep = strstr(p, end);
                 if (ep) p = ep + strlen(end);
                 continue;
             }
-            // Skip html/head/body/meta/link/title tags as containers
+            /* Skip html/head/body/meta/link/title tags as containers */
             if (strcmp(t.tag,"html")==0||strcmp(t.tag,"head")==0||
                 strcmp(t.tag,"body")==0||strcmp(t.tag,"meta")==0||
                 strcmp(t.tag,"link")==0||strcmp(t.tag,"title")==0||
@@ -274,10 +301,11 @@ static void TokenizeAndRender(const char* html) {
             else         HandleOpenTag (&t);
 
         } else {
-            // Text content
-            int i=0;
+            /* Text content */
+            int i;
+            i=0;
             while (*p && *p!='<' && i<MAX_STR-1) {
-                // Decode &amp; &lt; &gt; &nbsp;
+                /* Decode &amp; &lt; &gt; &nbsp; */
                 if (*p=='&') {
                     if (strncmp(p,"&amp;",5)==0)  { buf[i++]='&'; p+=5; }
                     else if (strncmp(p,"&lt;",4)==0) { buf[i++]='<'; p+=4; }
@@ -302,20 +330,28 @@ AEON_HTML4_API void AEON_HTML4_CALL AeonHTML4_Shutdown(void) {}
 AEON_HTML4_API int AEON_HTML4_CALL AeonHTML4_Render(
         HWND hwnd, const char* html, int scrollY)
 {
+    HDC hdc;
+    RECT cr;
+    HDC mem;
+    HBITMAP bmp;
+    HBITMAP oldb;
+    HBRUSH bgBr;
+
     if (!hwnd || !html) return 0;
 
-    PAINTSTRUCT ps;
-    HDC hdc = BeginPaint(hwnd, &ps);
+    /* Caller must have called BeginPaint() already or provide a valid HDC.
+     * We get the DC ourselves for the double-buffer blit. */
+    hdc = GetDC(hwnd);
 
-    RECT cr; GetClientRect(hwnd, &cr);
+    GetClientRect(hwnd, &cr);
 
-    // Double-buffer
-    HDC mem  = CreateCompatibleDC(hdc);
-    HBITMAP bmp  = CreateCompatibleBitmap(hdc, cr.right, cr.bottom);
-    HBITMAP oldb = (HBITMAP)SelectObject(mem, bmp);
+    /* Double-buffer */
+    mem  = CreateCompatibleDC(hdc);
+    bmp  = CreateCompatibleBitmap(hdc, cr.right, cr.bottom);
+    oldb = (HBITMAP)SelectObject(mem, bmp);
 
-    // Background
-    HBRUSH bgBr = CreateSolidBrush(BG_COLOR);
+    /* Background */
+    bgBr = CreateSolidBrush(BG_COLOR);
     FillRect(mem, &cr, bgBr);
     DeleteObject(bgBr);
 
@@ -349,16 +385,22 @@ AEON_HTML4_API int AEON_HTML4_CALL AeonHTML4_Render(
     BitBlt(hdc, 0, 0, cr.right, cr.bottom, mem, 0, 0, SRCCOPY);
 
     // Cleanup
-    for (int i=0;i<8;i++) if (g_RS.fonts[i]) DeleteObject(g_RS.fonts[i]);
+    {
+        int i;
+        for (i=0;i<8;i++) if (g_RS.fonts[i]) DeleteObject(g_RS.fonts[i]);
+    }
     SelectObject(mem, oldb); DeleteObject(bmp); DeleteDC(mem);
-    EndPaint(hwnd, &ps);
+    ReleaseDC(hwnd, hdc);
     return g_RS.y + scrollY;  // total document height
 }
 
 // Hit-test a click (call from WM_LBUTTONDOWN in browser chrome)
 AEON_HTML4_API const char* AEON_HTML4_CALL AeonHTML4_HitTest(int x, int y) {
-    for (int i = 0; i < g_RS.linkCount; i++) {
-        POINT pt = {x, y};
+    int i;
+    POINT pt;
+    pt.x = x;
+    pt.y = y;
+    for (i = 0; i < g_RS.linkCount; i++) {
         if (PtInRect(&g_RS.links[i].rc, pt))
             return g_RS.links[i].href;
     }
