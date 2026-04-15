@@ -151,3 +151,5 @@ Gemini_Generated_Image*.jpg
 !resources/images/installer_preview.jpg
 billing/
 assets/icons/raw/
+
+retro/bearssl_obj/

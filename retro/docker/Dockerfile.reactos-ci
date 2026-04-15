@@ -1,0 +1,40 @@
+# Aeon Retro Engine — Pre-baked QEMU + ReactOS Docker Image
+# DelgadoLogic — Speeds up Cloud Build ReactOS stage from ~3 min to ~30s
+#
+# Build: docker build -t ghcr.io/chronolapse411/aeon-reactos-ci:latest -f docker/Dockerfile.reactos-ci .
+# Push:  docker push ghcr.io/chronolapse411/aeon-reactos-ci:latest
+#
+# Usage in cloudbuild.yaml:
+#   - name: 'ghcr.io/chronolapse411/aeon-reactos-ci:latest'
+#     args: ['/run_test.sh', '/workspace/build_out/tls_test.exe']
+
+FROM ubuntu:22.04
+
+LABEL org.opencontainers.image.source="https://github.com/Chronolapse411/aeon-engine"
+LABEL org.opencontainers.image.description="Aeon Retro Engine CI — QEMU + ReactOS LiveCD for Win32 validation"
+LABEL org.opencontainers.image.vendor="DelgadoLogic"
+
+# Install QEMU + tools (no recommends to stay small)
+RUN apt-get update -qq && \
+    apt-get install -y -qq --no-install-recommends \
+        qemu-system-x86 \
+        qemu-utils \
+        genisoimage \
+        mtools \
+        dosfstools \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy ReactOS LiveCD into image (must be in build context)
+COPY tools/reactos-livecd.iso /opt/reactos/reactos-livecd.iso
+
+# Copy test runner script
+COPY docker/run_reactos_test.sh /run_test.sh
+RUN chmod +x /run_test.sh
+
+# Verify
+RUN qemu-system-i386 --version && \
+    ls -la /opt/reactos/reactos-livecd.iso && \
+    echo "ReactOS CI image ready"
+
+ENTRYPOINT ["/run_test.sh"]

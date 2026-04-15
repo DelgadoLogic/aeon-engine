@@ -183,7 +183,9 @@ void UploadPendingCrash() {
         return;  // Leave sentinel — retry next launch
     }
 
-    HINTERNET hConn = InternetConnectA(hNet, "crashes.delgadologic.tech",
+    // Production endpoint — Cloud Run service in aeon-browser-build project
+    // TODO: Switch to crashes.delgadologic.tech once GCP domain verification is complete
+    HINTERNET hConn = InternetConnectA(hNet, "crash-ingestion-343794371528.us-east1.run.app",
         INTERNET_DEFAULT_HTTPS_PORT, nullptr, nullptr,
         INTERNET_SERVICE_HTTP, 0, 0);
 
