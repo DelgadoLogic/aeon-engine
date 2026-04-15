@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Open Watcom 2.0
         run: |
@@ -253,7 +253,7 @@ jobs:
     needs: tier1-wine  # Only run if Wine tier passes
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download OW2 Build Artifacts
         uses: actions/download-artifact@v8
