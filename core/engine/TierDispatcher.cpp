@@ -97,9 +97,29 @@ AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile) {
 // TierDispatcher class (declared in TierDispatcher.h)
 TierDispatcher::TierDispatcher(const SystemProfile& p, HINSTANCE hInst)
     : m_Profile(p), m_hInst(hInst), m_impl(nullptr) {}
-TierDispatcher::~TierDispatcher() {}
+
+TierDispatcher::~TierDispatcher() {
+    // Shutdown the engine if it was loaded
+    if (m_engine && m_engine->Shutdown)
+        m_engine->Shutdown();
+}
+
 bool TierDispatcher::LoadEngine() {
     auto* e = TierDispatcher_LoadEngine(&m_Profile);
     m_effectiveTier = m_Profile.tier;
-    return (e != nullptr);
+    if (!e) return false;
+
+    // Initialize the engine DLL — must happen before any other vtable calls
+    if (e->Init) {
+        int result = e->Init(&m_Profile, m_hInst);
+        if (!result) {
+            fprintf(stderr, "[Tier] Engine Init() returned failure\n");
+            if (e->Shutdown) e->Shutdown();
+            return false;
+        }
+        fprintf(stdout, "[Tier] Engine Init() succeeded.\n");
+    }
+
+    m_engine = e;
+    return true;
 }

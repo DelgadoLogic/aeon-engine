@@ -16,6 +16,7 @@
 
 #include "AeonAgentPipe.h"
 #include "../ui/BrowserChrome.h"
+#include "../AeonVersion.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
