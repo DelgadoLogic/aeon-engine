@@ -4,6 +4,10 @@
 // Main entry point — Win32 WinMain.
 // Uses AeonProbe::RunProbe() for tier detection, TierDispatcher_LoadEngine() for
 // engine DLL loading, and AeonBridge::Init() for JS↔C++ communication.
+//
+// Session 19: Added CrashHandler, TLS init, SessionManager, PulseBridge phases.
+//             Fixed OnCrash/OnNewTab callbacks to actually modify UI state.
+//             Added __cdecl calling convention for ABI compliance.
 
 #include <windows.h>
 #include <windowsx.h>
@@ -13,6 +17,7 @@
 
 #pragma comment(lib, "dwmapi.lib")
 
+#include "core/AeonVersion.h"
 #include "core/probe/HardwareProbe.h"
 #include "core/engine/AeonEngine_Interface.h"
 #include "core/engine/AeonBridge.h"
@@ -21,6 +26,10 @@
 #include "core/settings/SettingsEngine.h"
 #include "core/memory/TabSleepManager.h"
 #include "core/security/PasswordVault.h"
+#include "core/crash/CrashHandler.h"
+#include "core/tls/TlsAbstraction.h"
+#include "core/session/SessionManager.h"
+#include "telemetry/PulseBridge.h"
 #include "updater/AutoUpdater.h"
 #include "core/billing/OmniLicense.h"
 #include "core/history/HistoryEngine.h"
@@ -52,6 +61,9 @@ AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
 
+    // PHASE 0: Install crash handler FIRST — catches any init failures.
+    AeonCrash::Install();
+
     // Console logging for diagnostics — attach console when --debug flag is passed.
     // Release builds use the internal logging subsystem (HistoryEngine trace log).
     {
@@ -74,14 +86,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     fprintf(stdout, "\u2551  browseaeon.com              \u2551\n");
     fprintf(stdout, "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n");
 
-    // 1. Hardware probe — detect OS tier + CPU
+    // PHASE 1: Hardware probe — detect OS tier + CPU
     SystemProfile profile = {};
     AeonTier tier = AeonProbe::RunProbe(profile);
+    fprintf(stdout, "[Boot] Aeon Browser v%s starting...\n", AEON_VERSION);
     fprintf(stdout, "[Boot] Tier: %s | OS: %u.%u.%u | Cores: %d | RAM: %.0f MB\n",
         AeonProbe::TierName(tier),
         profile.osMajor, profile.osMinor, profile.osBuild,
         (int)profile.cpu.cores,
         (double)profile.ramBytes / (1024.0 * 1024.0));
+
+    // PHASE 1b: TLS stack — must be initialised before ANY network call.
+    if (!AeonTls::Initialize(profile)) {
+        fprintf(stderr, "[Boot] WARNING: TLS init failed — network features may not work.\n");
+    }
+
+    // PHASE 1c: Session manager — restore previous tabs on crash/restart.
+    SessionManager::Initialize(profile);
+
+    // PHASE 1d: Telemetry baseline ping
+    PulseBridge::SendStartupPing(profile);
 
     // OmniLicense Hardware Check
     fprintf(stdout, "[Boot] Evaluating Crypto Signature via OmniLicense...\n");
@@ -163,33 +187,45 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     {
         static AeonEngineCallbacks cbs = {};
         cbs.OnProgress = [](unsigned int tab_id, int pct) {
-            fprintf(stdout, "[Engine] Tab #%u progress: %d%%\n", tab_id, pct);
+            fprintf(stdout, "[Engine→Shell] Tab #%u progress: %d%%\n", tab_id, pct);
         };
         cbs.OnTitleChanged = [](unsigned int tab_id, const char* title) {
-            fprintf(stdout, "[Engine] Tab #%u title: %s\n", tab_id, title);
+            fprintf(stdout, "[Engine→Shell] Tab #%u title: \"%s\"\n",
+                tab_id, title ? title : "(null)");
             if (g_MainHwnd)
                 BrowserChrome::UpdateTabTitle(g_MainHwnd, tab_id, title);
         };
         cbs.OnNavigated = [](unsigned int tab_id, const char* url) {
-            fprintf(stdout, "[Engine] Tab #%u navigated: %s\n", tab_id, url);
+            fprintf(stdout, "[Engine→Shell] Tab #%u navigated: %s\n",
+                tab_id, url ? url : "(null)");
             if (g_MainHwnd)
                 BrowserChrome::UpdateTabUrl(g_MainHwnd, tab_id, url);
         };
         cbs.OnLoaded = [](unsigned int tab_id) {
-            fprintf(stdout, "[Engine] Tab #%u loaded\n", tab_id);
+            fprintf(stdout, "[Engine→Shell] Tab #%u loaded\n", tab_id);
             if (g_MainHwnd)
                 BrowserChrome::SetTabLoaded(g_MainHwnd, tab_id);
         };
         cbs.OnCrash = [](unsigned int tab_id, const char* reason) {
-            fprintf(stderr, "[Engine] Tab #%u CRASHED: %s\n", tab_id,
-                reason ? reason : "unknown");
+            fprintf(stderr, "[Engine→Shell] CRASH: tab #%u — %s\n",
+                tab_id, reason ? reason : "unknown");
+            if (g_MainHwnd) {
+                // Navigate the crashed tab to the internal crash page
+                char crashUrl[512];
+                _snprintf_s(crashUrl, sizeof(crashUrl), _TRUNCATE,
+                            "aeon://crash?tab=%u&reason=%s", tab_id,
+                            reason ? reason : "unknown");
+                BrowserChrome::NavigateTab(g_MainHwnd, tab_id, crashUrl);
+            }
         };
         cbs.OnNewTab = [](unsigned int parent_id, const char* url) {
-            fprintf(stdout, "[Engine] Tab #%u requested new tab: %s\n",
-                parent_id, url ? url : "");
+            fprintf(stdout, "[Engine→Shell] NewTab: parent #%u → %s\n",
+                parent_id, url ? url : "(null)");
+            if (g_MainHwnd)
+                BrowserChrome::CreateTab(g_MainHwnd, url);
         };
         engine->SetCallbacks(&cbs);
-        fprintf(stdout, "[Boot] Engine callbacks wired.\n");
+        fprintf(stdout, "[Boot] Engine callbacks wired (6 handlers).\n");
     }
 
     // 5. Tab Sleep Manager

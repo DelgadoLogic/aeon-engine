@@ -33,8 +33,9 @@ set(AEON_TARGET_TIER "Pro" CACHE STRING
 
 message(STATUS "Aeon Browser build tier: ${AEON_TARGET_TIER}")
 
-# Version string — used by AutoUpdater
-add_compile_definitions(AEON_VERSION="${PROJECT_VERSION}")
+# Version string — sourced from core/AeonVersion.h (single source of truth).
+# Do NOT define AEON_VERSION here; AeonVersion.h defines it as "0.19.0"
+# and CMake's PROJECT_VERSION is metadata-only (used by install/packaging).
 
 # Tier-specific preprocessor defines
 if(AEON_TARGET_TIER STREQUAL "Pro" OR AEON_TARGET_TIER STREQUAL "Modern")
