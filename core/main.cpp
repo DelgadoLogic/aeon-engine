@@ -7,7 +7,7 @@
 //
 // IT TROUBLESHOOTING:
 //   - If the wrong tier loads, run with AEON_DEBUG=1 env var to dump probe.
-//   - Crash at startup on XP usually means WolfSSL DLL not found in PATH.
+//   - Crash at startup on XP usually means BearSSL init failed or OCA missing.
 //   - "No SSE2" crash on XP: confirm EraChrome is loading GeckoLite, not Blink.
 
 #include "probe/HardwareProbe.h"
@@ -45,7 +45,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int nCmdShow) {
 
     // -----------------------------------------------------------------------
     // PHASE 3: TLS stack — must be initialised before ANY network call.
-    // IT NOTE: On Win9x this loads wolfssl.dll from our install dir.
+    // IT NOTE: On Win9x this uses BearSSL (statically linked in retro DLL).
     //          On Vista it applies the TLS 1.2 schannel registry keys.
     //          On Win7+ it just enables TLS 1.2/1.3 in schannel if disabled.
     //          On Win10/11 the OS already supports TLS 1.3 natively.
@@ -53,8 +53,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int nCmdShow) {
     if (!AeonTls::Initialize(g_Profile)) {
         MessageBoxA(nullptr,
             "Aeon Browser: TLS initialization failed.\n"
-            "Check that wolfssl.dll is present in the installation directory.\n"
-            "Network features will not work.",
+            "BearSSL could not initialize. Network features will not work.\n"
+            "Try reinstalling Aeon Browser.",
             "Aeon — TLS Error", MB_ICONERROR | MB_OK);
         // Continue in offline mode — don't exit, browser still useful locally
     }

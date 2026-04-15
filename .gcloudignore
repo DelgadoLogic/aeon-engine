@@ -1,0 +1,28 @@
+# .gcloudignore — Only upload retro/ for Cloud Build
+# Ignore everything first
+*
+
+# Then include only what's needed for the retro build
+!retro/
+!retro/**
+
+# Exclude large binaries from retro/
+retro/tools/*.iso
+retro/tools/*.img
+retro/tools/*.log
+retro/tools/payload/
+retro/bearssl/build/
+retro/bearssl_obj/
+retro/*.o
+retro/*.obj
+retro/*.exe
+retro/*.dll
+retro/*.lib
+retro/*.map
+
+# Exclude node_modules and other common ignores
+node_modules/
+.git/
+__pycache__/
+*.pyc
+.env

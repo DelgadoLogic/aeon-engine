@@ -29,7 +29,10 @@ endif()
 # ---------------------------------------------------------------------------
 # aeon_blink.dll — WebView2-backed rendering engine
 # ---------------------------------------------------------------------------
-add_library(aeon_blink SHARED aeon_blink_stub.cpp)
+add_library(aeon_blink SHARED
+    aeon_blink_stub.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/extensions/ExtensionRuntime.cpp"
+)
 
 target_compile_definitions(aeon_blink PRIVATE
     AEON_ENGINE_EXPORTS
@@ -43,10 +46,11 @@ target_compile_definitions(aeon_blink PRIVATE
 
 # Include paths
 target_include_directories(aeon_blink PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/engine"   # AeonEngine_Interface.h
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/probe"    # HardwareProbe.h (for SystemProfile)
-    "${WV2_INCLUDE}"                                   # WebView2.h
-    "${WIL_INCLUDE}"                                   # wil/com.h
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/engine"     # AeonEngine_Interface.h
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/probe"      # HardwareProbe.h (for SystemProfile)
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/extensions" # ExtensionRuntime.h (NativeAdBlock)
+    "${WV2_INCLUDE}"                                     # WebView2.h
+    "${WIL_INCLUDE}"                                     # wil/com.h
 )
 
 # Link libraries
@@ -55,6 +59,7 @@ target_link_libraries(aeon_blink PRIVATE
     WebView2LoaderStatic    # Static link — no WebView2Loader.dll dependency
     kernel32 user32 gdi32 shell32 ole32 oleaut32
     shlwapi advapi32
+    crypt32                 # DPAPI — NativePassMgr::StoreCredential
 )
 
 # Output name
@@ -65,8 +70,10 @@ set_target_properties(aeon_blink PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out"
 )
 
-# Post-build: copy to main build output
+# Post-build: copy to dist_beta if it exists (skipped on CI)
 add_custom_command(TARGET aeon_blink POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../dist_beta"
     COMMAND ${CMAKE_COMMAND} -E copy
         "$<TARGET_FILE:aeon_blink>"
         "${CMAKE_CURRENT_SOURCE_DIR}/../../dist_beta/aeon_blink.dll"

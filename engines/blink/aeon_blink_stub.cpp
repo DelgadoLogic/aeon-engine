@@ -38,6 +38,8 @@
 #endif
 
 #include "AeonEngine_Interface.h"
+#include "ExtensionRuntime.h"
+// AeonBridge injection is handled by the host process via InjectEarlyJS ABI
 #include <windows.h>
 #include <shlobj.h>
 #include <cstdio>
@@ -45,6 +47,7 @@
 #include <map>
 #include <string>
 #include <functional>
+#include <vector>
 #include <shlwapi.h>
 
 #pragma comment(lib, "shlwapi.lib")
@@ -73,6 +76,9 @@ struct TabState {
     int x = 0, y = 0, w = 800, h = 600;
     bool loading = false;
 
+    // Scripts queued via InjectEarlyJS before WebView2 is ready
+    std::vector<std::string> pendingEarlyJS;
+
 #ifdef AEON_HAS_WEBVIEW2
     ComPtr<ICoreWebView2Controller> controller;
     ComPtr<ICoreWebView2>           webview;
@@ -84,10 +90,55 @@ static unsigned int                     g_NextTabId = 1;
 static AeonEngineCallbacks              g_Callbacks = {};
 static const void*                      g_Profile   = nullptr;
 static HINSTANCE                        g_hInst     = nullptr;
+static char                             g_ExeDir[MAX_PATH] = {};
 
 // Child window class for hosting WebView2
 #define AEON_WV2_CLASS L"AeonWebView2Host"
 static bool g_ClassRegistered = false;
+
+// ---------------------------------------------------------------------------
+// aeon:// URL resolution → local file:// path
+// Maps: aeon://newtab     → <exeDir>/newtab/newtab.html
+//       aeon://settings   → <exeDir>/pages/settings.html
+//       aeon://history    → <exeDir>/pages/history.html
+//       etc.
+// Returns empty string if not an aeon:// URL.
+// ---------------------------------------------------------------------------
+static std::string ResolveAeonUrl(const std::string& url) {
+    if (url.rfind("aeon://", 0) != 0) return {};
+    std::string page = url.substr(7); // strip "aeon://"
+
+    // Strip trailing slashes
+    while (!page.empty() && page.back() == '/') page.pop_back();
+    if (page.empty()) page = "newtab";
+
+    char path[MAX_PATH];
+    if (page == "newtab") {
+        _snprintf_s(path, sizeof(path), _TRUNCATE,
+            "%s\\newtab\\newtab.html", g_ExeDir);
+    } else {
+        _snprintf_s(path, sizeof(path), _TRUNCATE,
+            "%s\\pages\\%s.html", g_ExeDir, page.c_str());
+    }
+
+    // Verify file exists
+    if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+        fprintf(stderr, "[Blink] aeon://%s → file not found: %s\n",
+            page.c_str(), path);
+        return {};
+    }
+
+    // Convert backslashes to forward slashes for file:// URI
+    std::string fileUrl = "file:///";
+    for (const char* p = path; *p; p++) {
+        if (*p == '\\') fileUrl += '/';
+        else if (*p == ' ') fileUrl += "%20";
+        else fileUrl += *p;
+    }
+
+    fprintf(stdout, "[Blink] aeon://%s → %s\n", page.c_str(), fileUrl.c_str());
+    return fileUrl;
+}
 
 static LRESULT CALLBACK WV2HostProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -176,7 +227,9 @@ static void InitWebView2ForTab(TabState& tab) {
     wchar_t wProfileDir[MAX_PATH];
     MultiByteToWideChar(CP_UTF8, 0, profileDir, -1, wProfileDir, MAX_PATH);
 
-    // Create environment with additional browser args to disable Google services
+    // Create environment with additional browser args:
+    //   - Disable unnecessary Google services for sovereign operation
+    //   - Enable CDP remote debugging on port 9222 for AI agent control
     // Note: CoreWebView2EnvironmentOptions is provided by WebView2EnvironmentOptions.h
     auto envOptions = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
     envOptions->put_AdditionalBrowserArguments(
@@ -185,6 +238,8 @@ static void InitWebView2ForTab(TabState& tab) {
         L" --no-first-run"
         L" --disable-default-apps"
         L" --disable-component-update"
+        L" --remote-debugging-port=9222"
+        L" --remote-allow-origins=*"
     );
 
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
@@ -192,7 +247,11 @@ static void InitWebView2ForTab(TabState& tab) {
         wProfileDir,
         envOptions.Get(),
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-            [&tab](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+            [tabId = tab.id](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+                auto it = g_Tabs.find(tabId);
+                if (it == g_Tabs.end()) return S_OK; // Tab closed during init
+                TabState& tab = it->second;
+
                 if (FAILED(result) || !env) {
                     fprintf(stderr, "[Blink] WebView2 env creation failed: 0x%08x\n", result);
                     PaintFallback(tab);
@@ -202,7 +261,11 @@ static void InitWebView2ForTab(TabState& tab) {
                 env->CreateCoreWebView2Controller(
                     tab.childHwnd,
                     Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                        [&tab](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+                        [tabId, envPtr = ComPtr<ICoreWebView2Environment>(env)](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+                            auto it2 = g_Tabs.find(tabId);
+                            if (it2 == g_Tabs.end()) return S_OK; // Tab closed
+                            TabState& tab = it2->second;
+
                             if (FAILED(result) || !controller) {
                                 fprintf(stderr, "[Blink] WebView2 controller failed: 0x%08x\n", result);
                                 PaintFallback(tab);
@@ -275,15 +338,211 @@ static void InitWebView2ForTab(TabState& tab) {
                                         return S_OK;
                                     }).Get(), nullptr);
 
-                            // Navigate to initial URL
+                            // ── NativeAdBlock: WebResourceRequested ────────
+                            // Register a wildcard filter to intercept ALL
+                            // sub-resource requests (scripts, images, iframes,
+                            // XHR, etc.) and block ad/tracker domains.
+                            tab.webview->AddWebResourceRequestedFilter(
+                                L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+                            tab.webview->add_WebResourceRequested(
+                                Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+                                    [tabId = tab.id, envPtr](ICoreWebView2* sender,
+                                        ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+
+                                        ComPtr<ICoreWebView2WebResourceRequest> request;
+                                        args->get_Request(&request);
+                                        if (!request) return S_OK;
+
+                                        LPWSTR wUri = nullptr;
+                                        request->get_Uri(&wUri);
+                                        if (!wUri) return S_OK;
+
+                                        // Convert to UTF-8 for NativeAdBlock
+                                        char uri[2048];
+                                        WideCharToMultiByte(CP_UTF8, 0, wUri, -1,
+                                            uri, sizeof(uri), nullptr, nullptr);
+                                        CoTaskMemFree(wUri);
+
+                                        // Check against loaded filter lists
+                                        if (NativeAdBlock::ShouldBlock(uri)) {
+                                            // Block: create proper 403 response
+                                            if (envPtr) {
+                                                ComPtr<ICoreWebView2WebResourceResponse> response;
+                                                envPtr->CreateWebResourceResponse(
+                                                    nullptr, 403,
+                                                    L"Blocked by Aeon Shield",
+                                                    L"", &response);
+                                                if (response)
+                                                    args->put_Response(response.Get());
+                                            }
+                                            fprintf(stdout, "[AdBlock] Blocked: %.80s\n", uri);
+                                        }
+                                        return S_OK;
+                                    }).Get(), nullptr);
+
+                            // NOTE: AeonBridge injection is handled by the
+                            // host process (BrowserChrome) via the InjectEarlyJS
+                            // ABI call — the DLL does not link AeonBridge.cpp.
+
+                            // Flush any early-JS scripts queued before
+                            // WebView2 was ready (e.g. AeonBridge bootstrap)
+                            for (const auto& script : tab.pendingEarlyJS) {
+                                int wLen = MultiByteToWideChar(CP_UTF8, 0,
+                                    script.c_str(), -1, nullptr, 0);
+                                wchar_t* wJs = new wchar_t[wLen];
+                                MultiByteToWideChar(CP_UTF8, 0,
+                                    script.c_str(), -1, wJs, wLen);
+                                tab.webview->AddScriptToExecuteOnDocumentCreated(
+                                    wJs, nullptr);
+                                delete[] wJs;
+                            }
+                            if (!tab.pendingEarlyJS.empty()) {
+                                fprintf(stdout,
+                                    "[Blink] Flushed %zu queued early-JS scripts for tab #%u\n",
+                                    tab.pendingEarlyJS.size(), tab.id);
+                                tab.pendingEarlyJS.clear();
+                            }
+
+                            // ── DRM Monitor: Detect Widevine EME failures ──
+                            // Intercepts requestMediaKeySystemAccess() to
+                            // catch Widevine-only DRM negotiation and show
+                            // a user-friendly fallback before the site's
+                            // own error message appears.
+                            {
+                                const wchar_t* drmMonitorJs = LR"JS(
+(function() {
+    'use strict';
+    if (window.__aeonDrmMonitor) return;
+    window.__aeonDrmMonitor = true;
+
+    const origRMKSA = navigator.requestMediaKeySystemAccess;
+    if (!origRMKSA) return;
+
+    const WIDEVINE_SYSTEMS = [
+        'com.widevine.alpha',
+        'com.widevine.alpha.experiment'
+    ];
+
+    navigator.requestMediaKeySystemAccess = function(keySystem, configs) {
+        const isWidevine = WIDEVINE_SYSTEMS.includes(keySystem);
+
+        if (isWidevine) {
+            console.warn('[AeonDRM] Widevine key system requested:', keySystem);
+
+            // Check if PlayReady is available as fallback
+            const pr = origRMKSA.call(navigator,
+                'com.microsoft.playready.recommendation',
+                configs
+            ).catch(() => null);
+
+            return origRMKSA.call(navigator, keySystem, configs).catch(function(err) {
+                console.warn('[AeonDRM] Widevine CDM not available:', err.message);
+
+                // Show non-intrusive banner
+                if (!document.getElementById('aeon-drm-banner')) {
+                    const banner = document.createElement('div');
+                    banner.id = 'aeon-drm-banner';
+                    banner.innerHTML = `
+                        <style>
+                            #aeon-drm-banner {
+                                position: fixed; top: 0; left: 0; right: 0;
+                                background: linear-gradient(135deg, #1e2140 0%, #16182a 100%);
+                                border-bottom: 1px solid #2e3064;
+                                padding: 12px 20px;
+                                display: flex; align-items: center; gap: 12px;
+                                font-family: 'Inter', system-ui, sans-serif;
+                                font-size: 13px; color: #e8e8f0;
+                                z-index: 2147483647;
+                                animation: aeonSlideIn .3s ease-out;
+                                box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+                            }
+                            @keyframes aeonSlideIn {
+                                from { transform: translateY(-100%); }
+                                to { transform: translateY(0); }
+                            }
+                            #aeon-drm-banner .aeon-drm-icon {
+                                font-size: 20px; flex-shrink: 0;
+                            }
+                            #aeon-drm-banner .aeon-drm-msg { flex: 1; }
+                            #aeon-drm-banner .aeon-drm-msg strong {
+                                color: #a78bfa; font-weight: 600;
+                            }
+                            #aeon-drm-banner button {
+                                padding: 6px 14px; border-radius: 6px;
+                                border: none; font-size: 12px; font-weight: 600;
+                                cursor: pointer; font-family: inherit;
+                                transition: all .15s;
+                            }
+                            #aeon-drm-banner .aeon-btn-edge {
+                                background: linear-gradient(135deg, #6c63ff, #a78bfa);
+                                color: #fff;
+                            }
+                            #aeon-drm-banner .aeon-btn-edge:hover { opacity: 0.85; }
+                            #aeon-drm-banner .aeon-btn-info {
+                                background: #1e2140; color: #8888aa;
+                                border: 1px solid #2e3064;
+                            }
+                            #aeon-drm-banner .aeon-btn-info:hover {
+                                border-color: #6c63ff; color: #e8e8f0;
+                            }
+                            #aeon-drm-banner .aeon-btn-close {
+                                background: none; color: #8888aa;
+                                font-size: 18px; padding: 4px 8px;
+                            }
+                            #aeon-drm-banner .aeon-btn-close:hover { color: #e8e8f0; }
+                        </style>
+                        <span class="aeon-drm-icon">🔒</span>
+                        <span class="aeon-drm-msg">
+                            This site requires <strong>Widevine DRM</strong> for
+                            protected content playback.
+                        </span>
+                        <button class="aeon-btn-edge" onclick="
+                            try { window.location.href='microsoft-edge:'+window.location.href; }
+                            catch(e) { window.open(window.location.href); }
+                        ">Open in Edge</button>
+                        <button class="aeon-btn-info" onclick="
+                            window.location.href='aeon://drm-info?url='+
+                            encodeURIComponent(window.location.href)+
+                            '&drm='+encodeURIComponent('${keySystem}');
+                        ">Learn More</button>
+                        <button class="aeon-btn-close" onclick="
+                            this.parentElement.remove();
+                        ">×</button>
+                    `;
+                    document.body.appendChild(banner);
+                }
+
+                throw err; // Re-throw so the site handles its own fallback too
+            });
+        }
+
+        // Non-Widevine (PlayReady, ClearKey, etc.) — pass through
+        return origRMKSA.call(navigator, keySystem, configs);
+    };
+
+    console.log('[AeonDRM] DRM monitor active — Widevine detection enabled');
+})();
+)JS";
+                                tab.webview->AddScriptToExecuteOnDocumentCreated(
+                                    drmMonitorJs, nullptr);
+                                fprintf(stdout,
+                                    "[Blink] DRM monitor injected for tab #%u\n",
+                                    tab.id);
+                            }
+
+                            // Navigate to initial URL (resolve aeon:// → file://)
                             if (!tab.url.empty() && tab.url != "about:blank") {
+                                std::string resolved = ResolveAeonUrl(tab.url);
+                                const std::string& navUrl = resolved.empty() ? tab.url : resolved;
                                 wchar_t wUrl[2048];
-                                MultiByteToWideChar(CP_UTF8, 0, tab.url.c_str(), -1,
+                                MultiByteToWideChar(CP_UTF8, 0, navUrl.c_str(), -1,
                                     wUrl, 2048);
                                 tab.webview->Navigate(wUrl);
                             }
 
-                            fprintf(stdout, "[Blink] WebView2 ready for tab #%u\n", tab.id);
+                            fprintf(stdout, "[Blink] WebView2 ready for tab #%u (AdBlock: %d rules)\n",
+                                tab.id, NativeAdBlock::GetTotalRules());
                             return S_OK;
                         }).Get());
                 return S_OK;
@@ -304,9 +563,14 @@ static int __cdecl Engine_Init(const void* profile, void* hInst) {
     g_hInst = static_cast<HINSTANCE>(hInst);
     EnsureWindowClass(g_hInst);
 
+    // Cache exe directory for aeon:// URL resolution
+    GetModuleFileNameA(nullptr, g_ExeDir, MAX_PATH);
+    if (char* s = strrchr(g_ExeDir, '\\')) *s = '\0';
+    fprintf(stdout, "[Blink] Exe dir: %s\n", g_ExeDir);
+
 #ifdef AEON_HAS_WEBVIEW2
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    fprintf(stdout, "[Blink] WebView2 engine initialized.\n");
+    fprintf(stdout, "[Blink] WebView2 engine initialized (WebView2 + aeon:// resolver).\n");
 #else
     fprintf(stdout, "[Blink] GDI fallback engine initialized (WebView2 SDK not linked).\n");
 #endif
@@ -342,8 +606,11 @@ static unsigned int __cdecl Engine_Navigate(unsigned int tab_id,
 
 #ifdef AEON_HAS_WEBVIEW2
     if (tab.webview) {
+        // Resolve aeon:// scheme to local file path
+        std::string resolved = ResolveAeonUrl(tab.url);
+        const std::string& navUrl = resolved.empty() ? tab.url : resolved;
         wchar_t wUrl[2048];
-        MultiByteToWideChar(CP_UTF8, 0, tab.url.c_str(), -1, wUrl, 2048);
+        MultiByteToWideChar(CP_UTF8, 0, navUrl.c_str(), -1, wUrl, 2048);
         tab.webview->Navigate(wUrl);
     } else {
         PaintFallback(tab);
@@ -459,12 +726,21 @@ static void __cdecl Engine_InjectCSS(unsigned int tab_id, const char* css) {
 static void __cdecl Engine_InjectEarlyJS(unsigned int tab_id, const char* js) {
 #ifdef AEON_HAS_WEBVIEW2
     auto it = g_Tabs.find(tab_id);
-    if (it == g_Tabs.end() || !it->second.webview || !js) return;
+    if (it == g_Tabs.end() || !js) return;
 
-    wchar_t* wJs = new wchar_t[strlen(js) + 1];
-    MultiByteToWideChar(CP_UTF8, 0, js, -1, wJs, (int)strlen(js) + 1);
-    it->second.webview->AddScriptToExecuteOnDocumentCreated(wJs, nullptr);
-    delete[] wJs;
+    if (it->second.webview) {
+        // WebView2 is ready — inject immediately
+        int wLen = MultiByteToWideChar(CP_UTF8, 0, js, -1, nullptr, 0);
+        wchar_t* wJs = new wchar_t[wLen];
+        MultiByteToWideChar(CP_UTF8, 0, js, -1, wJs, wLen);
+        it->second.webview->AddScriptToExecuteOnDocumentCreated(wJs, nullptr);
+        delete[] wJs;
+    } else {
+        // WebView2 still initializing — queue for flush
+        it->second.pendingEarlyJS.emplace_back(js);
+        fprintf(stdout, "[Blink] Queued early-JS for tab #%u (pending: %zu)\n",
+            tab_id, it->second.pendingEarlyJS.size());
+    }
 #else
     (void)tab_id; (void)js;
 #endif
@@ -538,6 +814,15 @@ static AeonEngineVTable g_VTable = {
     Engine_SetCallbacks,
     Engine_SetViewport,
 };
+
+// ---------------------------------------------------------------------------
+// Standalone ABI version export — TierDispatcher calls this via
+// GetProcAddress("AeonEngine_AbiVersion") BEFORE AeonEngine_Create.
+// Without this export, the DLL is silently rejected by the ABI check.
+// ---------------------------------------------------------------------------
+AEON_EXPORT int __cdecl AeonEngine_AbiVersion() {
+    return AEON_ENGINE_ABI_VERSION;
+}
 
 // ---------------------------------------------------------------------------
 // Factory export — this is what TierDispatcher::LoadEngine() looks for

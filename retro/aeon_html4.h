@@ -1,6 +1,7 @@
 // AeonBrowser — aeon_html4.h
 // Retro HTML4 GDI renderer — DLL interface
 #pragma once
+#include <windows.h>
 #ifdef _WIN32
 #  ifdef AEON_HTML4_BUILD
 #    define AEON_HTML4_API __declspec(dllexport)

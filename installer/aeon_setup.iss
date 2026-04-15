@@ -63,36 +63,9 @@ Name: "defaultbrowser"; Description: "Set Aeon as my default browser"; \
       GroupDescription: "Browser settings"
 
 [Files]
-; Main browser binary
-Source: "..\build\win\aeon\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-
-; Browser resources (DLLs, pak files, locales, etc.)
-Source: "..\build\win\aeon\*.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\win\aeon\*.pak"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\win\aeon\*.bin"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\win\aeon\locales\*"; DestDir: "{app}\locales"; \
-      Flags: ignoreversion recursesubdirs
-Source: "..\build\win\aeon\resources\*"; DestDir: "{app}\resources"; \
-      Flags: ignoreversion recursesubdirs
-
-; AeonMind (local AI service)
-Source: "..\build\win\aeonmind\*"; DestDir: "{app}\aeonmind"; \
-      Flags: ignoreversion recursesubdirs
-
-; AeonHive (P2P mesh daemon)
-Source: "..\cloud\aeon_hive.py"; DestDir: "{app}\hive"; Flags: ignoreversion
-Source: "..\requirements_hive.txt"; DestDir: "{app}\hive"; Flags: ignoreversion
-
-; Universal updater (keeps everything current)
-Source: "..\updater\aeon_universal_updater.py"; DestDir: "{app}\updater"; \
-      Flags: ignoreversion
-
-; Silence policy (shared by all background daemons)
-Source: "..\aeon_silence_policy.py"; DestDir: "{app}"; Flags: ignoreversion
-
-; Bundled Python runtime (for hive/updater — users don't install Python)
-Source: "..\vendor\python\*"; DestDir: "{app}\python"; \
-      Flags: ignoreversion recursesubdirs
+; The actual browser is fetched over Ed25519 validated nodes.
+; We ONLY package the compiled 1MB C++ bootstrapper.
+Source: "..\build\win\installer\AeonInstaller.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Icon
 Source: "..\resources\aeon.ico"; DestDir: "{app}"; Flags: ignoreversion
@@ -122,11 +95,10 @@ Root: HKCU; Subkey: "Software\RegisteredApplications"; \
       ValueData: "Software\Clients\StartMenuInternet\AeonBrowser\Capabilities"
 
 [Run]
-; Start AeonHive in background after install
-Filename: "{app}\python\python.exe"; \
-      Parameters: "{app}\hive\aeon_hive.py"; \
-      WorkingDir: "{app}\hive"; \
-      Description: "Starting Aeon network daemon"; \
+; Run the C++ Bootstrapper natively as the main process.
+; The bootstrapper handles downloading from the hive/cdn, signature verification, and extraction.
+Filename: "{app}\AeonInstaller.exe"; \
+      Description: "Starting Aeon Core Download & Installation"; \
       Flags: nowait postinstall skipifsilent
 
 ; Open browser after install
@@ -139,24 +111,5 @@ Filename: "{app}\{#AppExeName}"; \
 Filename: "taskkill"; Parameters: "/f /im python.exe"; Flags: nowait
 
 [Code]
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
-begin
-  if CurStep = ssPostInstall then
-  begin
-    // Set as default browser if user selected that task
-    if IsTaskSelected('defaultbrowser') then
-    begin
-      Exec(ExpandConstant('{app}\{#AppExeName}'),
-           '--make-default-browser', '', SW_HIDE, ewWaitUntilTerminated,
-           ResultCode);
-    end;
-
-    // Install Python dependencies for hive/updater silently
-    Exec(ExpandConstant('{app}\python\python.exe'),
-         '-m pip install -q -r ' +
-         ExpandConstant('{app}\hive\requirements_hive.txt'),
-         ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  end;
-end;
+// The native bootstrapper handles post-install dependencies.
+// The Inno Setup simply unpacks the 1MB exe.

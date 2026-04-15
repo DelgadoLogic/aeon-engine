@@ -221,7 +221,7 @@ bool ResolveDoH(const char* hostname, char* out_buf, size_t buf_len) {
     // DNS-over-HTTPS: query https://1.1.1.1/dns-query?name=<host>&type=A
     // Returns the first A record IP.
     // IT NOTE: On Vista/7 we use native HTTPS (schannel after our TLS init).
-    //          On Win9x we use WolfSSL HTTP GET to 1.1.1.1:443.
+    //          On Win9x we use BearSSL HTTPS via retro DLL to 1.1.1.1:443.
     if (!hostname || !out_buf || buf_len < 8) return false;
 
     char url[256];

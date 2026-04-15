@@ -1,0 +1,170 @@
+﻿{
+  "status": "success",
+  "result": [
+    {
+      "projectId": "aegis-royale-backend",
+      "projectNumber": "893801527306",
+      "displayName": "aegis-royale-backend",
+      "name": "projects/aegis-royale-backend",
+      "resources": {
+        "hostingSite": "aegis-royale-backend"
+      },
+      "state": "ACTIVE",
+      "etag": "1_31a16224-8ad1-453e-ac09-0468da0c16c2"
+    },
+    {
+      "projectId": "delgado-creative-enterprises",
+      "projectNumber": "1023189564854",
+      "displayName": "Delgado Creative Enterprises",
+      "name": "projects/delgado-creative-enterprises",
+      "resources": {
+        "hostingSite": "delgado-creative-enterprises"
+      },
+      "state": "ACTIVE",
+      "etag": "1_a940c8e2-a453-447b-9e78-88cdcdabf8de"
+    },
+    {
+      "projectId": "delgado-kinetic-surge-2026",
+      "projectNumber": "214762987268",
+      "displayName": "Kinetic Surge",
+      "name": "projects/delgado-kinetic-surge-2026",
+      "resources": {
+        "hostingSite": "delgado-kinetic-surge-2026"
+      },
+      "state": "ACTIVE",
+      "etag": "1_8f1a6014-9ae1-49ac-84e3-9e026ffb8717"
+    },
+    {
+      "projectId": "kinetic-sanctuary-prod",
+      "projectNumber": "1038260613629",
+      "displayName": "Kinetic Sanctuary",
+      "name": "projects/kinetic-sanctuary-prod",
+      "resources": {
+        "hostingSite": "kinetic-sanctuary-prod"
+      },
+      "state": "ACTIVE",
+      "etag": "1_222eb216-f77e-44e9-a48c-c0f3d65c1ef7"
+    },
+    {
+      "projectId": "little-disciples-3d-prod",
+      "projectNumber": "692964345596",
+      "displayName": "little-disciples-3d-prod",
+      "name": "projects/little-disciples-3d-prod",
+      "resources": {
+        "hostingSite": "little-disciples-3d-prod"
+      },
+      "state": "ACTIVE",
+      "etag": "1_d9f8036a-541f-4984-8511-bd0527eb6ec0"
+    },
+    {
+      "projectId": "manuel-portfolio-2026",
+      "projectNumber": "558189456",
+      "displayName": "Manuel-Portfolio-2026",
+      "name": "projects/manuel-portfolio-2026",
+      "resources": {
+        "hostingSite": "manuel-portfolio-2026"
+      },
+      "state": "ACTIVE",
+      "etag": "1_1a30c01e-3ccd-462f-a287-f951f4a7f51c"
+    },
+    {
+      "projectId": "metricnova-calc-2026",
+      "projectNumber": "243358677474",
+      "displayName": "MetricNova",
+      "name": "projects/metricnova-calc-2026",
+      "resources": {
+        "hostingSite": "metricnova-calc-2026"
+      },
+      "state": "ACTIVE",
+      "etag": "1_e44da44b-e1e4-4d5f-bef6-b832bd7ba6ed"
+    },
+    {
+      "projectId": "omega-ai-johana",
+      "projectNumber": "223512374537",
+      "displayName": "Omega AI - Johana",
+      "name": "projects/omega-ai-johana",
+      "resources": {
+        "hostingSite": "omega-ai-johana"
+      },
+      "state": "ACTIVE",
+      "etag": "1_cbbfdd94-a622-42ca-beb0-c47577e93def"
+    },
+    {
+      "projectId": "project-aff54323-681f-41aa-aa1",
+      "projectNumber": "215652774916",
+      "displayName": "NexTax AI Project",
+      "name": "projects/project-aff54323-681f-41aa-aa1",
+      "resources": {
+        "hostingSite": "project-aff54323-681f-41aa-aa1"
+      },
+      "state": "ACTIVE",
+      "etag": "1_be9db2ae-7390-4cb4-a76d-839b3ddf0e25"
+    },
+    {
+      "projectId": "scrollstopper-ai-2026",
+      "projectNumber": "27509366525",
+      "displayName": "scrollstopper-ai-2026",
+      "name": "projects/scrollstopper-ai-2026",
+      "resources": {
+        "hostingSite": "scrollstopper-ai-2026"
+      },
+      "state": "ACTIVE",
+      "etag": "1_c7ef304b-0c68-462b-893f-c535876d748d"
+    },
+    {
+      "projectId": "studio-9741685524-84043",
+      "projectNumber": "7523677535",
+      "displayName": "Chronos Forge",
+      "name": "projects/studio-9741685524-84043",
+      "resources": {
+        "hostingSite": "studio-9741685524-84043"
+      },
+      "state": "ACTIVE",
+      "etag": "1_b2d02966-44de-4082-8fd9-9e6b3580efe9"
+    },
+    {
+      "projectId": "subslayer-calc-2026",
+      "projectNumber": "381140876364",
+      "displayName": "SubSlayer",
+      "name": "projects/subslayer-calc-2026",
+      "resources": {
+        "hostingSite": "subslayer-calc-2026"
+      },
+      "state": "ACTIVE",
+      "etag": "1_ebec43d3-ce15-46f8-8ccc-e10d913b60c2"
+    },
+    {
+      "projectId": "toolsforge-app",
+      "projectNumber": "780024837207",
+      "displayName": "ToolsForge",
+      "name": "projects/toolsforge-app",
+      "resources": {
+        "hostingSite": "toolsforge-app"
+      },
+      "state": "ACTIVE",
+      "etag": "1_97a19a48-6c35-4ca5-9fa5-38d80619f46f"
+    },
+    {
+      "projectId": "vectorstrike-prod",
+      "projectNumber": "496832379019",
+      "displayName": "VectorStrike Production",
+      "name": "projects/vectorstrike-prod",
+      "resources": {
+        "hostingSite": "vectorstrike-prod"
+      },
+      "state": "ACTIVE",
+      "etag": "1_d2247a97-5d6f-4f3b-949c-db9f2076e7c8"
+    },
+    {
+      "projectId": "viralweaver-ai-8912",
+      "projectNumber": "741337699252",
+      "displayName": "viralweaver-ai-8912",
+      "name": "projects/viralweaver-ai-8912",
+      "resources": {
+        "hostingSite": "viralweaver-ai-8912"
+      },
+      "state": "ACTIVE",
+      "etag": "1_13beb0d0-1f0c-4896-a1b3-cfbd3136ca13"
+    }
+  ]
+}

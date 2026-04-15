@@ -406,7 +406,7 @@
         placeholder="Search or enter address"
         autocomplete="off" spellcheck="false">
       <div class="search-engines">
-        <button class="engine-btn active" data-engine="brave"   title="Brave Search">Brave</button>
+        <button class="engine-btn active" data-engine="bing"    title="Bing">Bing</button>
         <button class="engine-btn"        data-engine="ddg"     title="DuckDuckGo">DDG</button>
         <button class="engine-btn"        data-engine="google"  title="Google">Google</button>
         <button class="engine-btn"        data-engine="onion"   title="Onion/Tor" style="font-size:11px;">🧅 Tor</button>
@@ -418,9 +418,9 @@
   <div class="section-label">Quick Access</div>
   <div class="speed-dial" id="speed-dial">
     <!-- Default dials — will be loaded from history/bookmarks via aeon:// protocol -->
-    <a class="dial-card" href="https://search.brave.com" data-aeon-dial>
-      <div class="dial-favicon">🦁</div>
-      <div class="dial-label">Brave Search</div>
+    <a class="dial-card" href="https://www.bing.com" data-aeon-dial>
+      <div class="dial-favicon">🔍</div>
+      <div class="dial-label">Bing</div>
     </a>
     <a class="dial-card" href="https://github.com" data-aeon-dial>
       <div class="dial-favicon">🐙</div>
@@ -430,7 +430,7 @@
       <div class="dial-favicon">▶️</div>
       <div class="dial-label">YouTube</div>
     </a>
-    <a class="dial-card" href="https://delgadologic.tech" data-aeon-dial>
+    <a class="dial-card" href="https://browseaeon.com" data-aeon-dial>
       <div class="dial-favicon">⚡</div>
       <div class="dial-label">DelgadoLogic</div>
     </a>
@@ -501,12 +501,12 @@ setInterval(updateClock, 10000);
 // SEARCH
 // =========================================================
 var ENGINES = {
-  brave:  'https://search.brave.com/search?q=',
+  bing:   'https://www.bing.com/search?q=',
   ddg:    'https://duckduckgo.com/?q=',
   google: 'https://www.google.com/search?q=',
   onion:  'https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/html/?q='
 };
-var activeEngine = 'brave';
+var activeEngine = 'bing';
 
 document.querySelectorAll('.engine-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {

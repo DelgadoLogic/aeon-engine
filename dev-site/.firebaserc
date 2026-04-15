@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "aeon-browser-delgado"
+  },
+  "targets": {
+    "aeon-browser-delgado": {
+      "hosting": {
+        "aeon-docs": [
+          "aeon-docs"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

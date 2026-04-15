@@ -10,7 +10,7 @@
 //   - Mirrors aeon.downloads bridge for downloads.html
 
 #include "DownloadManager.h"
-#include "../../history/HistoryEngine.h"
+#include "../history/HistoryEngine.h"
 #include <windows.h>
 #include <wininet.h>
 #include <shlobj.h>
@@ -288,7 +288,7 @@ uint64_t StartDownload(const char* url, const char* filename_hint) {
         (LPVOID)(INT_PTR)task.id, 0, nullptr);
     if (hThread) CloseHandle(hThread);
 
-    fprintf(stdout, "[DL] Started #%d: %s → %s\n", task.id, url, dest);
+    fprintf(stdout, "[DL] Started #%llu: %s → %s\n", (unsigned long long)task.id, url, dest);
     return task.id;
 }
 
@@ -333,31 +333,76 @@ void ClearCompleted() {
 }
 
 void RevealInExplorer(int id) {
-    std::lock_guard<std::mutex> lock(g_mu);
-    for (auto& t : g_tasks) {
-        if (t.id == id) {
-            char cmd[MAX_PATH + 32];
-            _snprintf_s(cmd, sizeof(cmd), _TRUNCATE,
-                "/select,\"%s\"", t.dest_path);
-            ShellExecuteA(nullptr, "open", "explorer.exe", cmd, nullptr, SW_SHOW);
+    // Capture path under lock, call ShellExecute AFTER release (P1 fix)
+    char pathBuf[512] = {};
+    {
+        std::lock_guard<std::mutex> lock(g_mu);
+        for (auto& t : g_tasks) {
+            if (t.id == id) {
+                strncpy_s(pathBuf, t.dest_path, sizeof(pathBuf)-1);
+                break;
+            }
         }
+    }
+    if (pathBuf[0]) {
+        char cmd[MAX_PATH + 32];
+        _snprintf_s(cmd, sizeof(cmd), _TRUNCATE,
+            "/select,\"%s\"", pathBuf);
+        ShellExecuteA(nullptr, "open", "explorer.exe", cmd, nullptr, SW_SHOW);
     }
 }
 
 void OpenFile(int id) {
-    std::lock_guard<std::mutex> lock(g_mu);
-    for (auto& t : g_tasks)
-        if (t.id == id && t.status == DLStatus::Complete)
-            ShellExecuteA(nullptr,"open",t.dest_path,nullptr,nullptr,SW_SHOW);
+    // Capture path under lock, call ShellExecute AFTER release (P1 fix)
+    char pathBuf[512] = {};
+    bool found = false;
+    {
+        std::lock_guard<std::mutex> lock(g_mu);
+        for (auto& t : g_tasks) {
+            if (t.id == id && t.status == DLStatus::Complete) {
+                strncpy_s(pathBuf, t.dest_path, sizeof(pathBuf)-1);
+                found = true;
+                break;
+            }
+        }
+    }
+    if (found)
+        ShellExecuteA(nullptr, "open", pathBuf, nullptr, nullptr, SW_SHOW);
 }
 
 void OpenDownloadFolder() {
     ShellExecuteA(nullptr,"open",g_downloadDir,nullptr,nullptr,SW_SHOW);
 }
 
-std::vector<DownloadTask> GetAll() {
+std::vector<DownloadItem> GetAll() {
     std::lock_guard<std::mutex> lock(g_mu);
-    return g_tasks;
+    std::vector<DownloadItem> out;
+    out.reserve(g_tasks.size());
+    for (const auto& t : g_tasks) {
+        DownloadItem item = {};
+        item.id            = t.id;
+        strncpy_s(item.url,      t.url,       sizeof(item.url)-1);
+        strncpy_s(item.filename, t.filename,   sizeof(item.filename)-1);
+        strncpy_s(item.destPath, t.dest_path,  sizeof(item.destPath)-1);
+        strncpy_s(item.error_msg,t.error_msg,  sizeof(item.error_msg)-1);
+        item.totalBytes    = t.size;
+        item.receivedBytes = t.received;
+        item.speed_bps     = t.speed_bps;
+        item.eta_sec       = t.eta_sec;
+        item.errorCode     = t.errorCode;
+        // Map internal DLStatus → public DownloadState
+        switch (t.status) {
+            case DLStatus::Idle:        item.state = DownloadState::Pending;   break;
+            case DLStatus::Queued:      item.state = DownloadState::Pending;   break;
+            case DLStatus::Downloading: item.state = DownloadState::Active;    break;
+            case DLStatus::Paused:      item.state = DownloadState::Paused;    break;
+            case DLStatus::Complete:    item.state = DownloadState::Complete;  break;
+            case DLStatus::Error:       item.state = DownloadState::Failed;    break;
+            case DLStatus::Cancelled:   item.state = DownloadState::Cancelled; break;
+        }
+        out.push_back(item);
+    }
+    return out;
 }
 
 const char* GetDownloadDir() { return g_downloadDir; }

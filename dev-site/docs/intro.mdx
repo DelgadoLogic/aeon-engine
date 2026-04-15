@@ -1,0 +1,84 @@
+---
+sidebar_position: 1
+slug: /intro
+title: Welcome to Aeon Browser
+---
+
+# Welcome to Aeon Browser
+
+**Aeon Browser** is a privacy-first, AI-native web browser built from the ground up on a Chromium foundation. This developer documentation covers everything you need to understand, build, and contribute to the project.
+
+## What is Aeon?
+
+Aeon isn't just another Chromium skin — it's a full browser engine architecture with custom components designed for:
+
+- 🔒 **Radical Privacy** — Built-in ad blocking, tracker prevention, and fingerprint resistance at the engine level
+- 🤖 **AI Integration** — Gemini + local LLM support for smart tab grouping, page summarization, and context-aware browsing
+- ⚡ **Performance** — Optimized process management, lazy resource loading, and memory-efficient tab handling
+- 🧩 **Extensibility** — Full Manifest V3 support plus Aeon-specific APIs for deeper browser integration
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────┐
+│                  Aeon Shell                  │
+│           (C++ / Win32 / UI Layer)           │
+├─────────────────────────────────────────────┤
+│               Aeon Engine DLL               │
+│    ┌─────────┬──────────┬──────────────┐    │
+│    │ Privacy │    AI    │  Extensions  │    │
+│    │ Engine  │  Bridge  │     API      │    │
+│    └─────────┴──────────┴──────────────┘    │
+├─────────────────────────────────────────────┤
+│          Chromium Embedded Framework         │
+│              (CEF / Blink / V8)              │
+└─────────────────────────────────────────────┘
+```
+
+## Quick Links
+
+| Resource | Description |
+|----------|-------------|
+| [Architecture](/docs/intro) | How Aeon is structured |
+| [Building from Source](/docs/intro) | Set up your dev environment |
+| [Contributing](/docs/intro) | Contribution guidelines |
+| [Dev Blog](/blog) | Engineering updates and releases |
+| [Main Site](https://browseaeon.com) | Product landing page |
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Browser Core** | Chromium Embedded Framework (CEF) |
+| **Engine** | Custom C++ DLL (`aeon_engine.dll`) |
+| **UI Shell** | Win32 / C++ native |
+| **AI** | Google Gemini API + local LLM fallback |
+| **Build System** | CMake + Ninja |
+| **Docs** | Docusaurus 3 |
+
+## Getting Started
+
+:::tip Prerequisites
+- **OS:** Windows 10/11 (64-bit)
+- **Build Tools:** Visual Studio 2022+, CMake 3.20+
+- **Node.js:** 20+ (for dev-site)
+:::
+
+```bash
+# Clone the repository
+git clone https://github.com/AeonBrowserDev/aeon-browser.git
+
+# Build the engine
+cd aeon-browser
+cmake -B build -G Ninja
+cmake --build build --config Release
+
+# Run Aeon
+./build/Release/aeon.exe
+```
+
+## Project Status
+
+Aeon Browser is currently in **active development** (pre-alpha). The core browser shell is functional with basic navigation. The engine integration, privacy features, and AI capabilities are being built out.
+
+Follow our progress on the [Dev Blog](/blog) and [GitHub](https://github.com/AeonBrowserDev/aeon-browser).

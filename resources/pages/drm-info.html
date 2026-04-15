@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DRM Content — Aeon Browser</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0e14;
+    --surface:   #16182a;
+    --card:      #1e2140;
+    --border:    #2e3064;
+    --accent:    #6c63ff;
+    --accent2:   #a78bfa;
+    --text:      #e8e8f0;
+    --text-dim:  #8888aa;
+    --green:     #22c55e;
+    --amber:     #f59e0b;
+    --red:       #ef4444;
+    --cyan:      #06b6d4;
+    --radius:    12px;
+    --mono:      'JetBrains Mono', 'Consolas', monospace;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar ──────────────────────────────────── */
+  nav {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 12px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .badge {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: #fff;
+  }
+  .nav-logo span { font-weight: 600; font-size: 15px; }
+
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background .15s, color .15s;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  nav a:hover  { background: var(--card); color: var(--text); }
+  nav a.active { background: var(--card); color: var(--accent2); }
+  nav a .icon  { width: 16px; text-align: center; font-size: 14px; }
+
+  /* ── Main ─────────────────────────────────────── */
+  main {
+    flex: 1;
+    padding: 60px 48px;
+    overflow-y: auto;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  /* ── Hero Section ────────────────────────────── */
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .hero-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px solid rgba(239, 68, 68, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 44px;
+    margin: 0 auto 28px;
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.15); }
+    50%      { box-shadow: 0 0 30px 8px rgba(239, 68, 68, 0.1); }
+  }
+
+  .hero h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--text), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero .subtitle {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .hero .subtitle strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* ── Info Cards ──────────────────────────────── */
+  section { margin-bottom: 32px; }
+  h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .info-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 14px;
+    transition: background .1s;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row:hover { background: rgba(108, 99, 255, 0.03); }
+
+  .info-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .info-icon.shield  { background: rgba(34, 197, 94, 0.12); }
+  .info-icon.warning { background: rgba(245, 158, 11, 0.12); }
+  .info-icon.info    { background: rgba(6, 182, 212, 0.12); }
+  .info-icon.lock    { background: rgba(108, 99, 255, 0.12); }
+
+  .info-content h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .info-content p {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  /* ── Site URL Banner ─────────────────────────── */
+  .site-banner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .site-banner .site-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .site-banner .site-url {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent2);
+    word-break: break-all;
+    flex: 1;
+  }
+
+  .site-banner .site-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  /* ── DRM Type Badge ─────────────────────────── */
+  .drm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--red);
+    margin-top: 6px;
+  }
+
+  .drm-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* ── Action Buttons ─────────────────────────── */
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 36px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .2s;
+    text-decoration: none;
+  }
+  .btn:hover {
+    border-color: var(--accent);
+    background: rgba(108, 99, 255, 0.1);
+    transform: translateY(-1px);
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(108, 99, 255, 0.25);
+  }
+  .btn.primary:hover {
+    opacity: 0.9;
+    box-shadow: 0 6px 28px rgba(108, 99, 255, 0.35);
+    transform: translateY(-2px);
+  }
+  .btn .icon { font-size: 16px; }
+
+  /* ── Technical Details (Expandable) ──────────── */
+  .tech-details {
+    margin-top: 36px;
+  }
+
+  .tech-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+    transition: color .15s;
+    width: 100%;
+  }
+  .tech-toggle:hover { color: var(--text); }
+  .tech-toggle .chevron {
+    font-size: 10px;
+    transition: transform .2s;
+  }
+  .tech-toggle.open .chevron { transform: rotate(180deg); }
+
+  .tech-content {
+    display: none;
+    margin-top: 12px;
+  }
+  .tech-content.show { display: block; }
+
+  .tech-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 14px;
+  }
+  .tech-row:last-child { border-bottom: none; }
+
+  .tech-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    min-width: 160px;
+    flex-shrink: 0;
+  }
+  .tech-value {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    word-break: break-all;
+  }
+
+  /* ── Privacy footer ─────────────────────────── */
+  .privacy-footer {
+    text-align: center;
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.8;
+  }
+  .privacy-footer a {
+    color: var(--accent2);
+    text-decoration: none;
+  }
+  .privacy-footer a:hover { text-decoration: underline; }
+
+  /* ── Toast ────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all .3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* ── Scrollbar ───────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 768px) {
+    nav { display: none; }
+    main { padding: 32px 20px; }
+    .hero h1 { font-size: 22px; }
+    .actions { flex-direction: column; }
+    .btn { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ───────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">
+    <div class="badge">A</div>
+    <span>Aeon</span>
+  </div>
+  <a href="aeon://settings">
+    <span class="icon">⚙️</span> Settings
+  </a>
+  <a href="aeon://history">
+    <span class="icon">🕐</span> History
+  </a>
+  <a href="aeon://bookmarks">
+    <span class="icon">🔖</span> Bookmarks
+  </a>
+  <a href="aeon://downloads">
+    <span class="icon">⬇️</span> Downloads
+  </a>
+  <a href="aeon://passwords">
+    <span class="icon">🔑</span> Passwords
+  </a>
+  <a href="aeon://diagnostics">
+    <span class="icon">🔬</span> Diagnostics
+  </a>
+  <a class="active" href="aeon://drm-info">
+    <span class="icon">🛡️</span> DRM Info
+  </a>
+</nav>
+
+<!-- ── Main Content ──────────────────────────────── -->
+<main>
+  <!-- ── Hero ──────────────────────────────────── -->
+  <div class="hero">
+    <div class="hero-icon">🔒</div>
+    <h1>Protected Content Detected</h1>
+    <p class="subtitle">
+      This site uses <strong>Widevine DRM</strong> to protect its media content.
+      Aeon Browser prioritizes your privacy by not bundling Google's proprietary
+      DRM module. You can watch this content by opening the page in Microsoft Edge,
+      which supports the required decryption.
+    </p>
+  </div>
+
+  <!-- ── Site URL Banner ───────────────────────── -->
+  <div class="site-banner" id="siteBanner">
+    <div class="site-icon">🌐</div>
+    <div>
+      <div class="site-label">Requesting Site</div>
+      <div class="site-url" id="siteUrl">—</div>
+      <div class="drm-badge" id="drmBadge">Widevine Required</div>
+    </div>
+  </div>
+
+  <!-- ── Why This Happens ──────────────────────── -->
+  <section>
+    <h2>Why Am I Seeing This?</h2>
+    <div class="card">
+      <div class="info-row">
+        <div class="info-icon shield">🛡️</div>
+        <div class="info-content">
+          <h3>Privacy-First Design</h3>
+          <p>Widevine is a Google-owned Content Decryption Module (CDM) that requires
+          a license agreement with Google. It operates as a closed-source binary blob
+          that runs with elevated privileges in your browser. Aeon chooses not to bundle
+          this module to maintain full transparency over every component in the browser.</p>
+        </div>
+      </div>
+      <div class="info-row">
+        <div class="info-icon warning">⚠️</div>
+        <div class="info-content">
+          <h3>Affected Services</h3>
+          <p>Netflix (HD/4K), Disney+, Amazon Prime Video, Hulu, HBO Max, Spotify (web player),
+          and other streaming platforms that require L1 or L3 Widevine CDM for content decryption.
+          Standard definition (SD) playback via PlayReady may still work on some services.</p>
+        </div>
+      </div>
+      <div class="info-row">
+        <div class="info-icon info">🔵</div>
+        <div class="info-content">
+          <h3>PlayReady Supported</h3>
+          <p>Aeon natively supports Microsoft PlayReady DRM through the Windows Media Foundation.
+          Some services (like Netflix on Windows) can negotiate PlayReady instead of Widevine,
+          which may allow up to 4K HDR playback without requiring Google's module.</p>
+        </div>
+      </div>
+      <div class="info-row">
+        <div class="info-icon lock">🔐</div>
+        <div class="info-content">
+          <h3>Long-Term Solution</h3>
+          <p>DelgadoLogic is actively pursuing a Widevine Master License Agreement (MLA) with
+          Google to enable native DRM support in future Aeon releases — without compromising
+          the browser's privacy architecture or requiring any Google services.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Action Buttons ────────────────────────── -->
+  <div class="actions">
+    <button class="btn primary" id="btnOpenEdge" onclick="openInEdge()">
+      <span class="icon">🌊</span> Open in Microsoft Edge
+    </button>
+    <button class="btn" id="btnCopyUrl" onclick="copyUrl()">
+      <span class="icon">📋</span> Copy URL
+    </button>
+    <button class="btn" onclick="window.history.back()">
+      <span class="icon">←</span> Go Back
+    </button>
+  </div>
+
+  <!-- ── Technical Details ─────────────────────── -->
+  <div class="tech-details">
+    <button class="tech-toggle" id="techToggle" onclick="toggleTech()">
+      Technical Details <span class="chevron">▼</span>
+    </button>
+    <div class="tech-content card" id="techContent">
+      <div class="tech-row">
+        <span class="tech-label">DRM System</span>
+        <span class="tech-value" id="techDrmSystem">Widevine (com.widevine.alpha)</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">EME Key System</span>
+        <span class="tech-value" id="techKeySystem">com.widevine.alpha</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">PlayReady Status</span>
+        <span class="tech-value" id="techPlayReady">Checking...</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">Security Level</span>
+        <span class="tech-value" id="techSecLevel">—</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">Content Type</span>
+        <span class="tech-value" id="techContentType">—</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">Aeon Engine</span>
+        <span class="tech-value" id="techEngine">WebView2 (Blink)</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">User Agent</span>
+        <span class="tech-value" id="techUA">—</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-label">Timestamp</span>
+        <span class="tech-value" id="techTimestamp">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Privacy Footer ────────────────────────── -->
+  <div class="privacy-footer">
+    <p>
+      Aeon Browser does not track, log, or transmit any information about DRM-blocked content.<br>
+      This page is generated entirely on-device. No data leaves your machine.
+    </p>
+    <p style="margin-top: 8px;">
+      <a href="aeon://settings">Privacy Settings</a> · 
+      <a href="aeon://diagnostics">System Diagnostics</a> · 
+      <a href="https://aeon.delgadologic.tech">Aeon Browser</a>
+    </p>
+  </div>
+</main>
+
+<!-- ── Toast ──────────────────────────────────────── -->
+<div class="toast" id="toast">Copied to clipboard</div>
+
+<script>
+// ====================================================================
+// Aeon DRM Info Page — Handles display of DRM-blocked content info
+// ====================================================================
+// This page is navigated to when the EME detection in aeon_blink_stub
+// intercepts a DRM negotiation failure (Widevine key system request).
+// Query params:
+//   ?url=<encoded_original_url>
+//   &drm=<key_system>
+//   &type=<content_type>
+// ====================================================================
+
+const bridge = window.AeonBridge || null;
+const params = new URLSearchParams(window.location.search);
+
+// ── Parse query params ──────────────────────────────
+const originalUrl = params.get('url') || (bridge && bridge.getDrmBlockedUrl ? bridge.getDrmBlockedUrl() : '');
+const drmSystem = params.get('drm') || 'com.widevine.alpha';
+const contentType = params.get('type') || 'video/mp4';
+
+// ── Populate UI ─────────────────────────────────────
+function init() {
+  // Site URL
+  const siteUrlEl = document.getElementById('siteUrl');
+  if (originalUrl) {
+    try {
+      const parsed = new URL(originalUrl);
+      siteUrlEl.textContent = parsed.hostname + parsed.pathname;
+    } catch {
+      siteUrlEl.textContent = originalUrl || 'Unknown';
+    }
+  } else {
+    siteUrlEl.textContent = 'No URL provided';
+  }
+
+  // DRM badge text
+  const badge = document.getElementById('drmBadge');
+  if (drmSystem.includes('widevine')) {
+    badge.textContent = 'Widevine Required';
+  } else if (drmSystem.includes('playready')) {
+    badge.textContent = 'PlayReady Required';
+    badge.style.background = 'rgba(245, 158, 11, 0.12)';
+    badge.style.color = 'var(--amber)';
+  } else {
+    badge.textContent = drmSystem.toUpperCase() + ' Required';
+  }
+
+  // Technical details
+  document.getElementById('techDrmSystem').textContent = drmSystem;
+  document.getElementById('techKeySystem').textContent = drmSystem;
+  document.getElementById('techContentType').textContent = contentType;
+  document.getElementById('techUA').textContent = navigator.userAgent;
+  document.getElementById('techTimestamp').textContent = new Date().toISOString();
+
+  // Check PlayReady support via EME
+  checkPlayReady();
+
+  // Engine info from bridge
+  if (bridge && bridge.getEngineInfo) {
+    const info = bridge.getEngineInfo();
+    document.getElementById('techEngine').textContent =
+      (info.backend || 'WebView2') + ' (ABI v' + (info.abiVersion || '1') + ')';
+  }
+}
+
+// ── Check if PlayReady is actually available ─────────
+async function checkPlayReady() {
+  const prEl = document.getElementById('techPlayReady');
+  const secEl = document.getElementById('techSecLevel');
+
+  try {
+    const config = [{
+      initDataTypes: ['cenc'],
+      videoCapabilities: [{
+        contentType: 'video/mp4; codecs="avc1.42E01E"',
+        robustness: ''
+      }]
+    }];
+
+    // Try PlayReady key system
+    const access = await navigator.requestMediaKeySystemAccess(
+      'com.microsoft.playready.recommendation', config
+    );
+
+    prEl.textContent = 'Available ✓';
+    prEl.style.color = 'var(--green)';
+    secEl.textContent = 'Hardware (SL3000)';
+    secEl.style.color = 'var(--green)';
+  } catch (e) {
+    // Try legacy PlayReady identifier
+    try {
+      const config2 = [{
+        initDataTypes: ['cenc'],
+        videoCapabilities: [{
+          contentType: 'video/mp4; codecs="avc1.42E01E"',
+          robustness: ''
+        }]
+      }];
+
+      await navigator.requestMediaKeySystemAccess(
+        'com.microsoft.playready', config2
+      );
+
+      prEl.textContent = 'Available (Legacy) ✓';
+      prEl.style.color = 'var(--green)';
+      secEl.textContent = 'Software (SL2000)';
+      secEl.style.color = 'var(--amber)';
+    } catch {
+      prEl.textContent = 'Not Available ✗';
+      prEl.style.color = 'var(--red)';
+      secEl.textContent = 'None';
+      secEl.style.color = 'var(--red)';
+    }
+  }
+}
+
+// ── Actions ─────────────────────────────────────────
+function openInEdge() {
+  if (!originalUrl) {
+    showToast('No URL available to open');
+    return;
+  }
+
+  // Try AeonBridge first (opens Edge via shell)
+  if (bridge && bridge.openInExternalBrowser) {
+    bridge.openInExternalBrowser(originalUrl, 'msedge');
+    showToast('Opening in Microsoft Edge...');
+    return;
+  }
+
+  // Fallback: use microsoft-edge: protocol
+  try {
+    window.location.href = 'microsoft-edge:' + originalUrl;
+    showToast('Opening in Microsoft Edge...');
+  } catch {
+    // Final fallback: copy URL
+    copyUrl();
+    showToast('Could not open Edge. URL copied to clipboard.');
+  }
+}
+
+function copyUrl() {
+  const url = originalUrl || document.getElementById('siteUrl').textContent;
+  if (!url || url === 'No URL provided') {
+    showToast('No URL to copy');
+    return;
+  }
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('URL copied to clipboard');
+  }).catch(() => {
+    // Fallback for older environments
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('URL copied to clipboard');
+  });
+}
+
+function toggleTech() {
+  const toggle = document.getElementById('techToggle');
+  const content = document.getElementById('techContent');
+  toggle.classList.toggle('open');
+  content.classList.toggle('show');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Initialize ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

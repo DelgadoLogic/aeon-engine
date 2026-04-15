@@ -16,7 +16,7 @@
 // These values must stay stable — they are serialised to registry/config.
 enum class AeonTier : uint8_t {
     Win16_Retro   = 0,  // Windows 3.x / 16-bit (Open Watcom HTML4 renderer)
-    Win9x_Retro   = 1,  // Windows 95 / 98 / ME  (KernelEx + WolfSSL)
+    Win9x_Retro   = 1,  // Windows 95 / 98 / ME  (KernelEx + BearSSL)
     Win2000_Compat= 2,  // Windows 2000 / BlackWingCat kernel
     WinXP_LowSpec = 3,  // Windows XP, no SSE2   (Gecko lightweight)
     WinXP_HiSpec  = 4,  // Windows XP + SSE2     (Blink-compatible)

@@ -54,29 +54,36 @@ void html4_parse(Html4_Document* doc, const char* html, int len) {
     int  heading = 0;
     BOOL bold = FALSE, italic = FALSE;
 
-    for (int i = 0; i < len; ++i) {
-        char c = html[i];
+    int  i;
+
+    for (i = 0; i < len; ++i) {
+        char c;
+        c = html[i];
         if (c == '<') {
             /* Flush pending text */
             if (xi > 0 && xi < HTML4_MAX_TEXT) {
+                Html4_ElemType t;
+                int sz;
                 text[xi] = '\0';
-                Html4_ElemType t = heading > 0
+                t = heading > 0
                     ? (Html4_ElemType)(HTML4_ELEM_H1 + heading - 1)
                     : HTML4_ELEM_P;
-                int sz = heading > 0 ? (24 - heading * 2) : 10;
+                sz = heading > 0 ? (24 - heading * 2) : 10;
                 AddElem(doc, t, text, NULL, bold || heading > 0, italic, sz);
                 xi = 0;
             }
             in_tag = TRUE; ti = 0;
         } else if (c == '>' && in_tag) {
+            char t0[32];
+            char* p;
             in_tag = FALSE;
             tag[ti] = '\0';
 
             /* Parse tag type (first word) */
-            char t0[32] = {0};
+            memset(t0, 0, sizeof(t0));
             sscanf(tag, "%31s", t0);
             /* Lowercase */
-            for (char* p = t0; *p; ++p)
+            for (p = t0; *p; ++p)
                 if (*p >= 'A' && *p <= 'Z') *p |= 0x20;
 
             if (!strcmp(t0, "h1"))       heading = 1;
@@ -118,24 +125,34 @@ void html4_parse(Html4_Document* doc, const char* html, int len) {
  * Flows elements top-to-bottom within the given RECT.
  * ---------------------------------------------------------------------- */
 void html4_render(const Html4_Document* doc, HDC hdc, const RECT* rc) {
+    /* All declarations at top of function */
+    HBRUSH bgBrush;
+    int y, margin, maxW, i;
+
     /* Clear background */
-    HBRUSH bgBrush = CreateSolidBrush(doc->bg_color);
+    bgBrush = CreateSolidBrush(doc->bg_color);
     FillRect(hdc, rc, bgBrush);
     DeleteObject(bgBrush);
 
     SetBkMode(hdc, TRANSPARENT);
 
-    int y = rc->top - doc->scroll_y + 8;
-    int margin = rc->left + 12;
-    int maxW   = rc->right - margin - 12;
+    y = rc->top - doc->scroll_y + 8;
+    margin = rc->left + 12;
+    maxW   = rc->right - margin - 12;
 
-    for (int i = 0; i < doc->count; ++i) {
+    for (i = 0; i < doc->count; ++i) {
         const Html4_Element* e = &doc->elements[i];
+        int ptH;
+        HFONT font;
+        HFONT oldFont;
+        RECT textRect;
 
         if (e->type == HTML4_ELEM_BR) { y += 6; continue; }
         if (e->type == HTML4_ELEM_HR) {
-            HPEN pen = CreatePen(PS_SOLID, 1, RGB(128,128,128));
-            HPEN old = SelectObject(hdc, pen);
+            HPEN pen;
+            HPEN old;
+            pen = CreatePen(PS_SOLID, 1, RGB(128,128,128));
+            old = SelectObject(hdc, pen);
             MoveToEx(hdc, margin, y + 4, NULL);
             LineTo  (hdc, rc->right - 12, y + 4);
             SelectObject(hdc, old);
@@ -146,8 +163,8 @@ void html4_render(const Html4_Document* doc, HDC hdc, const RECT* rc) {
         if (e->text[0] == '\0') continue;
 
         /* Create font for this element */
-        int ptH = -MulDiv(e->font_size_pt, GetDeviceCaps(hdc, LOGPIXELSY), 72);
-        HFONT font = CreateFont(
+        ptH = -MulDiv(e->font_size_pt, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+        font = CreateFont(
             ptH, 0, 0, 0,
             e->bold ? FW_BOLD : FW_NORMAL,
             e->italic ? TRUE : FALSE,
@@ -156,10 +173,13 @@ void html4_render(const Html4_Document* doc, HDC hdc, const RECT* rc) {
             ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             DEFAULT_QUALITY, DEFAULT_PITCH | FF_ROMAN,
             "Times New Roman");
-        HFONT oldFont = SelectObject(hdc, font);
+        oldFont = SelectObject(hdc, font);
 
         /* Measure and word-wrap */
-        RECT textRect = { margin, y, margin + maxW, y + 1000 };
+        textRect.left   = margin;
+        textRect.top    = y;
+        textRect.right  = margin + maxW;
+        textRect.bottom = y + 1000;
         SetTextColor(hdc, e->color);
         DrawText(hdc, e->text, -1, &textRect,
                  DT_WORDBREAK | DT_CALCRECT);

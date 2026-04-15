@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="aeonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6382ff"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <circle cx="24" cy="24" r="22" stroke="url(#aeonGrad)" stroke-width="3" fill="none"/>
+  <path d="M24 8 L14 36 L18 36 L20.5 29 L27.5 29 L30 36 L34 36 Z M22 25 L24 16 L26 25 Z" fill="url(#aeonGrad)"/>
+</svg>

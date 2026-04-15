@@ -65,6 +65,34 @@ enum class AeonHiveTopic : uint32_t {
     CircumventBridge   = 0x0007, // bridge config for censored regions
     PredictHints       = 0x0008, // resource prefetch hints
     PeerScore          = 0x0009, // peer reputation updates
+
+    // ── Pillar 1: Sovereign Crypto ────────────────────────────────────
+    TrustStoreUpdate   = 0x0100, // Ed25519-signed CA bundle updates (AeonTLS)
+    TrustStoreRequest  = 0x0101, // Request latest trust store from mesh
+
+    // ── Pillar 2: Cloud-Assisted Rendering ────────────────────────────
+    CloudRenderRequest = 0x0200, // Turbo Mode: client requests page render
+    CloudRenderTile    = 0x0201, // Turbo Mode: renderer sends visual tiles
+    CloudRenderMeta    = 0x0202, // Turbo Mode: DOM metadata + interactive map
+    CloudRenderInput   = 0x0203, // Turbo Mode: client relays user input
+    CloudRenderOffer   = 0x0204, // Renderer advertises available capacity
+
+    // ── Pillar 3: P2P Distribution ────────────────────────────────────
+    P2PUpdateManifest  = 0x0300, // Signed update manifest broadcast
+    P2PUpdateChunk     = 0x0301, // Update binary chunk transfer
+    P2PUpdateRequest   = 0x0302, // Request specific chunks from peers
+
+    // ── Pillar 4: Zero-Rating & MNO ──────────────────────────────────
+    PortalMNOManifest  = 0x0400, // MNO partner config broadcasts (signed)
+    PortalSponsored    = 0x0401, // Sponsored content manifest (signed)
+    PortalDataReport   = 0x0402, // Aggregated anonymous data usage stats
+    PortalZeroRateCfg  = 0x0403, // Zero-rating header config updates
+
+    // ── Pillar 5: Cross-Platform Sync ─────────────────────────────────
+    SyncBookmarks      = 0x0500, // Encrypted bookmark CRDT sync
+    SyncTabs           = 0x0501, // Open tab state across devices
+    SyncPasswords      = 0x0502, // E2E encrypted password vault sync
+    SyncHistory        = 0x0503, // Browsing history sync (opt-in)
 };
 
 // ---------------------------------------------------------------------------
@@ -233,3 +261,15 @@ private:
 
 // ── Global singleton ──────────────────────────────────────────────────────────
 AeonHive& AeonHiveInstance();
+
+// ── Sovereign Manifest Signing ───────────────────────────────────────────────
+// The official DelgadoLogic manifest signing public key.
+// Used to verify AeonHive sovereign manifests (version broadcasts, config).
+// Generated: 2026-04-12 by sovereign-keys/aeon_keygen.py
+// SHA-256: 843aef5e8040163028809be384b8dea93d12ed4f39de8fca462deaa366b3acf0
+static const uint8_t AEON_MANIFEST_SIGNER_PUBKEY[32] = {
+    0x24, 0x4c, 0xe1, 0x50, 0x36, 0x1f, 0x09, 0xdd,
+    0xa4, 0x55, 0x74, 0x66, 0x56, 0xc0, 0xd4, 0xf9,
+    0xf6, 0x48, 0xfb, 0x71, 0x61, 0x04, 0x28, 0x5d,
+    0xa5, 0x39, 0xdb, 0x56, 0xc5, 0x6a, 0x80, 0x62,
+};

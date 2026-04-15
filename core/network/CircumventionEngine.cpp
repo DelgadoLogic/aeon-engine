@@ -15,7 +15,7 @@
 //   Layer 1: ECH (Encrypted Client Hello)
 //     Prevents SNI-based filtering. Hides which domain you're connecting to.
 //     Works against basic DPI that only reads the TLS ClientHello SNI field.
-//     Support: Windows 11 (native), Win7-10 (WolfSSL patch), fail = Layer 2.
+//     Support: Windows 11 (native), Win7-10 (Schannel patch), fail = Layer 2.
 //
 //   Layer 2: DNS-over-HTTPS with obfuscated resolvers
 //     Bypasses DNS poisoning (China's #1 weapon). Routes DNS through:
@@ -90,10 +90,10 @@ static HANDLE             g_ssProcess       = nullptr; // Shadowsocks-libev chil
 static bool ProbeECH() {
     // Attempt to connect to Cloudflare's ECH endpoint (1.1.1.1:443)
     // and verify the server sent an encrypted_client_hello extension.
-    // WolfSSL handles ECH setup; we just check the negotiated extension.
+    // Schannel handles ECH setup on modern tiers; we just check the negotiated extension.
     // For now: return true if TlsAbstraction reports ECH was negotiated.
     fprintf(stdout, "[Circumvention] Probing ECH...\n");
-    // TODO: hook WolfSSL SSL_CTX_set_tlsext_ech_config() to enable ECH
+    // TODO: Implement ECH via native Schannel on Win10+ (TLS 1.3 extension)
     // For the initial scaffold, we always fall through to Layer 2+
     return false;
 }
@@ -156,9 +156,10 @@ static bool StartTorWithBridges(TransportType transport) {
     const char* names[] = { "obfs4", "meek", "Snowflake" };
     fprintf(stdout, "[Circumvention] Starting Tor with %s bridge...\n", names[idx]);
 
-    // Write a minimal torrc for Arti that enables the PT bridge
+    char tempDir[MAX_PATH];
+    GetTempPathA(MAX_PATH, tempDir);
     char torrcPath[MAX_PATH];
-    _snprintf_s(torrcPath, sizeof(torrcPath), _TRUNCATE, "%temp%\\aeon_torrc.tmp");
+    _snprintf_s(torrcPath, sizeof(torrcPath), _TRUNCATE, "%saeon_torrc.tmp", tempDir);
     FILE* f = nullptr;
     fopen_s(&f, torrcPath, "w");
     if (f) {

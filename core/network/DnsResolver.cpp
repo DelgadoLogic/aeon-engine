@@ -205,7 +205,8 @@ static const int     k_AirplaneTtlSec = 1800; // 30 minutes (save bandwidth)
 static const size_t  k_MaxCacheSize   = 1024;
 
 // ─── State ────────────────────────────────────────────────────────────────────
-static std::mutex    g_mu;
+static std::mutex    g_mu;           // Protects g_hint, g_corpSuffix, g_allowSystemDns
+static std::mutex    g_statsMu;      // Protects g_stats (separate to avoid I/O under lock)
 static NetworkEnvHint g_hint         = NetworkEnvHint::Unknown;
 static char          g_corpSuffix[128] = {};  // e.g. ".corp.acme.com"
 static bool          g_allowSystemDns = false;
@@ -464,30 +465,37 @@ static int RetriesForHint() {
 }
 
 ResolveResult Resolve(const std::string& rawHostname) {
-    std::lock_guard<std::mutex> lk(g_mu);
-    g_stats.totalQueries++;
+    // Capture config snapshot under g_mu (fast — no I/O)
+    NetworkEnvHint hint;
+    bool useSystemDns;
+    {
+        std::lock_guard<std::mutex> lk(g_mu);
+        hint = g_hint;
+        useSystemDns = g_allowSystemDns;
+    }
+
+    { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.totalQueries++; }
 
     std::string hostname = ToLower(rawHostname);
 
     // 1. Cache check
     ResolveResult cached;
     if (CacheGet(hostname, cached)) {
-        g_stats.cacheHits++;
+        { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.cacheHits++; }
         return cached;
     }
 
     // 2. Split-horizon: private/internal domain → system DNS
     if (IsPrivateDomain(hostname)) {
-        g_stats.systemFallbacks++;
+        { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.systemFallbacks++; }
         auto r = SystemResolve(hostname);
         CacheSet(hostname, r);
         return r;
     }
 
     // 3. Captive portal phase or explicit system DNS override
-    if (g_allowSystemDns ||
-        g_hint == NetworkEnvHint::CaptivePortal) {
-        g_stats.systemFallbacks++;
+    if (useSystemDns || hint == NetworkEnvHint::CaptivePortal) {
+        { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.systemFallbacks++; }
         auto r = SystemResolve(hostname);
         CacheSet(hostname, r);
         return r;
@@ -497,23 +505,20 @@ ResolveResult Resolve(const std::string& rawHostname) {
     //    If no provider worked AND hint is Military_Gov AND we already failed
     //    system too, return NETWORK_ERROR and go silent.
 
-    // 5. DoH cascade
+    // 5. DoH cascade (NO mutex held — safe for concurrent callers)
     int timeout  = TimeoutForHint();
     int retries  = RetriesForHint();
 
     // Choose provider order based on network hint
     std::vector<int> order;
-    if (g_hint == NetworkEnvHint::NationalFirewall) {
-        // ECH-capable providers first for GFW resistance
+    if (hint == NetworkEnvHint::NationalFirewall) {
         for (int i = 0; k_Providers[i].host; i++)
             if (k_Providers[i].supportsECH) order.push_back(i);
         for (int i = 0; k_Providers[i].host; i++)
             if (!k_Providers[i].supportsECH) order.push_back(i);
-    } else if (g_hint == NetworkEnvHint::Military_Gov) {
-        // Try DoH quickly; don't be aggressive — gov firewalls log failed attempts
+    } else if (hint == NetworkEnvHint::Military_Gov) {
         order = {0, 1}; // Cloudflare, Google only
     } else {
-        // Default priority order
         for (int i = 0; k_Providers[i].host; i++) order.push_back(i);
     }
 
@@ -521,27 +526,27 @@ ResolveResult Resolve(const std::string& rawHostname) {
         const auto& prov = k_Providers[provIdx];
         for (int attempt = 0; attempt <= retries; attempt++) {
             auto r = DoHQuery(prov, hostname, timeout);
-            g_stats.dohQueries++;
+            { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.dohQueries++; }
 
             if (r.status == ResolveStatus::OK) {
                 CacheSet(hostname, r);
                 return r;
             }
             if (r.status == ResolveStatus::NXDOMAIN) {
-                g_stats.totalQueries++;
-                return r; // Definitive NXDOMAIN — don't retry other providers
+                { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.totalQueries++; }
+                return r;
             }
-            // TIMEOUT or NETWORK_ERROR → try next provider
         }
     }
 
     // 6. All DoH providers failed → system DNS fallback
     fprintf(stdout, "[DnsResolver] All DoH providers failed for %s — system fallback\n",
         hostname.c_str());
-    g_stats.systemFallbacks++;
+    { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.systemFallbacks++; }
     auto r = SystemResolve(hostname);
     CacheSet(hostname, r);
     if (r.status != ResolveStatus::OK) {
+        std::lock_guard<std::mutex> lk(g_statsMu);
         g_stats.failed++;
     }
     return r;
@@ -635,7 +640,7 @@ std::string ActiveProvider() {
 }
 
 Stats GetStats() {
-    std::lock_guard<std::mutex> lk(g_mu);
+    std::lock_guard<std::mutex> lk(g_statsMu);
     return g_stats;
 }
 

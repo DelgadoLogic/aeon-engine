@@ -1,5 +1,5 @@
-; AeonInstaller.rc — Version metadata (metadata scrubbed of identifying info)
-; Compiled into the binary — sets File Properties visible in Windows Explorer
+// AeonInstaller.rc — Version metadata (metadata scrubbed of identifying info)
+// Compiled into the binary — sets File Properties visible in Windows Explorer
 
 #include <windows.h>
 
@@ -34,26 +34,4 @@ BEGIN
 END
 
 // ── Manifest ── (requestedExecutionLevel = requireAdministrator for Program Files install)
-1 RT_MANIFEST BEGIN
-"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>\r\n"
-"<assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0"">\r\n"
-"  <assemblyIdentity\r\n"
-"    version=""1.0.0.0""\r\n"
-"    processorArchitecture=""amd64""\r\n"
-"    name=""AeonBrowser.Installer""\r\n"
-"    type=""win32""/>\r\n"
-"  <trustInfo xmlns=""urn:schemas-microsoft-com:asm.v3"">\r\n"
-"    <security>\r\n"
-"      <requestedPrivileges>\r\n"
-"        <requestedExecutionLevel level=""requireAdministrator"" uiAccess=""false""/>\r\n"
-"      </requestedPrivileges>\r\n"
-"    </security>\r\n"
-"  </trustInfo>\r\n"
-"  <compatibility xmlns=""urn:schemas-microsoft-com:compatibility.v1"">\r\n"
-"    <application>\r\n"
-"      <!-- Windows 10/11 -->\r\n"
-"      <supportedOS Id=""{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}""/>\r\n"
-"    </application>\r\n"
-"  </compatibility>\r\n"
-"</assembly>\r\n"
-END
+1 24 "AeonInstaller.manifest"

@@ -131,7 +131,7 @@ char* Serve(const char* aeonUrl) {
             "<p>Version 1.0.0</p>"
             "<p>by <strong style='color:#e8e8f0'>DelgadoLogic</strong></p>"
             "<p style='margin-top:16px;font-size:12px'>Timeless. From Windows 3.1 to Windows 11.<br>"
-            "<a href='https://delgadologic.tech' style='color:#6c63ff'>delgadologic.tech</a></p>"
+            "<a href='https://browseaeon.com' style='color:#6c63ff'>browseaeon.com</a></p>"
             "</div></body></html>");
         return buf;
     }
@@ -154,11 +154,14 @@ char* Serve(const char* aeonUrl) {
         // Insert script before </head>
         char* headClose = strstr(html, "</head>");
         if (headClose) {
-            // Shift content right to make room
+            // Shift content right to make room — with overflow guard
             int insertLen  = (int)strlen(scriptTag);
             int tailLen    = (int)strlen(headClose);
-            memmove(headClose + insertLen, headClose, tailLen + 1);
-            memcpy(headClose, scriptTag, insertLen);
+            int usedBytes  = (int)(headClose - html) + tailLen + 1;
+            if (usedBytes + insertLen <= 512 * 1024) {
+                memmove(headClose + insertLen, headClose, tailLen + 1);
+                memcpy(headClose, scriptTag, insertLen);
+            }
         }
     }
 

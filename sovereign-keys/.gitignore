@@ -1,0 +1,9 @@
+# Sovereign signing keys — NEVER commit private keys
+*.key
+
+# Allow public keys and generated headers
+!*.pub
+!pubkeys.h
+!KEY_INVENTORY.md
+!aeon_keygen.py
+!.gitignore

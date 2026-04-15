@@ -156,6 +156,7 @@ public:
     uint64_t LastUpdateTime() const override { return m_last_update_utc; }
     ResourceBudget GetCurrentBudget() const override { return m_budget; }
     void SetResourceBudget(const ResourceBudget& b) override { m_budget = b; }
+    bool CanOffloadToHive() const override { return m_budget.hive_offload_ok; }
 
 protected:
     ComponentMetrics m_metrics{};

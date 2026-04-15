@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon Diagnostics</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0e14;
+    --surface:   #16182a;
+    --card:      #1e2140;
+    --border:    #2e3064;
+    --accent:    #6c63ff;
+    --accent2:   #a78bfa;
+    --text:      #e8e8f0;
+    --text-dim:  #8888aa;
+    --green:     #22c55e;
+    --amber:     #f59e0b;
+    --red:       #ef4444;
+    --cyan:      #06b6d4;
+    --radius:    12px;
+    --mono:      'JetBrains Mono', 'Consolas', monospace;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar ──────────────────────────────────── */
+  nav {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 12px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .badge {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: #fff;
+  }
+  .nav-logo span { font-weight: 600; font-size: 15px; }
+
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background .15s, color .15s;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  nav a:hover  { background: var(--card); color: var(--text); }
+  nav a.active { background: var(--card); color: var(--accent2); }
+  nav a .icon  { width: 16px; text-align: center; font-size: 14px; }
+
+  /* ── Main ─────────────────────────────────────── */
+  main {
+    flex: 1;
+    padding: 40px 48px;
+    overflow-y: auto;
+    max-width: 960px;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  h1 { font-size: 22px; font-weight: 600; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 32px; }
+
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn:hover { border-color: var(--accent); background: rgba(108, 99, 255, 0.1); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-color: transparent;
+    color: #fff;
+  }
+  .btn.primary:hover { opacity: 0.9; }
+  .btn .icon { font-size: 13px; }
+
+  section { margin-bottom: 36px; }
+  h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  /* ── Status Hero Banner ──────────────────────── */
+  .status-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .status-hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 4px;
+    border-radius: 4px 0 0 4px;
+  }
+  .status-hero.ok::before    { background: var(--green); }
+  .status-hero.warn::before  { background: var(--amber); }
+  .status-hero.error::before { background: var(--red); }
+
+  .status-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .status-hero.ok    .status-icon { background: rgba(34,197,94,0.12); color: var(--green); }
+  .status-hero.warn  .status-icon { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .status-hero.error .status-icon { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  .status-text h3 { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+  .status-text p  { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+
+  /* ── Card ─────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .diag-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    transition: background .1s;
+  }
+  .diag-row:last-child { border-bottom: none; }
+  .diag-row:hover { background: rgba(108,99,255,0.03); }
+
+  .diag-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    min-width: 180px;
+    flex-shrink: 0;
+  }
+  .diag-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    word-break: break-all;
+    flex: 1;
+  }
+
+  /* ── Status Pills ────────────────────────────── */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pill.green  { background: rgba(34,197,94,0.12);  color: var(--green); }
+  .pill.amber  { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .pill.red    { background: rgba(239,68,68,0.12);   color: var(--red); }
+  .pill.cyan   { background: rgba(6,182,212,0.12);   color: var(--cyan); }
+  .pill.purple { background: rgba(108,99,255,0.12);  color: var(--accent); }
+
+  .pill::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pill.green::before  { background: var(--green); }
+  .pill.amber::before  { background: var(--amber); }
+  .pill.red::before    { background: var(--red); }
+  .pill.cyan::before   { background: var(--cyan); }
+  .pill.purple::before { background: var(--accent); }
+
+  /* Animated pulse on live pills */
+  .pill.live::before {
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* ── Metrics Grid ────────────────────────────── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    transition: border-color .2s, transform .15s;
+  }
+  .metric-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .metric-card .metric-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .metric-card .metric-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* ── Feature Flags Grid ──────────────────────── */
+  .flags-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+  }
+  .flag-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    transition: border-color .15s;
+  }
+  .flag-item:hover { border-color: var(--accent); }
+  .flag-name { font-weight: 500; }
+  .flag-on  { color: var(--green); font-weight: 600; font-size: 11px; }
+  .flag-off { color: var(--text-dim); font-weight: 600; font-size: 11px; }
+
+  /* ── Toast ────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all .3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* ── Refresh Spin ────────────────────────────── */
+  .spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ───────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ───────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">
+    <div class="badge">A</div>
+    <span>Aeon</span>
+  </div>
+  <a href="aeon://settings">
+    <span class="icon">⚙️</span> Settings
+  </a>
+  <a href="aeon://history">
+    <span class="icon">🕐</span> History
+  </a>
+  <a href="aeon://bookmarks">
+    <span class="icon">🔖</span> Bookmarks
+  </a>
+  <a href="aeon://downloads">
+    <span class="icon">⬇️</span> Downloads
+  </a>
+  <a href="aeon://passwords">
+    <span class="icon">🔑</span> Passwords
+  </a>
+  <a class="active" href="aeon://diagnostics">
+    <span class="icon">🔬</span> Diagnostics
+  </a>
+</nav>
+
+<!-- ── Main Content ──────────────────────────────── -->
+<main>
+  <div class="page-header">
+    <h1>System Diagnostics</h1>
+    <div class="header-actions">
+      <button class="btn" id="btnRefresh" onclick="refreshAll()">
+        <span class="icon" id="refreshIcon">🔄</span> Refresh
+      </button>
+      <button class="btn primary" onclick="copyReport()">
+        <span class="icon">📋</span> Copy Report
+      </button>
+    </div>
+  </div>
+  <p class="subtitle">Real-time system health and configuration for Aeon Browser</p>
+
+  <!-- ── Status Hero ─────────────────────────────── -->
+  <div class="status-hero ok" id="statusHero">
+    <div class="status-icon">✅</div>
+    <div class="status-text">
+      <h3 id="statusTitle">All Systems Operational</h3>
+      <p id="statusDesc">Engine initialized, Shield active, all components reporting healthy.</p>
+    </div>
+  </div>
+
+  <!-- ── Quick Metrics ───────────────────────────── -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-value" id="metricTier">—</div>
+      <div class="metric-label">Rendering Tier</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metricTabs">0</div>
+      <div class="metric-label">Open Tabs</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metricMemory">—</div>
+      <div class="metric-label">Memory Usage</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metricUptime">—</div>
+      <div class="metric-label">Session Uptime</div>
+    </div>
+  </div>
+
+  <!-- ── Rendering Engine ────────────────────────── -->
+  <section>
+    <h2>Rendering Engine</h2>
+    <div class="card">
+      <div class="diag-row">
+        <span class="diag-label">Engine Backend</span>
+        <span class="diag-value" id="engineBackend">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">ABI Version</span>
+        <span class="diag-value" id="engineAbi">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">WebView2 Runtime</span>
+        <span class="diag-value" id="webview2Ver">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Edge Channel</span>
+        <span class="diag-value" id="edgeChannel">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Chromium Version</span>
+        <span class="diag-value" id="chromiumVer">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">V8 Engine</span>
+        <span class="diag-value" id="v8Ver">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">User Agent</span>
+        <span class="diag-value" id="userAgent">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AeonShield ──────────────────────────────── -->
+  <section>
+    <h2>AeonShield Security</h2>
+    <div class="card">
+      <div class="diag-row">
+        <span class="diag-label">Shield Status</span>
+        <span id="shieldStatus"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">DNS Provider</span>
+        <span class="diag-value" id="dnsProvider">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">DoH Enabled</span>
+        <span id="dohStatus"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Ad/Tracker Rules</span>
+        <span class="diag-value" id="adblockRules">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Blocked This Session</span>
+        <span class="diag-value" id="blockedCount">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Fingerprint Guard</span>
+        <span id="fingerprintStatus"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">GPC Header</span>
+        <span id="gpcStatus"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AeonHive P2P ────────────────────────────── -->
+  <section>
+    <h2>AeonHive Network</h2>
+    <div class="card">
+      <div class="diag-row">
+        <span class="diag-label">Hive Status</span>
+        <span id="hiveStatus"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Node ID</span>
+        <span class="diag-value" id="hiveNodeId">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Connected Peers</span>
+        <span class="diag-value" id="hivePeers">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Bootstrap Nodes</span>
+        <span class="diag-value" id="hiveBootstrap">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Protocol</span>
+        <span class="diag-value" id="hiveProtocol">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">UDP Port</span>
+        <span class="diag-value" id="hivePort">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Update System ───────────────────────────── -->
+  <section>
+    <h2>Sovereign Update System</h2>
+    <div class="card">
+      <div class="diag-row">
+        <span class="diag-label">Auto-Update</span>
+        <span id="updateStatus"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Current Version</span>
+        <span class="diag-value" id="currentVersion">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Update Server</span>
+        <span class="diag-value" id="updateServer">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Signature Verification</span>
+        <span id="sigVerify"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Last Check</span>
+        <span class="diag-value" id="lastUpdateCheck">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Feature Flags ───────────────────────────── -->
+  <section>
+    <h2>Feature Flags</h2>
+    <div class="flags-grid" id="flagsGrid">
+      <!-- populated by JS -->
+    </div>
+  </section>
+
+  <!-- ── System Info ─────────────────────────────── -->
+  <section>
+    <h2>System Information</h2>
+    <div class="card">
+      <div class="diag-row">
+        <span class="diag-label">Operating System</span>
+        <span class="diag-value" id="osInfo">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Platform</span>
+        <span class="diag-value" id="platformInfo">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">CPU Cores</span>
+        <span class="diag-value" id="cpuCores">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Device Memory</span>
+        <span class="diag-value" id="deviceMemory">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">GPU Renderer</span>
+        <span class="diag-value" id="gpuRenderer">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Screen Resolution</span>
+        <span class="diag-value" id="screenRes">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Color Depth</span>
+        <span class="diag-value" id="colorDepth">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Language</span>
+        <span class="diag-value" id="langInfo">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Timezone</span>
+        <span class="diag-value" id="tzInfo">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Build Info ──────────────────────────────── -->
+  <section>
+    <h2>Build Information</h2>
+    <div class="card">
+      <div class="diag-row">
+        <span class="diag-label">Build Number</span>
+        <span class="diag-value" id="buildNumber">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Build Date</span>
+        <span class="diag-value" id="buildDate">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Build Channel</span>
+        <span class="diag-value" id="buildChannel">—</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Code Signed</span>
+        <span id="codeSigned"></span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Binary Hashes</span>
+        <span class="diag-value" id="binaryHashes">—</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ── Toast ──────────────────────────────────────── -->
+<div class="toast" id="toast">Copied to clipboard</div>
+
+<script>
+// ====================================================================
+// Aeon Diagnostics — Data Collection & Display
+// ====================================================================
+// This page reads live telemetry from the AeonBridge JS API injected
+// by the host process. If AeonBridge is unavailable (e.g. opened in
+// a regular browser for dev), it falls back to navigator/WebGL APIs.
+// ====================================================================
+
+const bridge = window.AeonBridge || null;
+const startTime = Date.now();
+
+// ── Helpers ────────────────────────────────────────
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val ?? '—';
+}
+
+function setPill(id, text, color, live = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '';
+  const pill = document.createElement('span');
+  pill.className = `pill ${color}` + (live ? ' live' : '');
+  pill.textContent = text;
+  el.appendChild(pill);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes < 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+  return bytes.toFixed(i > 1 ? 1 : 0) + ' ' + units[i];
+}
+
+function formatUptime(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+// ── GPU Detection ──────────────────────────────────
+function getGpuRenderer() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    if (!gl) return 'Not available';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    if (ext) return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+    return gl.getParameter(gl.RENDERER);
+  } catch { return 'Detection failed'; }
+}
+
+// ── Chromium Version from UA ───────────────────────
+function parseChromiumVersion() {
+  const ua = navigator.userAgent;
+  const match = ua.match(/Chrome\/(\d+\.\d+\.\d+\.\d+)/);
+  return match ? match[1] : '—';
+}
+
+function parseEdgeVersion() {
+  const ua = navigator.userAgent;
+  const match = ua.match(/Edg\/(\d+\.\d+\.\d+\.\d+)/);
+  return match ? match[1] : null;
+}
+
+// ── Feature Flags Definition ───────────────────────
+const FEATURE_FLAGS = [
+  { name: 'DBSC Cookie Protection',     key: 'dbsc',         default: true },
+  { name: 'Sanitizer API',              key: 'sanitizer',    default: true },
+  { name: 'Scroll-Driven Animations',   key: 'scrollAnim',   default: true },
+  { name: 'Scoped Custom Elements',     key: 'scopedCE',     default: true },
+  { name: 'PDF OCR (Tesseract)',        key: 'pdfOcr',       default: true },
+  { name: 'Split-Screen Tabs',          key: 'splitScreen',  default: true },
+  { name: 'WebMCP (Local)',             key: 'webMcp',       default: true },
+  { name: 'AeonShield',                 key: 'shield',       default: true },
+  { name: 'Fingerprint Guard',          key: 'fingerprint',  default: true },
+  { name: 'AeonAgent AI',               key: 'agent',        default: true },
+  { name: 'Google Sync',                key: 'googleSync',   default: false },
+  { name: 'Gemini AI',                  key: 'geminiAi',     default: false },
+  { name: 'Safe Browsing (Google)',     key: 'safeBrowsing', default: false },
+  { name: 'Translate UI (Google)',      key: 'translateUi',  default: false },
+];
+
+// ── Main Data Population ───────────────────────────
+function refreshAll() {
+  const icon = document.getElementById('refreshIcon');
+  icon.classList.add('spin');
+  setTimeout(() => icon.classList.remove('spin'), 800);
+
+  populateAll();
+}
+
+function populateAll() {
+  // ── Rendering Engine ───
+  if (bridge && bridge.getEngineInfo) {
+    const info = bridge.getEngineInfo();
+    setText('engineBackend', info.backend || 'WebView2 (Blink)');
+    setText('engineAbi',     info.abiVersion || '—');
+    setText('webview2Ver',   info.webview2Version || '—');
+    setText('metricTier',    info.tier || 'Blink');
+  } else {
+    // Fallback: infer from UA
+    const edge = parseEdgeVersion();
+    setText('engineBackend', 'WebView2 (Blink)');
+    setText('engineAbi',     '3');
+    setText('webview2Ver',   edge || 'Not detected');
+    setText('metricTier',    'Blink');
+  }
+
+  setText('chromiumVer', parseChromiumVersion());
+  setText('edgeChannel', parseEdgeVersion() ? 'Stable' : '—');
+
+  // V8 version rough mapping from Chromium major
+  const chromeMajor = parseInt(parseChromiumVersion());
+  if (!isNaN(chromeMajor) && chromeMajor > 0) {
+    // Approximate: Chrome 130 ≈ V8 13.0, etc.
+    const v8Major = Math.floor(chromeMajor / 10);
+    const v8Minor = chromeMajor % 10;
+    setText('v8Ver', `${v8Major}.${v8Minor} (approx)`);
+  }
+
+  setText('userAgent', navigator.userAgent);
+
+  // ── AeonShield ───
+  if (bridge && bridge.getShieldStatus) {
+    const s = bridge.getShieldStatus();
+    setPill('shieldStatus',     s.active ? 'Active' : 'Inactive', s.active ? 'green' : 'red', s.active);
+    setText('dnsProvider',      s.dnsProvider || 'System Default');
+    setPill('dohStatus',        s.dohEnabled ? 'Enabled' : 'Disabled', s.dohEnabled ? 'green' : 'amber');
+    setText('adblockRules',     (s.totalRules || 0).toLocaleString());
+    setText('blockedCount',     (s.blockedCount || 0).toLocaleString());
+    setPill('fingerprintStatus', s.fingerprintGuard ? 'Active' : 'Inactive', s.fingerprintGuard ? 'green' : 'amber');
+    setPill('gpcStatus',        s.gpcHeader ? 'Sending' : 'Disabled', s.gpcHeader ? 'green' : 'amber');
+  } else {
+    setPill('shieldStatus',     'Active', 'green', true);
+    setText('dnsProvider',      'AeonDNS (Sovereign)');
+    setPill('dohStatus',        'Enabled', 'green');
+    setText('adblockRules',     '—');
+    setText('blockedCount',     '—');
+    setPill('fingerprintStatus', 'Active', 'green');
+    setPill('gpcStatus',        'Sending', 'green');
+  }
+
+  // ── AeonHive ───
+  if (bridge && bridge.getHiveStatus) {
+    const h = bridge.getHiveStatus();
+    const connected = h.connected && h.peers > 0;
+    setPill('hiveStatus',   connected ? 'Connected' : 'Disconnected', connected ? 'green' : 'red', connected);
+    setText('hiveNodeId',   h.nodeId || '—');
+    setText('hivePeers',    h.peers != null ? h.peers.toString() : '0');
+    setText('hiveBootstrap', h.bootstrapNodes || '—');
+    setText('hiveProtocol', h.protocol || 'iroh/QUIC');
+    setText('hivePort',     h.port || '9797');
+  } else {
+    setPill('hiveStatus',   'Not Connected', 'amber');
+    setText('hiveNodeId',   'Awaiting bootstrap');
+    setText('hivePeers',    '0');
+    setText('hiveBootstrap', 'Not deployed');
+    setText('hiveProtocol', 'iroh/QUIC');
+    setText('hivePort',     '9797');
+  }
+
+  // ── Update System ───
+  if (bridge && bridge.getUpdateInfo) {
+    const u = bridge.getUpdateInfo();
+    setPill('updateStatus',   u.enabled ? 'Enabled' : 'Disabled', u.enabled ? 'green' : 'amber');
+    setText('currentVersion', u.version || '—');
+    setText('updateServer',   u.server || '—');
+    setPill('sigVerify',      u.ed25519 ? 'Ed25519 Verified' : 'Unverified', u.ed25519 ? 'green' : 'red');
+    setText('lastUpdateCheck', u.lastCheck || '—');
+  } else {
+    setPill('updateStatus',   'Enabled', 'green', true);
+    setText('currentVersion', '1.0.0-dev');
+    setText('updateServer',   'aeon-update-server-y2r5ogip6q-ue.a.run.app');
+    setPill('sigVerify',      'Ed25519', 'green');
+    setText('lastUpdateCheck', 'Not yet checked');
+  }
+
+  // ── Metrics ───
+  if (bridge && bridge.getTabCount) {
+    setText('metricTabs', bridge.getTabCount().toString());
+  } else {
+    setText('metricTabs', '1');
+  }
+
+  // Memory
+  if (performance.memory) {
+    setText('metricMemory', formatBytes(performance.memory.usedJSHeapSize));
+  } else {
+    setText('metricMemory', '—');
+  }
+
+  // Uptime
+  setText('metricUptime', formatUptime(Date.now() - startTime));
+
+  // ── System Info ───
+  setText('osInfo',      detectOS());
+  setText('platformInfo', navigator.platform);
+  setText('cpuCores',    navigator.hardwareConcurrency || '—');
+  setText('deviceMemory', navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '—');
+  setText('gpuRenderer', getGpuRenderer());
+  setText('screenRes',   `${screen.width}×${screen.height} @ ${devicePixelRatio.toFixed(1)}x`);
+  setText('colorDepth',  screen.colorDepth + '-bit');
+  setText('langInfo',    navigator.language);
+  setText('tzInfo',      Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+  // ── Build Info ───
+  if (bridge && bridge.getBuildInfo) {
+    const b = bridge.getBuildInfo();
+    setText('buildNumber',  b.number || '—');
+    setText('buildDate',    b.date || '—');
+    setText('buildChannel', b.channel || 'Dev');
+    setPill('codeSigned',   b.signed ? 'Signed (OV)' : 'Unsigned', b.signed ? 'green' : 'red');
+    setText('binaryHashes', b.hashes || '—');
+  } else {
+    setText('buildNumber',  '7');
+    setText('buildDate',    'April 13, 2026');
+    setText('buildChannel', 'Dev');
+    setPill('codeSigned',   'Unsigned', 'red');
+    setText('binaryHashes', 'Available after code signing');
+  }
+
+  // ── Feature Flags ───
+  const grid = document.getElementById('flagsGrid');
+  grid.innerHTML = '';
+  FEATURE_FLAGS.forEach(f => {
+    let enabled = f.default;
+    if (bridge && bridge.isFeatureEnabled) {
+      enabled = bridge.isFeatureEnabled(f.key);
+    }
+    const item = document.createElement('div');
+    item.className = 'flag-item';
+    item.innerHTML = `
+      <span class="flag-name">${f.name}</span>
+      <span class="${enabled ? 'flag-on' : 'flag-off'}">${enabled ? '✓ ON' : '✗ OFF'}</span>
+    `;
+    grid.appendChild(item);
+  });
+
+  // ── Overall Status ───
+  updateOverallStatus();
+}
+
+function detectOS() {
+  const ua = navigator.userAgent;
+  if (ua.includes('Windows NT 10.0')) {
+    return ua.includes('Windows NT 10.0; Win64') ? 'Windows 10/11 (x64)' : 'Windows 10/11';
+  }
+  if (ua.includes('Windows NT 6.3')) return 'Windows 8.1';
+  if (ua.includes('Windows NT 6.2')) return 'Windows 8';
+  if (ua.includes('Windows NT 6.1')) return 'Windows 7';
+  if (ua.includes('Windows NT 6.0')) return 'Windows Vista';
+  if (ua.includes('Windows NT 5.1')) return 'Windows XP';
+  if (ua.includes('Linux'))  return 'Linux';
+  if (ua.includes('Mac'))    return 'macOS';
+  return navigator.platform || 'Unknown';
+}
+
+function updateOverallStatus() {
+  const hero   = document.getElementById('statusHero');
+  const title  = document.getElementById('statusTitle');
+  const desc   = document.getElementById('statusDesc');
+  const icon   = hero.querySelector('.status-icon');
+
+  // Determine overall status from component health
+  const issues = [];
+
+  // Check Hive
+  const hivePill = document.querySelector('#hiveStatus .pill');
+  if (hivePill && hivePill.classList.contains('red')) {
+    issues.push('AeonHive disconnected');
+  } else if (hivePill && hivePill.classList.contains('amber')) {
+    issues.push('AeonHive not connected');
+  }
+
+  // Check code signing
+  const signPill = document.querySelector('#codeSigned .pill');
+  if (signPill && signPill.classList.contains('red')) {
+    issues.push('Binary unsigned');
+  }
+
+  if (issues.length === 0) {
+    hero.className = 'status-hero ok';
+    icon.textContent = '✅';
+    title.textContent = 'All Systems Operational';
+    desc.textContent = 'Engine initialized, Shield active, all components reporting healthy.';
+  } else if (issues.some(i => i.includes('disconnected'))) {
+    hero.className = 'status-hero error';
+    icon.textContent = '❌';
+    title.textContent = 'Issues Detected';
+    desc.textContent = issues.join(' · ');
+  } else {
+    hero.className = 'status-hero warn';
+    icon.textContent = '⚠️';
+    title.textContent = 'Warnings Present';
+    desc.textContent = issues.join(' · ');
+  }
+}
+
+// ── Copy Report ────────────────────────────────────
+function copyReport() {
+  const rows = document.querySelectorAll('.diag-row');
+  let report = '═══ AEON BROWSER DIAGNOSTIC REPORT ═══\n';
+  report += `Generated: ${new Date().toISOString()}\n\n`;
+
+  let currentSection = '';
+  rows.forEach(row => {
+    const section = row.closest('section');
+    const heading = section ? section.querySelector('h2') : null;
+    if (heading && heading.textContent !== currentSection) {
+      currentSection = heading.textContent;
+      report += `── ${currentSection.toUpperCase()} ──\n`;
+    }
+    const label = row.querySelector('.diag-label');
+    const value = row.querySelector('.diag-value') || row.querySelector('.pill');
+    if (label && value) {
+      report += `  ${label.textContent.padEnd(24)} ${value.textContent.trim()}\n`;
+    }
+  });
+
+  // Add metrics
+  report += '\n── METRICS ──\n';
+  report += `  Tier:        ${document.getElementById('metricTier').textContent}\n`;
+  report += `  Open Tabs:   ${document.getElementById('metricTabs').textContent}\n`;
+  report += `  Memory:      ${document.getElementById('metricMemory').textContent}\n`;
+  report += `  Uptime:      ${document.getElementById('metricUptime').textContent}\n`;
+
+  // Add feature flags
+  report += '\n── FEATURE FLAGS ──\n';
+  document.querySelectorAll('.flag-item').forEach(item => {
+    const name = item.querySelector('.flag-name').textContent;
+    const state = item.querySelector('.flag-on, .flag-off').textContent;
+    report += `  ${name.padEnd(28)} ${state}\n`;
+  });
+
+  report += '\n═══ END REPORT ═══\n';
+
+  navigator.clipboard.writeText(report).then(() => {
+    showToast('📋 Diagnostic report copied to clipboard');
+  }).catch(() => {
+    // Fallback for environments without clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = report;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('📋 Diagnostic report copied to clipboard');
+  });
+}
+
+// ── Init ───────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  populateAll();
+
+  // Auto-refresh uptime every 30 seconds
+  setInterval(() => {
+    setText('metricUptime', formatUptime(Date.now() - startTime));
+    if (performance.memory) {
+      setText('metricMemory', formatBytes(performance.memory.usedJSHeapSize));
+    }
+  }, 30000);
+});
+</script>
+</body>
+</html>

@@ -73,6 +73,24 @@ static std::string JStr(const char* s) {
     return r;
 }
 static std::string JBool(bool b)  { return b ? "true" : "false"; }
+
+// Escape backslashes and quotes in a string for safe JS string interpolation.
+// Prevents injection/breakage from Windows paths like C:\Users\...
+static std::string JEscape(const char* s) {
+    std::string out;
+    if (!s) return out;
+    out.reserve(strlen(s) + 16);
+    for (const char* p = s; *p; ++p) {
+        switch (*p) {
+            case '\\': out += "\\\\"; break;
+            case '"':  out += "\\\""; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            default:   out += *p;     break;
+        }
+    }
+    return out;
+}
 static std::string JNum(int n)    { return std::to_string(n); }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,86 +156,79 @@ static void Bridge_SetDefaultBrowser() {
 // History bridge
 // ─────────────────────────────────────────────────────────────────────────────
 static std::string Bridge_GetHistory(int maxItems = 200) {
-    // Returns JSON array of history items for aeon://history page
-    // Production: replace with real HistoryEngine::Query()
-    // Format: [{title, url, ts}]
+    auto entries = HistoryEngine::GetRecent(maxItems);
     std::string json = "[";
-    // TODO: HistoryEngine::QueryRecent(maxItems, [&](const HistoryRow& row) {
-    //   json += "{\"title\":" + JStr(row.title) + ","
-    //         + "\"url\":"   + JStr(row.url)   + ","
-    //         + "\"ts\":"    + JNum(row.ts)     + "},";
-    // });
-    // For now: stub returns empty array (page uses its own demo data)
+    for (size_t i = 0; i < entries.size(); i++) {
+        if (i > 0) json += ",";
+        json += "{\"title\":" + JStr(entries[i].title)
+             + ",\"url\":"   + JStr(entries[i].url)
+             + ",\"ts\":"    + std::to_string(entries[i].visitTime)
+             + ",\"count\":" + JNum(entries[i].visitCount) + "}";
+    }
     json += "]";
-    fprintf(stdout, "[Bridge] getHistory (%d max)\n", maxItems);
+    fprintf(stdout, "[Bridge] getHistory (%d max, %zu returned)\n", maxItems, entries.size());
     return json;
 }
 
 static void Bridge_DeleteHistoryEntry(const char* url, long long ts) {
-    // HistoryEngine::Delete(url, ts);
+    HistoryEngine::DeleteEntry(url);
     fprintf(stdout, "[Bridge] deleteHistoryEntry: %s (ts=%lld)\n", url, ts);
 }
 
 static void Bridge_ClearHistory() {
-    // HistoryEngine::Clear();
-    fprintf(stdout, "[Bridge] clearHistory\n");
+    HistoryEngine::WipeAll();
+    fprintf(stdout, "[Bridge] clearHistory — wiped\n");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bookmarks bridge
 // ─────────────────────────────────────────────────────────────────────────────
 static void Bridge_AddBookmark(const char* title, const char* url, const char* folder) {
-    // HistoryEngine::AddBookmark(title, url, folder);
+    HistoryEngine::AddBookmark(url, title, folder ? folder : "Bookmarks");
     fprintf(stdout, "[Bridge] addBookmark: %s | %s | folder=%s\n", title, url, folder);
 }
 
 static void Bridge_UpdateBookmark(int id, const char* title, const char* url, const char* folder) {
-    // HistoryEngine::UpdateBookmark(id, title, url, folder);
+    // Update = delete old + add new (HistoryEngine has no Update API)
+    HistoryEngine::DeleteBookmark((uint64_t)id);
+    HistoryEngine::AddBookmark(url, title, folder ? folder : "Bookmarks");
     fprintf(stdout, "[Bridge] updateBookmark #%d: %s\n", id, title);
 }
 
 static void Bridge_DeleteBookmark(int id) {
-    // HistoryEngine::DeleteBookmark(id);
+    HistoryEngine::DeleteBookmark((uint64_t)id);
     fprintf(stdout, "[Bridge] deleteBookmark #%d\n", id);
 }
 
 static void Bridge_CreateFolder(const char* name) {
-    // HistoryEngine::CreateBookmarkFolder(name);
-    fprintf(stdout, "[Bridge] createFolder: %s\n", name);
+    // Folder creation is implicit in HistoryEngine — folders exist when bookmarks reference them
+    fprintf(stdout, "[Bridge] createFolder: %s (implicit)\n", name);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Downloads bridge
 // ─────────────────────────────────────────────────────────────────────────────
-static void Bridge_PauseDownload(int id)   { /* DownloadManager::Pause(id);  */ fprintf(stdout, "[Bridge] pause %d\n", id); }
-static void Bridge_ResumeDownload(int id)  { /* DownloadManager::Resume(id); */ fprintf(stdout, "[Bridge] resume %d\n", id); }
-static void Bridge_RetryDownload(int id)   { /* DownloadManager::Retry(id);  */ fprintf(stdout, "[Bridge] retry %d\n", id); }
-static void Bridge_CancelDownload(int id)  { /* DownloadManager::Cancel(id); */ fprintf(stdout, "[Bridge] cancel %d\n", id); }
-static void Bridge_ClearCompleted()        { /* DownloadManager::ClearDone();*/ fprintf(stdout, "[Bridge] clearCompleted\n"); }
+static void Bridge_PauseDownload(int id)   { DownloadManager::Pause(id);  fprintf(stdout, "[Bridge] pause %d\n", id); }
+static void Bridge_ResumeDownload(int id)  { DownloadManager::Resume(id); fprintf(stdout, "[Bridge] resume %d\n", id); }
+static void Bridge_RetryDownload(int id)   { DownloadManager::Resume(id); fprintf(stdout, "[Bridge] retry %d\n", id); }
+static void Bridge_CancelDownload(int id)  { DownloadManager::Cancel(id); fprintf(stdout, "[Bridge] cancel %d\n", id); }
+static void Bridge_ClearCompleted()        { DownloadManager::ClearCompleted(); fprintf(stdout, "[Bridge] clearCompleted\n"); }
 
 static void Bridge_ShowInFolder(int id) {
-    // Get download path from DownloadManager, then open Explorer
-    // DownloadManager::GetPath(id, path);
-    char path[MAX_PATH] = {};
-    AeonSettings s = SettingsEngine::Load();
-    strncpy_s(path, s.dl_path, sizeof(path)-1);
-    // Open folder: ShellExecute with "explore"
-    ShellExecuteA(nullptr, "explore", path, nullptr, nullptr, SW_SHOW);
-    fprintf(stdout, "[Bridge] showInFolder #%d → %s\n", id, path);
+    DownloadManager::RevealInExplorer(id);
+    fprintf(stdout, "[Bridge] showInFolder #%d\n", id);
 }
 
 static void Bridge_OpenDownloadFolder() {
-    AeonSettings s = SettingsEngine::Load();
-    ShellExecuteA(nullptr, "explore", s.dl_path, nullptr, nullptr, SW_SHOW);
+    DownloadManager::OpenDownloadFolder();
 }
 
 static void Bridge_BrowseDlPath() {
-    // IFolderPickerDialog — requires COM/STA; post WM_AEONBRIDGE back to main thread
     PostMessage(g_mainHwnd, WM_AEONBRIDGE, BRIDGE_CMD_BROWSE_DL, 0);
 }
 
 static void Bridge_OpenDownload(int id) {
-    // DownloadManager::OpenFile(id);
+    DownloadManager::OpenFile(id);
     fprintf(stdout, "[Bridge] openDownload #%d\n", id);
 }
 
@@ -290,8 +301,41 @@ std::string Dispatch(const char* method, const char* argsJson) {
     if (!strcmp(method, "getHistory"))          return Bridge_GetHistory(200);
     if (!strcmp(method, "clearHistory"))        { Bridge_ClearHistory(); return "null"; }
 
+    // Bookmarks
+    if (!strcmp(method, "getBookmarks")) {
+        auto bk = HistoryEngine::GetBookmarks();
+        std::string json = "[";
+        for (size_t i = 0; i < bk.size(); i++) {
+            if (i > 0) json += ",";
+            json += "{\"id\":" + std::to_string(bk[i].id)
+                 + ",\"title\":" + JStr(bk[i].title)
+                 + ",\"url\":"   + JStr(bk[i].url)
+                 + ",\"folder\":" + JStr(bk[i].folder)
+                 + ",\"added\":" + std::to_string(bk[i].added_time) + "}";
+        }
+        json += "]";
+        return json;
+    }
+
     // Downloads
-    if (!strcmp(method, "getDownloads"))        return "[]"; // stub
+    if (!strcmp(method, "getDownloads")) {
+        auto dl = DownloadManager::GetAll();
+        std::string json = "[";
+        for (size_t i = 0; i < dl.size(); i++) {
+            if (i > 0) json += ",";
+            json += "{\"id\":" + std::to_string(dl[i].id)
+                 + ",\"url\":"      + JStr(dl[i].url)
+                 + ",\"filename\":" + JStr(dl[i].filename)
+                 + ",\"total\":"    + std::to_string(dl[i].totalBytes)
+                 + ",\"received\":" + std::to_string(dl[i].receivedBytes)
+                 + ",\"speed\":"    + std::to_string(dl[i].speed_bps)
+                 + ",\"eta\":"      + JNum(dl[i].eta_sec)
+                 + ",\"state\":"    + JNum((int)dl[i].state)
+                 + ",\"error\":"    + JNum(dl[i].errorCode) + "}";
+        }
+        json += "]";
+        return json;
+    }
     if (!strcmp(method, "clearCompleted"))      { Bridge_ClearCompleted(); return "null"; }
     if (!strcmp(method, "openDownloadFolder"))  { Bridge_OpenDownloadFolder(); return "null"; }
 
@@ -447,11 +491,11 @@ std::string BuildInjectionScript() {
         JBool(s.block_3p_cookies).c_str(),
         JBool(s.safe_browsing).c_str(),
         JBool(s.telemetry_enabled).c_str(),
-        s.search_engine,
-        s.doh_provider,
-        s.dl_path,
-        s.startup_page,
-        s.homepage,
+        JEscape(s.search_engine).c_str(),
+        JEscape(s.doh_provider).c_str(),
+        JEscape(s.dl_path).c_str(),
+        JEscape(s.startup_page).c_str(),
+        JEscape(s.homepage).c_str(),
         s.min_tls,
         s.dl_streams,
         JBool(s.dl_ask).c_str(),

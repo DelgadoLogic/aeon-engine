@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="fg" x1="16" y1="8" x2="48" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#6382ff"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#12152a"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+  </defs>
+  <!-- Circular background -->
+  <circle cx="32" cy="32" r="31" fill="url(#bg)"/>
+  <!-- Shield outline -->
+  <path d="M32 10 L47 18 L47 32 Q47 41 32 47 Q17 41 17 32 L17 18 Z"
+        stroke="url(#fg)" stroke-width="2.2" fill="none" stroke-linejoin="round"/>
+  <!-- Stylized A -->
+  <path d="M32 16 L24 39 L27 39 L28.5 34.5 L35.5 34.5 L37 39 L40 39 Z M29.5 32 L32 22 L34.5 32 Z"
+        fill="url(#fg)"/>
+  <!-- Loop at bottom of A -->
+  <ellipse cx="32" cy="36.5" rx="4.5" ry="4"
+           stroke="url(#fg)" stroke-width="1.8" fill="none"/>
+</svg>
