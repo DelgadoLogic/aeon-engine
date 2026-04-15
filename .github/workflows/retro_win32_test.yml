@@ -131,7 +131,7 @@ jobs:
           fi
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: retro-build-linux
@@ -222,7 +222,7 @@ jobs:
           }
 
       - name: Upload Windows Test Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: retro-test-windows
