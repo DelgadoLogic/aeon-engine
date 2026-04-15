@@ -80,6 +80,9 @@ set(CORE_SOURCES
     core/session/SessionManager.cpp
     core/tls/TlsAbstraction.cpp
     core/crash/CrashHandler.cpp
+    core/crash/CrashKeys.cpp
+    core/crash/Breadcrumbs.cpp
+    core/crash/AeonLog.cpp
     core/extensions/ExtensionRuntime.cpp
     core/billing/OmniLicense.cpp
     core/aeon_component.cpp
