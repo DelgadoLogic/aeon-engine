@@ -27,6 +27,9 @@
 #include "core/memory/TabSleepManager.h"
 #include "core/security/PasswordVault.h"
 #include "core/crash/CrashHandler.h"
+#include "core/crash/CrashKeys.h"
+#include "core/crash/Breadcrumbs.h"
+#include "core/crash/AeonLog.h"
 #include "core/tls/TlsAbstraction.h"
 #include "core/session/SessionManager.h"
 #include "telemetry/PulseBridge.h"
@@ -63,6 +66,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
 
     // PHASE 0: Install crash handler FIRST — catches any init failures.
     AeonCrash::Install();
+    AeonCrash::SetKey("boot_phase", "init");
+    AeonCrash::SetKey("version", AEON_VERSION);
+    AeonCrash::AddBreadcrumb("boot", "crash_handler_installed");
 
     // Console logging for diagnostics — attach console when --debug flag is passed.
     // Release builds use the internal logging subsystem (HistoryEngine trace log).
@@ -80,6 +86,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
         }
     }
 
+    // Initialize structured logger — after console, before anything else
+    AeonLog::Init();
+    AeonCrash::AddBreadcrumb("boot", "logger_initialized");
+
     fprintf(stdout, "\n");
     fprintf(stdout, "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n");
     fprintf(stdout, "\u2551  Aeon Browser  \u2014  by DelgadoLogic    \u2551\n");
@@ -87,14 +97,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     fprintf(stdout, "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n");
 
     // PHASE 1: Hardware probe — detect OS tier + CPU
+    AeonCrash::SetKey("boot_phase", "hardware_probe");
     SystemProfile profile = {};
     AeonTier tier = AeonProbe::RunProbe(profile);
-    fprintf(stdout, "[Boot] Aeon Browser v%s starting...\n", AEON_VERSION);
-    fprintf(stdout, "[Boot] Tier: %s | OS: %u.%u.%u | Cores: %d | RAM: %.0f MB\n",
+    ALOG_INFO("Boot", "Aeon Browser v%s starting...", AEON_VERSION);
+    ALOG_INFO("Boot", "Tier: %s | OS: %u.%u.%u | Cores: %d | RAM: %.0f MB",
         AeonProbe::TierName(tier),
         profile.osMajor, profile.osMinor, profile.osBuild,
         (int)profile.cpu.cores,
         (double)profile.ramBytes / (1024.0 * 1024.0));
+    AeonCrash::SetKey("tier", AeonProbe::TierName(tier));
+    AeonCrash::SetKeyInt("ram_mb", (int64_t)(profile.ramBytes / (1024 * 1024)));
+    AeonCrash::AddBreadcrumb("boot", "hardware_probe_complete");
 
     // PHASE 1b: TLS stack — must be initialised before ANY network call.
     if (!AeonTls::Initialize(profile)) {
@@ -104,8 +118,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     // PHASE 1c: Session manager — restore previous tabs on crash/restart.
     SessionManager::Initialize(profile);
 
-    // PHASE 1d: Telemetry baseline ping
+    // PHASE 1d: Telemetry baseline ping + crash upload from previous session
+    AeonCrash::SetKey("boot_phase", "telemetry");
     PulseBridge::SendStartupPing(profile);
+    PulseBridge::UploadPendingCrash();
+    AeonCrash::AddBreadcrumb("boot", "telemetry_initialized");
 
     // OmniLicense Hardware Check
     fprintf(stdout, "[Boot] Evaluating Crypto Signature via OmniLicense...\n");

@@ -31,6 +31,8 @@
 #include <windows.h>
 #include <wininet.h>
 #include <cstdio>
+#include <cstring>
+#include <new>
 
 #pragma comment(lib, "wininet.lib")
 
@@ -107,4 +109,127 @@ void SendStartupPing(const SystemProfile& p) {
     InternetCloseHandle(hNet);
 }
 
+void UploadPendingCrash() {
+    if (!IsTelemetryEnabled()) return;
+
+    // Check for crash sentinel from previous session
+    char tempPath[MAX_PATH], sentinelPath[MAX_PATH];
+    GetTempPathA(MAX_PATH, tempPath);
+    _snprintf_s(sentinelPath, sizeof(sentinelPath), _TRUNCATE,
+        "%saeon_crash_pending.txt", tempPath);
+
+    FILE* sentinel = nullptr;
+    fopen_s(&sentinel, sentinelPath, "r");
+    if (!sentinel) return;  // No pending crash — normal startup
+
+    // Read dump path and JSON path from sentinel
+    char dmpPath[MAX_PATH] = {}, jsonPath[MAX_PATH] = {};
+    if (fgets(dmpPath, sizeof(dmpPath), sentinel)) {
+        // Strip newline
+        char* nl = strchr(dmpPath, '\n');
+        if (nl) *nl = '\0';
+        nl = strchr(dmpPath, '\r');
+        if (nl) *nl = '\0';
+    }
+    if (fgets(jsonPath, sizeof(jsonPath), sentinel)) {
+        char* nl = strchr(jsonPath, '\n');
+        if (nl) *nl = '\0';
+        nl = strchr(jsonPath, '\r');
+        if (nl) *nl = '\0';
+    }
+    fclose(sentinel);
+
+    fprintf(stdout, "[PulseBridge] Found pending crash report:\n");
+    fprintf(stdout, "  Dump: %s\n", dmpPath);
+    fprintf(stdout, "  JSON: %s\n", jsonPath);
+
+    // Read JSON crash report
+    FILE* jsonFile = nullptr;
+    fopen_s(&jsonFile, jsonPath, "r");
+    if (!jsonFile) {
+        fprintf(stderr, "[PulseBridge] Cannot read crash JSON — skipping upload.\n");
+        DeleteFileA(sentinelPath);
+        return;
+    }
+
+    // Read entire JSON file
+    fseek(jsonFile, 0, SEEK_END);
+    long jsonSize = ftell(jsonFile);
+    fseek(jsonFile, 0, SEEK_SET);
+
+    if (jsonSize <= 0 || jsonSize > 1024 * 1024) {
+        fprintf(stderr, "[PulseBridge] JSON file invalid size — skipping.\n");
+        fclose(jsonFile);
+        DeleteFileA(sentinelPath);
+        return;
+    }
+
+    char* jsonBody = new (std::nothrow) char[(size_t)jsonSize + 1];
+    if (!jsonBody) {
+        fclose(jsonFile);
+        DeleteFileA(sentinelPath);
+        return;
+    }
+    fread(jsonBody, 1, (size_t)jsonSize, jsonFile);
+    jsonBody[jsonSize] = '\0';
+    fclose(jsonFile);
+
+    // Upload via WinINet POST
+    HINTERNET hNet = InternetOpenA("AeonBrowser/1.0 CrashUpload",
+        INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+    if (!hNet) {
+        fprintf(stderr, "[PulseBridge] WinINet unavailable for crash upload.\n");
+        delete[] jsonBody;
+        return;  // Leave sentinel — retry next launch
+    }
+
+    HINTERNET hConn = InternetConnectA(hNet, "crashes.delgadologic.tech",
+        INTERNET_DEFAULT_HTTPS_PORT, nullptr, nullptr,
+        INTERNET_SERVICE_HTTP, 0, 0);
+
+    bool uploaded = false;
+    if (hConn) {
+        const char* acceptTypes[] = { "application/json", nullptr };
+        HINTERNET hReq = HttpOpenRequestA(hConn, "POST", "/aeon/report",
+            nullptr, nullptr, acceptTypes,
+            INTERNET_FLAG_SECURE | INTERNET_FLAG_NO_UI, 0);
+
+        if (hReq) {
+            const char* headers = "Content-Type: application/json\r\n";
+            if (HttpSendRequestA(hReq, headers, (DWORD)strlen(headers),
+                    jsonBody, (DWORD)jsonSize)) {
+                // Check HTTP response
+                DWORD statusCode = 0, statusSize = sizeof(statusCode);
+                HttpQueryInfoA(hReq, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                    &statusCode, &statusSize, nullptr);
+
+                if (statusCode >= 200 && statusCode < 300) {
+                    fprintf(stdout, "[PulseBridge] Crash report uploaded (HTTP %u).\n",
+                        statusCode);
+                    uploaded = true;
+                } else {
+                    fprintf(stderr, "[PulseBridge] Crash upload HTTP %u — will retry.\n",
+                        statusCode);
+                }
+            } else {
+                fprintf(stderr, "[PulseBridge] Crash upload failed (offline?) — will retry.\n");
+            }
+            InternetCloseHandle(hReq);
+        }
+        InternetCloseHandle(hConn);
+    }
+    InternetCloseHandle(hNet);
+    delete[] jsonBody;
+
+    if (uploaded) {
+        // Clean up: remove sentinel, JSON, and dump
+        DeleteFileA(sentinelPath);
+        DeleteFileA(jsonPath);
+        // Keep .dmp for local diagnosis — user can delete manually
+        fprintf(stdout, "[PulseBridge] Crash files cleaned up.\n");
+    }
+    // If not uploaded, leave files for retry on next launch
+}
+
 } // namespace PulseBridge
+
