@@ -1617,6 +1617,39 @@ ffmpeg_branding = "Chrome"
 
 ---
 
+### Session 21 — April 15, 2026: Cloud Crash Pipeline Goes Live
+
+**Problem:** The crash system from Session 20 generated structured JSON reports locally, but had nowhere to send them. The `crashes.delgadologic.tech` endpoint didn't exist. No cloud infrastructure to receive, store, query, or triage crash reports across any DelgadoLogic product.
+
+**What Was Built:**
+
+| Component | Description |
+|-----------|-------------|
+| `crash-ingestion` Cloud Run | Node.js/Express service deployed to `aeon-browser-build` (us-east1). 256Mi, 0–3 auto-scaling instances. |
+| `gs://delgadologic-crash-reports` | GCS bucket with product/date partitioned storage (`aeon/2026-04-15/*.json`). |
+| Firestore `crashes` collection | Real-time crash index with composite indexes on `product + received_at`. |
+| Firestore `crash_stats` collection | Daily per-product crash counters with composite indexes on `product + date`. |
+| Multi-product routing | `POST /:product/report` — any product name accepted (`aeon`, `logicflow`, `civicvault`, etc.). |
+| Triage API | `POST /admin/triage` — marks crash with analysis result/notes. Ready for AI pipeline integration. |
+| PulseBridge endpoint update | Client updated from placeholder domain to live `crash-ingestion-343794371528.us-east1.run.app`. |
+
+**Architecture Decisions:**
+- **Multi-product from day one**: Not Aeon-specific. Any DelgadoLogic product can report crashes to the same service with full data isolation via the `/:product/` namespace.
+- **Cloud Run scale-to-zero**: No cost when no crashes are incoming. Scales to 3 instances during burst events.
+- **Dual storage**: GCS for long-term archival (full JSON), Firestore for fast querying and dashboard support.
+- **Cloudflare custom domain deferred**: `crashes.delgadologic.tech` CNAME was created and tested, but Cloud Run domain mapping requires GCP domain verification. Direct `.run.app` URL is functional now.
+
+**Verification Results:**
+- ✅ Health endpoint: `GET /` returns service info
+- ✅ Crash ingestion: `POST /aeon/report` → stored in GCS + indexed in Firestore
+- ✅ Stats dashboard: `GET /aeon/stats` → daily counts + recent crashes
+- ✅ Product isolation: Aeon and LogicFlow crashes correctly separated
+- ✅ Triage API: `POST /admin/triage` → crash marked as triaged with notes
+
+**Roadmap Impact:** Master plan updated to v7.7. Cloud infrastructure now ready for AI triage integration (AeonHive genetic brain).
+
+---
+
 > **This document is a living archive. It will be updated as the project progresses.**
 > **Every failure is a lesson. Every lesson is a brick in the foundation.**
 > **The browser no one controls — built by one person and one AI.**

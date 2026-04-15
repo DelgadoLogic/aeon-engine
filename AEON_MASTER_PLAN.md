@@ -27,7 +27,7 @@
 | **Classification** | `CONFIDENTIAL — INTERNAL USE ONLY` |
 | **Owner** | Manuel A. Delgado · DelgadoLogic |
 | **Last Updated** | April 15, 2026 |
-| **Version** | 7.6 — Post-Crash System Overhaul & Session 20 Edition |
+| **Version** | 7.7 — Cloud Crash Pipeline Deployed & Session 21 Edition |
 
 </div>
 
@@ -225,8 +225,17 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 - [x] **Breadcrumbs** — Lock-free ring buffer recording last 50 events with timestamps.
 - [x] **AeonLog** — Structured rotating file logger (TRACE→FATAL, 5MB rotation, 3 backups).
 - [x] **CrashHandler v2** — Rewritten with rich minidump (thread stacks, modules) + JSON sidecar (crash keys, breadcrumbs, exception names, uptime).
-- [x] **PulseBridge::UploadPendingCrash()** — Sentinel-based JSON POST to `crashes.delgadologic.tech/aeon/report` with retry-on-failure.
+- [x] **PulseBridge::UploadPendingCrash()** — Sentinel-based JSON POST to Cloud Run endpoint with retry-on-failure.
 - [x] **Boot instrumented** — Crash keys set at each boot phase, breadcrumbs at every milestone.
+
+### Cloud Crash Pipeline Deployment (Session 21 — April 15)
+- [x] **Cloud Run ingestion service** — `crash-ingestion-343794371528.us-east1.run.app` (Node.js/Express, 256Mi, 0–3 instances).
+- [x] **GCS archival** — `gs://delgadologic-crash-reports` with product/date partitioning (`aeon/YYYY-MM-DD/*.json`).
+- [x] **Firestore indexing** — `crashes` + `crash_stats` collections with composite indexes for product+date queries.
+- [x] **Multi-product routing** — `/:product/report` accepts any product (`aeon`, `logicflow`, `civicvault`, etc.).
+- [x] **Triage API** — `POST /admin/triage` marks crashes with AI/manual analysis results.
+- [x] **PulseBridge updated** — Client points to live Cloud Run endpoint (domain verification pending for `crashes.delgadologic.tech`).
+- [x] **Pipeline verified** — End-to-end test: report→GCS→Firestore→stats→triage all functional.
 
 ### Documentation Sync (Session 18 — April 15)
 - [x] **~4,400 stale artifacts purged** from repo.
