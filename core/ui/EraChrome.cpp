@@ -16,11 +16,13 @@
 //   - Sidebar missing on XP: vertical tab bar requires Gecko engine which
 //     has a native sidebar implementation. HTML4 tier has horizontal tabs only.
 //   - LogicFlow button not responding: LogicFlowAgent.exe not running.
-//     Button is greyed out when IPC pipe "\\.\pipe\LFAgent" is unavailable.
+//     Button is greyed out when IPC pipe "\\.\\pipe\\LFAgent" is unavailable.
 
 #include "EraChrome.h"
 #include "BrowserChrome.h"
 #include "../probe/HardwareProbe.h"
+#include "../engine/AeonBridge.h"
+#include "../agent/AeonAgentPipe.h"
 
 #include <windows.h>
 #include <dwmapi.h>    // DwmIsCompositionEnabled, DwmExtendFrameIntoClientArea
@@ -95,39 +97,141 @@ static void PaintRetroChrome(HWND hwnd, HDC hdc, const RECT& rc) {
 }
 
 // ---------------------------------------------------------------------------
-// Window Procedures
+// Window Procedures — forward all relevant messages to BrowserChrome + IPC
 // ---------------------------------------------------------------------------
 static LRESULT CALLBACK ModernWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
-        case WM_DESTROY: PostQuitMessage(0); return 0;
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(h, &ps);
-            // Modern skin: compositor handles background
-            // We only draw our sidebar and toolbar widgets
-            EndPaint(h, &ps);
+        case WM_DESTROY:
+            AeonAgentPipe::Stop();
+            PostQuitMessage(0);
+            return 0;
+
+        case WM_PAINT:
+            BrowserChrome::OnPaint(h);
+            // Also let DefWindowProc validate the paint region
+            break;
+
+        case WM_SIZE: {
+            int width  = LOWORD(l);
+            int height = HIWORD(l);
+            BrowserChrome::OnSize(h, width, height);
             return 0;
         }
+
+        case WM_LBUTTONDOWN: {
+            int x = (short)LOWORD(l);
+            int y = (short)HIWORD(l);
+
+            // Hit-test: if click is on empty nav bar area, initiate window drag
+            int hit = BrowserChrome::HitTest(h, x, y);
+            if (hit == -1 && y < 40) {
+                // Caption area drag — send to system
+                ReleaseCapture();
+                SendMessage(h, WM_NCLBUTTONDOWN, HTCAPTION, l);
+                return 0;
+            }
+            BrowserChrome::OnLButtonDown(h, x, y);
+            return 0;
+        }
+
+        case WM_LBUTTONUP: {
+            int x = (short)LOWORD(l);
+            int y = (short)HIWORD(l);
+            BrowserChrome::OnLButtonUp(h, x, y);
+            return 0;
+        }
+
+        case WM_MOUSEMOVE: {
+            int x = (short)LOWORD(l);
+            int y = (short)HIWORD(l);
+            BrowserChrome::OnMouseMove(h, x, y);
+            return 0;
+        }
+
+        case WM_COMMAND:
+            BrowserChrome::OnCommand(h, LOWORD(w), HIWORD(w), (HWND)l);
+            return 0;
+
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
             if (BrowserChrome::OnKeyDown(h, w, l))
                 return 0;
             break;
+
+        case WM_AEON_AGENT:
+            AeonAgentPipe::HandleCommand(w, l);
+            return 0;
+
+        case WM_AEONBRIDGE:
+            AeonBridge::HandleWmAeonBridge(w, l);
+            return 0;
     }
     return DefWindowProcW(h, m, w, l);
 }
 
 static LRESULT CALLBACK RetroWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
-        case WM_DESTROY: PostQuitMessage(0); return 0;
+        case WM_DESTROY:
+            AeonAgentPipe::Stop();
+            PostQuitMessage(0);
+            return 0;
+
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(h, &ps);
             RECT rc; GetClientRect(h, &rc);
             PaintRetroChrome(h, hdc, rc);
             EndPaint(h, &ps);
+            // Also paint the BrowserChrome tab strip over the retro base
+            BrowserChrome::OnPaint(h);
             return 0;
         }
+
+        case WM_SIZE: {
+            int width  = LOWORD(l);
+            int height = HIWORD(l);
+            BrowserChrome::OnSize(h, width, height);
+            return 0;
+        }
+
+        case WM_LBUTTONDOWN: {
+            int x = (short)LOWORD(l);
+            int y = (short)HIWORD(l);
+            BrowserChrome::OnLButtonDown(h, x, y);
+            return 0;
+        }
+
+        case WM_LBUTTONUP: {
+            int x = (short)LOWORD(l);
+            int y = (short)HIWORD(l);
+            BrowserChrome::OnLButtonUp(h, x, y);
+            return 0;
+        }
+
+        case WM_MOUSEMOVE: {
+            int x = (short)LOWORD(l);
+            int y = (short)HIWORD(l);
+            BrowserChrome::OnMouseMove(h, x, y);
+            return 0;
+        }
+
+        case WM_COMMAND:
+            BrowserChrome::OnCommand(h, LOWORD(w), HIWORD(w), (HWND)l);
+            return 0;
+
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+            if (BrowserChrome::OnKeyDown(h, w, l))
+                return 0;
+            break;
+
+        case WM_AEON_AGENT:
+            AeonAgentPipe::HandleCommand(w, l);
+            return 0;
+
+        case WM_AEONBRIDGE:
+            AeonBridge::HandleWmAeonBridge(w, l);
+            return 0;
     }
     return DefWindowProcW(h, m, w, l);
 }
@@ -184,6 +288,12 @@ void EraChrome::CreateBrowserWindow() {
         ApplyMicaBackdrop(m_hwnd);
         ApplyRoundedCorners(m_hwnd);
     }
+
+    // ── Wire BrowserChrome to the window ────────────────────────────────
+    BrowserChrome::Create(m_hwnd, &m_Profile, m_engine);
+
+    // ── Start agent control pipe ────────────────────────────────────────
+    AeonAgentPipe::Start(m_hwnd);
 
     ShowWindow(m_hwnd, m_nCmdShow);
     UpdateWindow(m_hwnd);

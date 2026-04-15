@@ -1,6 +1,11 @@
 // AeonBrowser — EraChrome.h
+// DelgadoLogic | Lead UI Engineer
+//
+// PURPOSE: Adaptive UI Engine — selects Modern (Mica/DWM) or Retro (Win32)
+// skin based on OS tier, creates the browser window, and runs the message loop.
 #pragma once
 #include "../probe/HardwareProbe.h"
+#include "../engine/AeonEngine_Interface.h"
 #include <windows.h>
 
 class EraChrome {
@@ -13,6 +18,9 @@ public:
     void CreateBrowserWindow();
     int  Run(const char* cmdLine);
 
+    // Set the engine vtable — must be called before CreateBrowserWindow().
+    void SetEngine(AeonEngineVTable* engine) { m_engine = engine; }
+
     HWND GetHwnd() const { return m_hwnd; }
 
 private:
@@ -20,4 +28,5 @@ private:
     HINSTANCE            m_hInst;
     int                  m_nCmdShow;
     HWND                 m_hwnd = nullptr;
+    AeonEngineVTable*    m_engine = nullptr;
 };
