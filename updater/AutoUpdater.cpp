@@ -30,6 +30,7 @@
 //   - Never executes code from unsigned sources
 
 #include "AutoUpdater.h"
+#include "../core/AeonVersion.h"
 #include "../core/settings/SettingsEngine.h"
 #include <windows.h>
 #include <shellapi.h>
