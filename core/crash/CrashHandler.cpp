@@ -25,8 +25,18 @@ static LONG WINAPI VectoredHandler(EXCEPTION_POINTERS* ep) {
     // Don't handle C++ exceptions (__CxxFrameHandler) — those are caught
     // by the runtime. Only intercept genuine hardware faults.
     DWORD code = ep->ExceptionRecord->ExceptionCode;
+
+    // Skip debugger notifications
     if (code == EXCEPTION_BREAKPOINT || code == EXCEPTION_SINGLE_STEP) {
         return EXCEPTION_CONTINUE_SEARCH; // debugger attached — skip
+    }
+
+    // Skip all informational/warning exceptions (severity < 3).
+    // This filters out DBG_PRINTEXCEPTION_C (0x40010006) and
+    // DBG_PRINTEXCEPTION_WIDE_C (0x4001000A) which WebView2 emits via
+    // OutputDebugString(). Only severity 3 (0xC0xxxxxx) are real faults.
+    if ((code >> 30) < 3) {
+        return EXCEPTION_CONTINUE_SEARCH;
     }
 
     // Build minidump filename: %TEMP%\aeon_crash_<timestamp>.dmp
