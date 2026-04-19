@@ -12,7 +12,7 @@
 
 #pragma once
 
-#define AEON_VERSION       "0.19.0"
+#define AEON_VERSION       "0.22.0"
 #define AEON_VERSION_MAJOR 0
-#define AEON_VERSION_MINOR 19
+#define AEON_VERSION_MINOR 22
 #define AEON_VERSION_PATCH 0

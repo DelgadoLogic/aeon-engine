@@ -23,6 +23,4 @@ private:
     HINSTANCE            m_hInst;
     AeonTier             m_effectiveTier = AeonTier::Unknown;
     AeonEngineVTable*    m_engine = nullptr;
-    struct Impl;
-    Impl* m_impl;
 };

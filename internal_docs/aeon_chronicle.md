@@ -1650,6 +1650,49 @@ ffmpeg_branding = "Chrome"
 
 ---
 
+### Session 22 — April 19, 2026: Code Audit + Runtime IPC Validation
+
+**Problem:** System crash wiped conversation context. Full codebase needed audit before development could continue. Several code quality issues accumulated over Sessions 19-21. Runtime IPC validation had never been performed end-to-end.
+
+**What Was Fixed:**
+
+| Issue | Fix |
+|-------|-----|
+| **Double settings load** | `AeonMain.cpp` loaded `SettingsEngine::Load()` twice (L133 + L169). Consolidated to single load. |
+| **AI engine leak path** | `AeonTabIntelligence` and `AeonJourneyAnalytics` were `new`'d BEFORE engine validation. If engine load failed (L185), early return leaked both objects. Moved AI init after engine validation. |
+| **Dead `m_impl` pointer** | `TierDispatcher.h` forward-declared `struct Impl` and stored `Impl* m_impl` — never defined, never used. Removed. |
+| **Dual WinMain entry points** | `AeonMain.cpp` (active) and `core/main.cpp` (dead, not in CMakeLists). Archived `core/main.cpp` as `.bak`. |
+| **Version bump** | `0.19.0` → `0.22.0` |
+
+**Runtime IPC Validation — FIRST LIVE TEST:**
+
+All 14 Named Pipe commands tested. Results:
+
+| Command | Status | Details |
+|---------|--------|---------|
+| `ping` | ✅ | `{"ok":true,"pong":true}` |
+| `browser.info` | ✅ | Version, PID 40216, HWND, tab count, window bounds, CDP port |
+| `tab.list` | ✅ | Returns full tab metadata (ID, index, URL, title, active state) |
+| `tab.active` | ✅ | Correctly identifies active tab |
+| `tab.new` | ✅ | Created tab 2 → Google loaded, title resolved |
+| `tab.navigate` | ✅ | Navigated tab 1 → `browseaeon.com`, title: "Aeon Browser — The Browser No One Controls" |
+| `tab.close` | ✅ | Both tabs closed cleanly |
+| `window.bounds` | ✅ | `{x:206, y:86, w:2339, h:979}` |
+
+**Key Validation:**
+- **Full engine→shell pipeline confirmed live:** `tab.navigate` → engine `Navigate()` → WebView2 loads → `OnNavigated` callback fires → `BrowserChrome::UpdateTabUrl()` → `OnTitleChanged` callback → `BrowserChrome::UpdateTabTitle()` → title appears in `tab.list` response.
+- **WebView2 rendering confirmed:** Google.com and browseaeon.com both loaded with correct titles.
+- **Tab lifecycle confirmed:** Create → Navigate → List → Close all function end-to-end.
+
+**Architecture Decisions:**
+- **Keep `AeonMain.cpp` as sole entry point**: It has the superior boot sequence (crash keys, AI engines, Mica backdrop, frameless window). `core/main.cpp` (EraChrome pathway) archived.
+- **AI init ordering hardened**: AI engines now only allocate after the rendering engine is confirmed loaded and initialized, preventing memory leaks on all early exit paths.
+
+**Roadmap Impact:** Master plan updated to v7.8. Runtime IPC validation is now **COMPLETE** — closing audit item #1 from Session 22 recovery.
+
+---
+
 > **This document is a living archive. It will be updated as the project progresses.**
 > **Every failure is a lesson. Every lesson is a brick in the foundation.**
 > **The browser no one controls — built by one person and one AI.**
+

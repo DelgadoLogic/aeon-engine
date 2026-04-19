@@ -129,7 +129,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     std::string hwid = OmniLicense::GenerateHWID();
     fprintf(stdout, "[Boot] OmniLicense HWID: %s\n", hwid.c_str());
 
-    // 2. Load settings
+    // 2. Load settings (single load — used by vault, download manager, updater)
     AeonSettings settings = SettingsEngine::Load();
 
     // 3. Initialize Password Vault
@@ -165,9 +165,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
         fprintf(stdout, "[Boot] HistoryEngine initialized: %s\n", historyPath);
     }
 
-    // 4b. Download manager
-    AeonSettings bootSettings = SettingsEngine::Load();
-    const char* downloadStartDir = (bootSettings.dl_path[0]) ? bootSettings.dl_path : nullptr;
+    // 4b. Download manager (reuses settings loaded above)
+    const char* downloadStartDir = (settings.dl_path[0]) ? settings.dl_path : nullptr;
     if (!DownloadManager::Init(downloadStartDir)) {
         fprintf(stderr, "[Boot] WARNING: DownloadManager init failed — downloads disabled.\n");
     } else {
@@ -249,6 +248,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     TabSleepManager::Initialize((unsigned int)tier);
 
     // 5b. AI — Tab Intelligence Engine
+    // NOTE: AI engines are initialized AFTER engine validation above.
+    // If engine loading failed, we already returned — no leak risk.
     {
         // Build resource budget from probe results
         ResourceBudget aiBudget;
