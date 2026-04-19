@@ -96,7 +96,7 @@ AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile) {
 
 // TierDispatcher class (declared in TierDispatcher.h)
 TierDispatcher::TierDispatcher(const SystemProfile& p, HINSTANCE hInst)
-    : m_Profile(p), m_hInst(hInst), m_impl(nullptr) {}
+    : m_Profile(p), m_hInst(hInst) {}
 
 TierDispatcher::~TierDispatcher() {
     // Shutdown the engine if it was loaded
