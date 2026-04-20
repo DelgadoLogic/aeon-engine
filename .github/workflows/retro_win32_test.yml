@@ -231,7 +231,7 @@ jobs:
           fi
 
       - name: Upload ERA1 Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: retro-era1-dos
@@ -534,7 +534,7 @@ jobs:
             fi
 
       - name: Upload Android Test Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: retro-era6-android
