@@ -317,9 +317,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     int X = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
     int Y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
 
-    // WS_EX_NOREDIRECTIONBITMAP: required for DWM Mica/Acrylic (Win11)
-    DWORD exStyle = (profile.osMajor >= 10 && profile.osBuild >= 22000)
-        ? WS_EX_NOREDIRECTIONBITMAP : 0;
+    // NOTE: WS_EX_NOREDIRECTIONBITMAP was removed because BrowserChrome
+    // renders via GDI (BitBlt), which paints to a null surface when that
+    // flag is set. Mica/Acrylic requires DirectComposition; we can re-enable
+    // this once the chrome rendering migrates to Direct2D/DXGI.
+    DWORD exStyle = 0;
 
     HWND hWnd = CreateWindowExW(
         exStyle, AEON_WINDOW_CLASS, AEON_TITLE,
@@ -329,18 +331,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     if (!hWnd) return 1;
     g_MainHwnd = hWnd;  // Set before BrowserChrome::Create so callbacks are routed
 
-    // Enable DWM Mica on Windows 11
-    if (profile.osBuild >= 22000) {
-        MARGINS margins = { -1 };
+    // DWM frameless window setup (Win10+)
+    // NOTE: margins={-1} was removed — it extended DWM glass over the entire
+    // client area, covering our GDI-painted chrome. Mica backdrop was also
+    // removed as it requires WS_EX_NOREDIRECTIONBITMAP (incompatible with GDI).
+    // Use {0,0,1,0} for the DWM drop-shadow trick on frameless windows.
+    if (profile.osMajor >= 10) {
+        MARGINS margins = { 0, 0, 1, 0 };
         DwmExtendFrameIntoClientArea(hWnd, &margins);
-        int backdropType = 2; // DWMSBT_MAINWINDOW (Mica)
-        DwmSetWindowAttribute(hWnd, 38 /*DWMWA_SYSTEMBACKDROP_TYPE*/,
-            &backdropType, sizeof(backdropType));
-        // Dark mode title bar (prevents white flash on any residual non-client area)
+        // Dark mode title bar (prevents white flash on any residual NC area)
         BOOL darkMode = TRUE;
         DwmSetWindowAttribute(hWnd, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/,
             &darkMode, sizeof(darkMode));
     }
+
+    // Force Windows to re-evaluate WM_NCCALCSIZE — this activates the
+    // frameless window (removes native title bar) so our custom chrome shows.
+    SetWindowPos(hWnd, nullptr, 0, 0, 0, 0,
+        SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER);
 
     // NOTE: GWLP_USERDATA is reserved for BrowserChrome's ChromeState.
     // Engine pointer is stored in g_Engine global instead.
@@ -462,8 +470,12 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_PAINT: {
+            // BeginPaint/EndPaint is required for proper DWM composition.
+            // Without it, GDI content flashes and gets overwritten by DWM.
+            PAINTSTRUCT ps;
+            BeginPaint(hWnd, &ps);
             BrowserChrome::OnPaint(hWnd);
-            ValidateRect(hWnd, nullptr);
+            EndPaint(hWnd, &ps);
             return 0;
         }
         case WM_SIZE:
