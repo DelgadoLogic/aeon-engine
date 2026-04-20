@@ -75,11 +75,15 @@ static const int CHROME_H    = NAV_HEIGHT + TAB_HEIGHT; // 72px total chrome
 
 // Button zones (nav bar, from left)
 static const int BTN_LOGO_X  = 8;   static const int BTN_LOGO_W  = 36;
-static const int BTN_BACK_X  = 52;  static const int BTN_BACK_W  = 28;
-static const int BTN_FWD_X   = 82;  static const int BTN_FWD_W   = 28;
-static const int BTN_REF_X   = 112; static const int BTN_REF_W   = 28;
-static const int URLBAR_PAD  = 148; // URL bar starts here
-static const int URLBAR_END  = 120; // pixels from right edge (for icon buttons)
+static const int BTN_BACK_X  = 52;  static const int BTN_BACK_W  = 32;
+static const int BTN_FWD_X   = 88;  static const int BTN_FWD_W   = 32;
+static const int BTN_REF_X   = 124; static const int BTN_REF_W   = 32;
+static const int URLBAR_PAD  = 164; // URL bar starts here
+// Right side layout: [URL bar] [8px gap] [4 toolbar icons × 32px] [8px gap] [3 window controls × 46px]
+static const int CTRL_W      = 46;  // each window control button width
+static const int CTRL_TOTAL  = CTRL_W * 3;            // 138px for min/max/close
+static const int TOOLBAR_ICONS_W = 4 * 32;             // 128px for 4 toolbar icons
+static const int URLBAR_END  = CTRL_TOTAL + TOOLBAR_ICONS_W + 16; // 282px from right edge
 
 // ---------------------------------------------------------------------------
 // Per-tab state
@@ -119,6 +123,47 @@ struct ChromeState {
 // ---------------------------------------------------------------------------
 // GDI helpers
 // ---------------------------------------------------------------------------
+// Reverse-map file:// URLs back to aeon:// display URLs
+// Converts resolved local paths back to clean protocol-style display strings.
+//   file:///C:/Users/.../newtab/newtab.html  →  aeon://newtab
+//   file:///C:/Users/.../pages/settings.html →  aeon://settings
+// ---------------------------------------------------------------------------
+static std::string ReverseMapUrl(const std::string& url) {
+    // Only process file:// URLs
+    if (url.rfind("file:///", 0) != 0) return url;
+
+    // Check for known internal pages by suffix
+    struct { const char* suffix; const char* aeonUrl; } mappings[] = {
+        { "newtab/newtab.html",   "aeon://newtab" },
+        { "pages/settings.html",  "aeon://settings" },
+        { "pages/history.html",   "aeon://history" },
+        { "pages/bookmarks.html", "aeon://bookmarks" },
+        { "pages/downloads.html", "aeon://downloads" },
+    };
+
+    for (auto& m : mappings) {
+        // Case-insensitive suffix check (handles %20 and mixed slashes)
+        std::string lower = url;
+        for (auto& c : lower) { if (c == '\\') c = '/'; c = (char)tolower(c); }
+        std::string suffLower = m.suffix;
+        for (auto& c : suffLower) c = (char)tolower(c);
+        // Replace %20 with space for matching
+        std::string decoded = lower;
+        size_t pos;
+        while ((pos = decoded.find("%20")) != std::string::npos)
+            decoded.replace(pos, 3, " ");
+        if (decoded.size() >= suffLower.size() &&
+            decoded.compare(decoded.size() - suffLower.size(),
+                           suffLower.size(), suffLower) == 0) {
+            return m.aeonUrl;
+        }
+    }
+    return url; // Not an internal page — show original URL
+}
+
+// ---------------------------------------------------------------------------
+// GDI helper functions
+// ---------------------------------------------------------------------------
 static void FillRectColor(HDC hdc, const RECT& r, COLORREF c) {
     HBRUSH b = CreateSolidBrush(c);
     FillRect(hdc, &r, b);
@@ -140,30 +185,100 @@ static void DrawRoundRect(HDC hdc, const RECT& r, int rx, COLORREF fill, COLORRE
 static void DrawText16(HDC hdc, const char* text, const RECT& r,
                        COLORREF c, int ptSize = 9, bool bold = false) {
     int ptH = -MulDiv(ptSize, GetDeviceCaps(hdc, LOGPIXELSY), 72);
-    HFONT f = CreateFontA(ptH, 0, 0, 0, bold ? FW_SEMIBOLD : FW_NORMAL,
-        0, 0, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, "Segoe UI");
+    HFONT f = CreateFontW(ptH, 0, 0, 0, bold ? FW_SEMIBOLD : FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
     HFONT old = (HFONT)SelectObject(hdc, f);
     SetTextColor(hdc, c);
     SetBkMode(hdc, TRANSPARENT);
-    DrawTextA(hdc, text, -1, const_cast<LPRECT>(&r),
+    // Convert UTF-8 to wide string for proper Unicode rendering
+    int wLen = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
+    wchar_t* wBuf = (wchar_t*)_alloca(wLen * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, -1, wBuf, wLen);
+    RECT dr = r;
+    DrawTextW(hdc, wBuf, -1, &dr,
         DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     SelectObject(hdc, old);
     DeleteObject(f);
 }
 
 // ---------------------------------------------------------------------------
+// MDL2 icon helper — renders glyphs from "Segoe MDL2 Assets" (Win10+)
+// ---------------------------------------------------------------------------
+static void DrawIcon(HDC hdc, const wchar_t* glyph, const RECT& r,
+                     COLORREF c, int ptSize = 10) {
+    int ptH = -MulDiv(ptSize, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+    HFONT f = CreateFontW(ptH, 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
+    HFONT old = (HFONT)SelectObject(hdc, f);
+    SetTextColor(hdc, c);
+    SetBkMode(hdc, TRANSPARENT);
+    RECT dr = r;
+    DrawTextW(hdc, glyph, -1, &dr,
+        DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+    SelectObject(hdc, old);
+    DeleteObject(f);
+}
+
+// MDL2 glyph constants
+#define ICON_BACK      L"\uE72B"
+#define ICON_FORWARD   L"\uE72A"
+#define ICON_REFRESH   L"\uE72C"
+#define ICON_DOWNLOAD  L"\uE896"
+#define ICON_BOOKMARK  L"\uE734"
+#define ICON_SHIELD    L"\uE83D"
+#define ICON_MORE      L"\uE712"
+#define ICON_MINIMIZE  L"\uE921"
+#define ICON_MAXIMIZE  L"\uE922"
+#define ICON_RESTORE   L"\uE923"
+#define ICON_CLOSE     L"\uE8BB"
+#define ICON_ADD       L"\uE710"
+#define ICON_LOCK      L"\uE72E"
+
+// ---------------------------------------------------------------------------
 // Paint the "A" logo badge — the signature element from the mockup
 // ---------------------------------------------------------------------------
 static void DrawLogoBadge(HDC hdc, int x, int y) {
-    // Outer rounded square (gradient approximated as solid accent)
-    RECT badge = { x, y, x + 28, y + 28 };
-    DrawRoundRect(hdc, badge, 8, CLR_ACCENT, CLR_ACCENT2);
+    const int SIZE = 28;
+    // Gradient approximation — 4 vertical bands from accent to accent2
+    COLORREF gradColors[] = {
+        RGB(108, 99, 255),  // #6c63ff top
+        RGB(120, 108, 253), // mid-upper
+        RGB(140, 120, 252), // mid-lower
+        RGB(167, 139, 250)  // #a78bfa bottom
+    };
+    int bandH = SIZE / 4;
+    for (int i = 0; i < 4; i++) {
+        RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
+        if (i == 0) band.top += 1;  // rounded top visual offset
+        FillRectColor(hdc, band, gradColors[i]);
+    }
 
-    // "A" lettermark — bold, white, slightly italic feel via offset
-    RECT textR = { x + 2, y + 1, x + 28, y + 28 };
-    int ptH = -MulDiv(16, GetDeviceCaps(hdc, LOGPIXELSY), 72);
-    HFONT f = CreateFontA(ptH, 0, 0, 0, FW_BOLD, TRUE, 0, 0,
+    // Rounded corners via clipping region
+    HRGN rgn = CreateRoundRectRgn(x, y, x + SIZE + 1, y + SIZE + 1, 8, 8);
+    SelectClipRgn(hdc, rgn);
+    for (int i = 0; i < 4; i++) {
+        RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
+        FillRectColor(hdc, band, gradColors[i]);
+    }
+    SelectClipRgn(hdc, nullptr);
+    DeleteObject(rgn);
+
+    // Subtle border highlight
+    HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(140, 130, 255));
+    HBRUSH nullBr = (HBRUSH)GetStockObject(NULL_BRUSH);
+    HPEN oldPen = (HPEN)SelectObject(hdc, borderPen);
+    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, nullBr);
+    RoundRect(hdc, x, y, x + SIZE, y + SIZE, 8, 8);
+    SelectObject(hdc, oldPen);
+    SelectObject(hdc, oldBr);
+    DeleteObject(borderPen);
+
+    // "A" lettermark — bold, white, centered
+    RECT textR = { x, y, x + SIZE, y + SIZE };
+    int ptH = -MulDiv(15, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+    HFONT f = CreateFontA(ptH, 0, 0, 0, FW_BOLD, FALSE, 0, 0,
         ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, "Segoe UI");
     HFONT old = (HFONT)SelectObject(hdc, f);
@@ -185,30 +300,32 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     // "A" logo badge — top-left, vertically centered
     DrawLogoBadge(hdc, BTN_LOGO_X, (NAV_HEIGHT - 28) / 2);
 
-    // Nav buttons: ← → ↻
-    struct { int x; const char* ch; } btns[] = {
-        { BTN_BACK_X, "<" },
-        { BTN_FWD_X,  ">" },
-        { BTN_REF_X,  "R" }
+    // Nav buttons: ← → ↻  (flat icons, no card borders — modern browser style)
+    struct { int x; const wchar_t* icon; } navBtns[] = {
+        { BTN_BACK_X, ICON_BACK },
+        { BTN_FWD_X,  ICON_FORWARD },
+        { BTN_REF_X,  ICON_REFRESH }
     };
-    for (auto& b : btns) {
-        RECT br = { b.x, 6, b.x + BTN_BACK_W, NAV_HEIGHT - 6 };
-        DrawRoundRect(hdc, br, 6, CLR_BG_CARD, CLR_TEXT_FAINT);
-        DrawText16(hdc, b.ch, br, CLR_TEXT_DIM, 9, true);
+    for (auto& b : navBtns) {
+        RECT br = { b.x, 4, b.x + BTN_BACK_W, NAV_HEIGHT - 4 };
+        // Hover highlight (subtle bg card on hover)
+        bool isHover = (ch->hoverBtn == (&b - navBtns + 1));
+        if (isHover) {
+            DrawRoundRect(hdc, br, 6, CLR_BG_CARD, CLR_BG_CARD);
+        }
+        DrawIcon(hdc, b.icon, br, isHover ? CLR_TEXT : CLR_TEXT_DIM, 10);
     }
 
     // URL bar
     int urlLeft  = URLBAR_PAD;
     int urlRight = width - URLBAR_END;
     RECT urlR = { urlLeft, 6, urlRight, NAV_HEIGHT - 6 };
-    COLORREF urlBorder = ch->urlFocused ? CLR_ACCENT : CLR_BG_CARD;
+    COLORREF urlBorder = ch->urlFocused ? CLR_ACCENT : RGB(30, 33, 50);
     DrawRoundRect(hdc, urlR, 12, CLR_BG_CARD, urlBorder);
 
-    // Lock icon (green dot as placeholder)
-    HBRUSH lockB = CreateSolidBrush(CLR_GREEN);
-    RECT lockR = { urlLeft + 10, 16, urlLeft + 17, 24 };
-    FillRect(hdc, &lockR, lockB);
-    DeleteObject(lockB);
+    // Lock icon — proper MDL2 lock glyph
+    RECT lockR = { urlLeft + 6, 6, urlLeft + 24, NAV_HEIGHT - 6 };
+    DrawIcon(hdc, ICON_LOCK, lockR, CLR_GREEN, 8);
 
     // URL text
     const char* urlTxt = "about:blank";
@@ -217,36 +334,59 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
         const auto& t = ch->tabs[ch->activeTab];
         urlTxt = t.url.c_str();
     }
-    RECT urlTextR = { urlLeft + 22, 6, urlRight - 32, NAV_HEIGHT - 6 };
+    RECT urlTextR = { urlLeft + 26, 6, urlRight - 32, NAV_HEIGHT - 6 };
     DrawText16(hdc, urlTxt, urlTextR, CLR_TEXT, 9);
 
-    // AdBlock shield — green dot
+    // AdBlock shield — small green dot indicator
     HBRUSH shieldB = CreateSolidBrush(CLR_GREEN);
-    RECT shieldR = { urlRight - 28, 16, urlRight - 21, 24 };
+    RECT shieldR = { urlRight - 24, 16, urlRight - 17, 23 };
     HRGN shieldRgn = CreateEllipticRgn(shieldR.left, shieldR.top,
         shieldR.right, shieldR.bottom);
     FillRgn(hdc, shieldRgn, shieldB);
     DeleteObject(shieldRgn);
     DeleteObject(shieldB);
 
-    // Right icon buttons: Downloads(⬇), Bookmarks(★), Tor(🧅), Menu(⋮)
-    const char* rightIcons[] = { "v", "*", "o", "." };
+    // Right icon buttons: Downloads, Bookmarks, Tor/Shield, Menu
+    // Positioned between URL bar end and window controls
+    int toolbarStart = width - CTRL_TOTAL - TOOLBAR_ICONS_W - 8;
+    const wchar_t* rightIcons[] = { ICON_DOWNLOAD, ICON_BOOKMARK, ICON_SHIELD, ICON_MORE };
     COLORREF torColor = ch->settings.tor_enabled ? CLR_GREEN : CLR_TEXT_DIM;
     COLORREF iconColors[] = { CLR_TEXT_DIM, CLR_TEXT_DIM, torColor, CLR_TEXT_DIM };
     for (int i = 0; i < 4; i++) {
-        RECT ir = { width - URLBAR_END + 4 + i * 26, 8,
-                    width - URLBAR_END + 4 + i * 26 + 22, NAV_HEIGHT - 8 };
-        DrawText16(hdc, rightIcons[i], ir, iconColors[i], 10, true);
+        RECT ir = { toolbarStart + i * 32, 4,
+                    toolbarStart + i * 32 + 28, NAV_HEIGHT - 4 };
+        bool iconHover = (ch->hoverBtn == 20 + i);
+        if (iconHover) {
+            DrawRoundRect(hdc, ir, 6, CLR_BG_CARD, CLR_BG_CARD);
+        }
+        COLORREF ic = iconHover ? CLR_TEXT : iconColors[i];
+        DrawIcon(hdc, rightIcons[i], ir, ic, 11);
     }
 
-    // Window control buttons: _ □ ✕
-    RECT minR  = { width - 90, 0, width - 60, NAV_HEIGHT };
-    RECT maxR  = { width - 60, 0, width - 30, NAV_HEIGHT };
-    RECT clsR  = { width - 30, 0, width,      NAV_HEIGHT };
-    DrawText16(hdc, "-", minR, CLR_TEXT_DIM, 9);
-    DrawText16(hdc, "□", maxR, CLR_TEXT_DIM, 9);
-    // Close button gets red on hover — for now always dim
-    DrawText16(hdc, "x", clsR, CLR_TEXT_DIM, 9, true);
+    // Window control buttons: minimize, maximize/restore, close
+    // Anchored at the far right edge
+    RECT minR  = { width - CTRL_TOTAL,          0, width - CTRL_W * 2, NAV_HEIGHT };
+    RECT maxR  = { width - CTRL_W * 2,          0, width - CTRL_W,     NAV_HEIGHT };
+    RECT clsR  = { width - CTRL_W,              0, width,              NAV_HEIGHT };
+    // Minimize hover
+    if (ch->hoverBtn == 10) {
+        FillRectColor(hdc, minR, CLR_BG_CARD);
+    }
+    DrawIcon(hdc, ICON_MINIMIZE, minR, ch->hoverBtn == 10 ? CLR_TEXT : CLR_TEXT_DIM, 10);
+    // Maximize hover
+    if (ch->hoverBtn == 11) {
+        FillRectColor(hdc, maxR, CLR_BG_CARD);
+    }
+    DrawIcon(hdc, IsZoomed(ch->hwnd) ? ICON_RESTORE : ICON_MAXIMIZE, maxR,
+             ch->hoverBtn == 11 ? CLR_TEXT : CLR_TEXT_DIM, 10);
+    // Close button — red background on hover
+    bool closeHover = (ch->hoverBtn == 99);
+    if (closeHover) {
+        FillRectColor(hdc, clsR, RGB(196, 43, 28));
+        DrawIcon(hdc, ICON_CLOSE, clsR, RGB(255, 255, 255), 10);
+    } else {
+        DrawIcon(hdc, ICON_CLOSE, clsR, CLR_TEXT_DIM, 10);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -296,21 +436,21 @@ static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
         DeleteObject(favB);
 
         // Tab title
-        RECT titleR = { tR.left + 20, tR.top, tR.right - 18, tR.bottom };
+        RECT titleR = { tR.left + 20, tR.top, tR.right - 24, tR.bottom };
         DrawText16(hdc, t.title.empty() ? "New Tab" : t.title.c_str(),
             titleR, active ? CLR_TEXT : CLR_TEXT_DIM, 8);
 
-        // Close ×
-        RECT closeR = { tR.right - 18, tR.top + 2, tR.right - 2, tR.bottom - 2 };
-        DrawText16(hdc, "x", closeR, CLR_TEXT_FAINT, 7);
+        // Close × (MDL2 icon) — more breathing room from title
+        RECT closeR = { tR.right - 22, tR.top + 4, tR.right - 4, tR.bottom - 4 };
+        DrawIcon(hdc, ICON_CLOSE, closeR, CLR_TEXT_FAINT, 8);
 
         tabX += tabW + TAB_MARGIN;
     }
 
     // New tab (+) button
-    RECT addR = { tabX + 4, NAV_HEIGHT + 6, tabX + 26, NAV_HEIGHT + TAB_HEIGHT - 6 };
+    RECT addR = { tabX + 4, NAV_HEIGHT + 5, tabX + 28, NAV_HEIGHT + TAB_HEIGHT - 5 };
     DrawRoundRect(hdc, addR, 5, CLR_BG_CARD, CLR_TEXT_FAINT);
-    DrawText16(hdc, "+", addR, CLR_TEXT_DIM, 11, true);
+    DrawIcon(hdc, ICON_ADD, addR, CLR_TEXT_DIM, 9);
 }
 
 // ---------------------------------------------------------------------------
@@ -558,6 +698,18 @@ int HitTest(HWND hwnd, int x, int y) {
 
     // Nav bar region (y < NAV_HEIGHT)
     if (y < NAV_HEIGHT) {
+        // Window controls (check first — anchored at far right)
+        if (x >= W - CTRL_W)              return 12; // close
+        if (x >= W - CTRL_W * 2)          return 11; // maximize
+        if (x >= W - CTRL_TOTAL)          return 10; // minimize
+
+        // Toolbar icons: Downloads, Bookmarks, Shield, Menu
+        int toolbarStart = W - CTRL_TOTAL - TOOLBAR_ICONS_W - 8;
+        if (x >= toolbarStart && x < toolbarStart + TOOLBAR_ICONS_W) {
+            int iconIdx = (x - toolbarStart) / 32;
+            return 20 + iconIdx; // 20=download, 21=bookmark, 22=shield, 23=menu
+        }
+
         // Logo badge
         if (x >= BTN_LOGO_X && x < BTN_LOGO_X + BTN_LOGO_W) return 0;
         // Back
@@ -568,12 +720,7 @@ int HitTest(HWND hwnd, int x, int y) {
         if (x >= BTN_REF_X && x < BTN_REF_X + BTN_REF_W) return 3;
         // URL bar
         if (x >= URLBAR_PAD && x < W - URLBAR_END) return 4;
-        // Window controls
-        if (x >= W - 90 && x < W - 60) return 10; // minimize
-        if (x >= W - 60 && x < W - 30) return 11; // maximize
-        if (x >= W - 30) return 12;                // close
-        // Right icons area
-        if (x >= W - URLBAR_END) return 5;
+
         return -1; // Empty nav bar = draggable
     }
 
@@ -582,17 +729,16 @@ int HitTest(HWND hwnd, int x, int y) {
         for (int i = 0; i < (int)ch->tabs.size(); i++) {
             const RECT& tr = ch->tabs[i].tabRect;
             if (x >= tr.left && x < tr.right && y >= tr.top && y < tr.bottom) {
-                // Close button on tab?
-                if (x >= tr.right - 18) return 200 + i;
+                // Close button on tab (22px from right edge)
+                if (x >= tr.right - 22) return 200 + i;
                 return 100 + i;
             }
         }
         // "+" new tab button
-        int tabX = 8;
         int tabCount = max(1, (int)ch->tabs.size());
         int tabW = min(200, max(80, (W - 60) / tabCount));
         int addX = 8 + (int)ch->tabs.size() * (tabW + 4) + 4;
-        if (x >= addX && x < addX + 22) return 50; // new tab
+        if (x >= addX && x < addX + 28) return 50; // new tab (wider hit area)
         return -1;
     }
 
@@ -673,6 +819,17 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
             CreateNewTab(ch);
             break;
 
+        case 20: // Download button (placeholder)
+        case 21: // Bookmarks button (placeholder)
+        case 23: // Menu button (placeholder)
+            // TODO: implement dropdown panels for these
+            break;
+
+        case 22: // Tor/Shield toggle
+            ch->settings.tor_enabled = !ch->settings.tor_enabled;
+            PaintChrome(ch);
+            break;
+
         default:
             // Tab click (100+i)
             if (hit >= 200) {
@@ -719,8 +876,24 @@ void OnMouseMove(HWND hwnd, int x, int y) {
     if (!ch) return;
 
     int oldHover = ch->hoverTab;
+    int oldBtn   = ch->hoverBtn;
     ch->hoverTab = -1;
+    ch->hoverBtn = -1;
 
+    // Nav bar hover tracking
+    if (y < NAV_HEIGHT) {
+        int hit = HitTest(hwnd, x, y);
+        switch (hit) {
+            case 1: case 2: case 3:   ch->hoverBtn = hit; break;  // back/fwd/refresh
+            case 10:                  ch->hoverBtn = 10;  break;  // minimize
+            case 11:                  ch->hoverBtn = 11;  break;  // maximize
+            case 12:                  ch->hoverBtn = 99;  break;  // close (99 for red bg)
+            case 20: case 21: case 22: case 23:
+                                      ch->hoverBtn = hit; break;  // toolbar icons
+        }
+    }
+
+    // Tab strip hover tracking
     if (y >= NAV_HEIGHT && y < CHROME_H) {
         for (int i = 0; i < (int)ch->tabs.size(); i++) {
             const RECT& tr = ch->tabs[i].tabRect;
@@ -731,7 +904,7 @@ void OnMouseMove(HWND hwnd, int x, int y) {
         }
     }
 
-    if (ch->hoverTab != oldHover) {
+    if (ch->hoverTab != oldHover || ch->hoverBtn != oldBtn) {
         PaintChrome(ch);
     }
 }
@@ -872,9 +1045,10 @@ void UpdateTabUrl(HWND hwnd, unsigned int tab_id, const char* url) {
     ChromeState* ch = reinterpret_cast<ChromeState*>(
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
     if (!ch) return;
+    std::string mapped = ReverseMapUrl(url ? url : "");
     for (auto& t : ch->tabs) {
         if (t.id == tab_id) {
-            t.url = url ? url : "";
+            t.url = mapped;
             break;
         }
     }
