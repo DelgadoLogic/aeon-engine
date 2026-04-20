@@ -353,7 +353,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Install Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Build Android Test APK
         working-directory: retro
