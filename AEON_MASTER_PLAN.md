@@ -11,7 +11,7 @@
 # 🔒 CONFIDENTIAL
 ## Aeon Browser — Master Architecture, Strategy & Roadmap
 
-### DelgadoLogic · Internal Document · v7.5 · April 2026
+### DelgadoLogic · Internal Document · v8.2 · April 2026
 
 *Not for public distribution. Contains production infrastructure, credential references,*
 *proprietary AI strategy, and revenue projections.*
@@ -27,7 +27,7 @@
 | **Classification** | `CONFIDENTIAL — INTERNAL USE ONLY` |
 | **Owner** | Manuel A. Delgado · DelgadoLogic |
 | **Last Updated** | April 21, 2026 |
-| **Version** | 8.1 — AeonMind Vision + Session 25 Engine Wiring |
+| **Version** | 8.2 — Build #8 Verified, All Pages Wired, Session Persistence |
 
 </div>
 
@@ -242,6 +242,22 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 - [x] **Architecture report migrated** to `internal_docs/agent_browser_architecture_report.md`.
 - [x] **Chronicle, roadmap, and master plan** synchronized.
 
+### UI Polish (Session 24 — April 20)
+- [x] **History recording** — `OnNavigated` → `HistoryEngine::RecordVisit()`, `OnTitleChanged` → `UpdateTitle()`. Auto-dedup.
+- [x] **URL bar dark theme** — `WM_CTLCOLOREDIT` handler, `#16182a` bg, `#e8e8f0` text.
+- [x] **Loading indicator** — Animated pulsing spinner in tab strip + "Loading..." during navigation.
+- [x] **Back/Forward visual state** — Dim when `canGoBack`/`canGoForward` is false.
+- [x] **Right-click context menu** — Back, Forward, Reload, New Tab, View Source, Inspect.
+
+### Engine-to-Shell Data Wiring (Session 25 — April 21)
+- [x] **All 5 internal pages bridge-wired** — settings, history, bookmarks, downloads, passwords.
+- [x] **Bookmark dispatch** — `addBookmark`, `updateBookmark`, `deleteBookmark`, `createFolder` in `AeonBridge::Dispatch()`.
+- [x] **Password Vault dispatch** — 7 functions (get, add, update, delete, copy, unlock, export) via DPAPI-backed vault.
+- [x] **Download control dispatch** — 7 actions (pause, resume, retry, cancel, open, show, browse).
+- [x] **SessionManager** — `core/session/SessionManager.cpp` — 30s autosave timer, tab snapshot → `session.json`, crash recovery on boot.
+- [x] **Frontend JSON parsing** — `bookmarks.html` + `passwords.html` consume JSON string responses with field normalization.
+- [x] **Build #8 verified** — `Aeon.exe` 1.78 MB + `aeon_blink.dll` 136 KB + `aeon_router.dll` 440 KB. All 8 validation tests passed on GCP `n2-standard-8` Spot VM.
+
 ### Aeon Codebase (Legacy)
 - [x] **Aeon Installer** — NSIS/Inno Setup fetch/verification complete.
 - [x] `LogicFlow v0.1.0-foundation` GitHub release generated and matched with Aeon integrations.
@@ -258,16 +274,19 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 ### Immediate (This Week)
 - [x] ~~**Wire Engine to Shell**~~ — ✅ DONE (Session 19) — `engine->Init()`, `SetCallbacks()`, `AeonBridge::Init()`, full WndProc wiring.
 - [x] ~~**Runtime IPC Validation**~~ — ✅ DONE (Session 22) — 8/8 Named Pipe commands verified live, full engine→shell pipeline confirmed.
-- [ ] **URL Bar Navigation** — Type URL → hit Enter → page loads (UI trigger pending, works via agent pipe).
+- [x] ~~**URL Bar Navigation**~~ — ✅ DONE (Session 22) — WM_COMMAND handler wired, works via both UI and agent pipe.
 - [x] ~~**Tab Management**~~ — ✅ DONE (Session 22) — tab.new, tab.list, tab.close all runtime-validated via Named Pipe.
 - [x] ~~**Fix dangling lambda**~~ — ✅ DONE (Session 19) — `InitWebView2ForTab` tabId capture by value.
 - [x] ~~**Bridge injection**~~ — ✅ DONE (Session 19) — `AddScriptToExecuteOnDocumentCreated` for reliable `window.aeonBridge`.
+- [x] ~~**Feature Wiring**~~ — ✅ DONE (Session 25) — All 5 internal pages bridge-wired (settings, history, bookmarks, downloads, passwords).
+- [x] ~~**Session Persistence**~~ — ✅ DONE (Session 25) — SessionManager with 30s autosave + crash recovery.
+- [ ] **Phase 3: LLM Task Planner** — Plan→Act→Observe→Validate loop for autonomous browsing (~3-5 days).
 - [ ] **Sectigo OV Certificate** — Secure Windows CA signature eliminating SmartScreen blocking (~$200).
 
 ### This Month
-- [ ] **Feature Wiring** — History recording, bookmarks, downloads, content blocker → all need engine.
+- [ ] **Content Blocker Production** — Fix `put_Response` + Aho-Corasick filter engine for EasyList parsing.
+- [ ] **Wire AI Engines** — Connect Tab Intelligence + Journey Analytics to WebView2 lifecycle.
 - [ ] **AeonHive Anchor Nodes** — *MANUAL ACTION REQUIRED:* Spin up Hetzner CX11 and execute `./setup.sh`.
-- [ ] **Python FFI Bridge** — `pyo3` bindings connecting Rust HiveNode to Python circumvention engine.
 - [ ] **OmniLicense RSA-2048 Validation** — Production license verification (currently stubbed).
 - [ ] **Installer Ed25519 Verification** — Signature check for update packages (currently stubbed).
 - [ ] **Rotate PAT Tokens** — Rotate `Chronolapse411` PAT before expiration in June 2026.
@@ -288,7 +307,11 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
              ├── ✅ AeonShield cloud services live (DNS, Relay, Intel)
              ├── ✅ AeonHive core library (Rust, 6/6 tests)
              ├── ✅ Engine↔Shell wiring (Session 19 — SetCallbacks + Init + Bridge)
-             ├── 🟡 Runtime validation (next step)
+             ├── ✅ Runtime validation (Session 22 — 8/8 IPC commands, pages rendering)
+             ├── ✅ All 5 internal pages bridge-wired (Session 25)
+             ├── ✅ Session persistence + crash recovery (Session 25)
+             ├── ✅ Build #8 verified — Aeon.exe 1.78MB, all tests passed (Session 25)
+             ├── 🟡 Phase 3: LLM Task Planner (next step)
              ├── 🟡 Autonomous Evolution Engine (agents exist, scheduler pending)
              └── 🔴 Code signing: Sectigo OV cert (pending purchase)
 
