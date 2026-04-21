@@ -409,9 +409,40 @@ setInterval(() => {
 }, 500);
 
 // Load real data from native bridge if available
+function mapState(s) {
+  // C++ DownloadState enum: 0=Pending, 1=Active, 2=Paused, 3=Complete, 4=Failed, 5=Cancelled
+  const map = ['active','active','paused','done','error','error'];
+  return map[s] || 'active';
+}
+
+function iconForExt(name) {
+  const e = (name || '').split('.').pop().toLowerCase();
+  const map = {exe:'⚙',msi:'⚙',zip:'📦',gz:'📦',tar:'📦',iso:'💿',pdf:'📄',
+    jpg:'🖼',png:'🖼',mp4:'🎬',mp3:'🎵',txt:'📋',html:'🌐',dll:'🔧'};
+  return map[e] || '📄';
+}
+
 try {
-  const real = window.aeonBridge?.getDownloads?.();
-  if (real && real.length) downloads = real;
+  let items = null;
+  const raw = window.aeonBridge?.getDownloads?.();
+  if (raw && typeof raw === 'string') {
+    items = JSON.parse(raw);
+  } else if (Array.isArray(raw)) {
+    items = raw;
+  }
+  if (items && items.length) {
+    downloads = items.map(d => ({
+      id: d.id,
+      name: d.filename || d.url.split('/').pop() || 'download',
+      size: (d.total || 0) / (1024*1024),
+      downloaded: (d.received || 0) / (1024*1024),
+      speed: (d.speed || 0) / (1024*1024),
+      status: mapState(d.state),
+      icon: iconForExt(d.filename),
+      started: '',
+      url: d.url
+    }));
+  }
 } catch(_) {}
 
 render();

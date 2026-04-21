@@ -381,8 +381,20 @@ function newFolder() {
 
 // Load real data from native bridge
 try {
-  const real = window.aeonBridge?.getBookmarks?.();
-  if (real && real.length) bookmarks = real;
+  let data = window.aeonBridge?.getBookmarks?.();
+  // Bridge may return JSON string — parse it
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch(_) {}
+  }
+  if (data && Array.isArray(data) && data.length) {
+    bookmarks = data.map((b, i) => ({
+      id: (b.id !== undefined) ? b.id : i,
+      title: b.title || b.url || '',
+      url: b.url || '',
+      icon: b.icon || '🌐',
+      folder: b.folder || 'Bookmarks Bar'
+    }));
+  }
 } catch(_) {}
 
 render();
