@@ -47,7 +47,6 @@ static HWND               g_MainHwnd = nullptr;
 static std::vector<SessionTab> g_Tabs;
 static int                g_ActiveTab = 0;
 static UINT_PTR           g_AutosaveTimer = 0;
-static const UINT_PTR     AUTOSAVE_TIMER_ID = 0xAE05;  // Aeon Session
 static const DWORD        AUTOSAVE_INTERVAL_MS = 30000; // 30 seconds
 
 // ─────────────────────────────────────────────────────────────────────────────
