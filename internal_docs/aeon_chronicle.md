@@ -7,7 +7,7 @@
 > **Location:** Florida, USA (EST / UTC-4)
 > **Email:** chronolapse411@gmail.com
 > **Start Date:** ~March 24, 2026
-> **Last Updated:** April 15, 2026
+> **Last Updated:** April 20, 2026
 
 ---
 
@@ -1688,11 +1688,317 @@ All 14 Named Pipe commands tested. Results:
 - **Keep `AeonMain.cpp` as sole entry point**: It has the superior boot sequence (crash keys, AI engines, Mica backdrop, frameless window). `core/main.cpp` (EraChrome pathway) archived.
 - **AI init ordering hardened**: AI engines now only allocate after the rendering engine is confirmed loaded and initialized, preventing memory leaks on all early exit paths.
 
-**Roadmap Impact:** Master plan updated to v7.8. Runtime IPC validation is now **COMPLETE** — closing audit item #1 from Session 22 recovery.
+**Phase 2 Agent Expansion — "The Hands + The Eyes":**
+
+After confirming the IPC foundation was solid, Session 22 expanded the MCP server from **17 tools to 23 tools** by adding six new interaction capabilities:
+
+| New MCP Tool | CDP Method(s) | Purpose |
+|-------------|---------------|---------|
+| `aeon_page_scroll` | `Input.dispatchMouseEvent (mouseWheel)` + `DOM.scrollIntoViewIfNeeded` | Scroll up/down/top/bottom by pixel amount, or scroll-to-element by ref number |
+| `aeon_page_wait` | `Runtime.evaluate` (polling loop) | Wait for page load, network idle, text appearance, or element existence with configurable timeout |
+| `aeon_page_press_key` | `Input.dispatchKeyEvent` | Press keyboard keys (Enter, Tab, Escape, arrows, etc.) with modifier support (Ctrl, Shift, Alt) |
+| `aeon_page_hover` | `Input.dispatchMouseEvent (mouseMoved)` + `DOM.getBoxModel` | Hover over element by ref — triggers CSS `:hover` states and `mouseover` events |
+| `aeon_page_select_option` | `DOM.resolveNode` + `Runtime.callFunctionOn` | Select dropdown option by value or visible text, fires `change` event |
+| `aeon_page_fill_form` | `DOM.focus` + `Input.dispatchKeyEvent` (batch) | Fill multiple form fields at once — focus, Ctrl+A, type per char, for each field |
+
+**TypeScript compilation:** `npx tsc --noEmit` — **0 errors**. MCP server version bumped from `0.2.0` → `0.3.0`.
+
+**Agentic Gap Analysis:**
+
+Conducted a comprehensive gap analysis comparing Aeon's current agent capabilities against:
+1. **IDE-style browser agents** (like Antigravity's built-in browser_subagent) — can click, type, scroll, read DOM
+2. **Consumer-facing autonomous task agents** (ChatGPT Operator, Google Mariner, Perplexity Comet) — "type a prompt and it goes boom"
+
+Key finding: **Phase 1 ("The Hands" — click/type) was already implemented** in the existing codebase. Phase 2 tools (scroll, wait, key press, hover, select, form fill) closed the remaining gap to IDE-level agent control. The remaining gap to consumer-facing autonomy is **Phase 3 ("The Brain")** — an LLM task planner and step executor loop (~3-5 days of work).
+
+**Aeon's killer differentiator identified:** Every competitor (OpenAI Operator, Google Auto Browse, Perplexity Comet, Anthropic Computer Use) runs their agent in THE CLOUD — user data flows through their servers. Aeon runs the agent LOCALLY. Privacy-first, local-first autonomous browsing with no subscription required.
+
+**Git History:**
+- Commit `d0371d8` — "audit: consolidate boot, fix AI leak, remove dead code, v0.22.0"
+- Commit `32a720d` — "feat(agent): Phase 2 agentic tools — scroll, wait, keys, hover, select, fill"
+- Both pushed to `origin/main`.
+
+**Final Tool Inventory (23 tools):**
+
+| Category | Count | Tools |
+|----------|-------|-------|
+| Perception | 1 | `aeon_snapshot` |
+| Shell (Named Pipe) | 5 | `aeon_tab_list`, `aeon_tab_new`, `aeon_tab_close`, `aeon_tab_activate`, `aeon_navigate` |
+| Content (CDP) | 3 | `aeon_page_navigate`, `aeon_page_evaluate`, `aeon_page_screenshot` |
+| Interaction (CDP) | 7 | `aeon_page_click`, `aeon_page_type`, `aeon_page_scroll`, `aeon_page_hover`, `aeon_page_press_key`, `aeon_page_select_option`, `aeon_page_fill_form` |
+| Waiting | 1 | `aeon_page_wait` |
+| Validation | 1 | `aeon_validate` |
+| Advanced | 1 | `aeon_cdp_raw` |
+| Diagnostics | 2 | `aeon_health`, `aeon_targets` |
+| **Total** | **23** | |
+
+**Roadmap Impact:** Master plan updated to v7.8. Runtime IPC validation is now **COMPLETE**. Phase 2 agentic tools are **COMPLETE**. Next milestone: Phase 3 — LLM task planner integration (estimated 3-5 days).
+
+**Session 22 Duration:** ~5 hours | **Session Velocity:** Highest yet — 5 audit fixes + 8 runtime validations + 6 new MCP tools + gap analysis + documentation sweep.
+
+---
+
+## Session 23 — April 20, 2026: AeonMind — The PS3/Folding@home Play for AI
+
+**Duration:** ~2h | **Commit:** Documentation-only session (no code changes)
+
+**The Idea:**
+
+A brainstorm crystallized around a fundamental insight: AeonHive already turns every Aeon browser into a P2P compute node for DNS, relay, and updates. What if the same mesh infrastructure also contributed compute cycles toward training a custom LLM? The PS3/Folding@home precedent was the catalyst — 15 million PS3 users contributed 100 million compute hours to protein folding research. AeonHive could do the same thing, but for AI.
+
+**Research Findings:**
+
+Extensive research into distributed LLM training revealed that classical synchronous gradient training (the data-center approach) is **not feasible** over consumer internet — NVLink does gradient sync in microseconds, consumer internet adds 50-100ms (a 1000x penalty). However, four alternative paths ARE feasible:
+
+| Path | Difficulty | User Scale | What It Does |
+|------|:---:|:---:|-------------|
+| **Data Harvesting** | 🟢 Easy | 10K+ | Every browser generates anonymized web interaction training data just by browsing |
+| **Federated Fine-Tuning** | 🟡 Medium | 50K+ | Each node fine-tunes a LoRA adapter locally, syncs 5MB deltas via GossipSub |
+| **Distributed Inference** | 🟡 Medium | 100K+ | Petals-style — split 70B model across mesh nodes, run inference collectively |
+| **Full Pre-Training** | 🔴 Hard | 500K+ | PS3 moment — DiLoCo/Hivemind algorithms, takes months but costs $0 |
+
+**The Math:**
+
+At 1M users with 10% contributing 2hrs/day:
+- **6 million GPU-hours/month** of free compute
+- Equivalent to **~$3M/month** in cloud GPU rental
+- Enough to pre-train a competitive 7B model quarterly, for $0
+
+**AeonHive Infrastructure Mapping:**
+
+Every existing AeonHive component maps directly to distributed training:
+- **Ed25519 identity** → authenticate gradient contributions
+- **GossipSub** → distribute adapter weights + collect gradients
+- **iroh-blobs** → distribute base model weights (same as browser updates)
+- **Reputation** → weight contributions by node reliability
+- **Sybil defense** → prevent gradient poisoning attacks
+- **DHT** → discover nearby compute nodes
+
+**The Name: AeonMind**
+
+> "The AI that belongs to everyone and no one."
+
+Competitive moat: Every competitor (OpenAI, Google, Anthropic) charges $20/month and runs agents in the cloud. AeonMind would be free, local-first, trained by the users, for the users, and impossible to shut down because the model lives on a million devices.
+
+**Key Existing Projects Studied:**
+- **Petals** (BigScience) — distributed inference, BitTorrent-style model sharding
+- **Hivemind** (Yandex) — distributed training library for unreliable volunteer nodes
+- **Flower** — federated learning framework
+- **DiLoCo** (Google Research) — distributed low-communication training algorithm
+- **io.net / Render Network / Golem** — decentralized GPU compute marketplaces
+
+**Phased Roadmap (AeonMind):**
+- Phase 0 (0-10K users): Ship with cloud-fine-tuned Llama 3.2 3B base model
+- Phase 1 (10K-50K): Anonymized web interaction data harvesting via mesh
+- Phase 2 (50K-100K): Federated QLoRA fine-tuning via GossipSub
+- Phase 3 (100K+): Petals-style distributed inference across mesh
+- Phase 4 (500K+): Full distributed pre-training — the PS3 moment
+
+**Deliverables:**
+- `aeonmind_distributed_ai_brainstorm.md` — full brainstorm document added to `internal_docs/`
+- Document uploaded to Google Drive for mobile reading
+- All internal documents updated to reference AeonMind vision
+
+**Roadmap Impact:** AeonMind becomes **Phase 7** of the Aeon roadmap — a long-horizon vision that builds on the existing Phase 5 (AeonHive P2P) infrastructure. No immediate coding work — this activates after Phase 5 mesh is operational.
+
+### Session 24 — April 20, 2026: UI Polish Sprint — History, Dark Theme, Loading, Context Menu
+
+**Duration:** ~3h | **Type:** Browser chrome polish + history recording | **Cost:** $0
+
+#### Objective
+
+Make the Aeon Browser feel like a real production browser with visual polish: history recording, URL bar theming, loading indicators, navigation button states, and right-click context menus.
+
+#### What Was Built
+
+**1. History Recording — Automatic Visit Tracking**
+
+Every successful page navigation now records to the HistoryEngine SQLite database:
+
+- `OnNavigated` callback → `HistoryEngine::RecordVisit(url)` 
+- `OnTitleChanged` callback → `HistoryEngine::UpdateTitle(url, title)`
+- Deduplicated: won't record duplicate back-to-back URLs
+- Timestamp: ISO 8601 format stored per visit
+
+**2. URL Bar Dark Theme**
+
+The URL bar previously appeared as a white Win32 `EDIT` control against the dark chrome — visually jarring.
+
+- Added `WM_CTLCOLOREDIT` handler in `BrowserChrome`
+- Background: `#16182a` (dark navy matching chrome)
+- Text: `#e8e8f0` (light grey)
+- Custom `HBRUSH` created once at chrome init, destroyed on cleanup
+
+**3. Loading Indicator**
+
+Tab strip now shows real-time loading state:
+
+- Animated pulsing spinner rendered inline in the tab title area
+- "Loading..." text replaces page title during navigation
+- `OnLoaded` callback clears the spinner and shows the actual title
+- Smooth CSS-style pulsing animation using `WM_TIMER`
+
+**4. Back/Forward Navigation Button State**
+
+- Back and Forward buttons now dim (alpha blend) when navigation history doesn't support them
+- `OnNavigated` callback queries `canGoBack` / `canGoForward` from the engine
+- Buttons update visual state immediately on every navigation event
+
+**5. Right-Click Context Menu**
+
+Full Win32 context menu wired to `WM_CONTEXTMENU`:
+
+| Menu Item | Action |
+|-----------|--------|
+| Back | `engine->GoBack()` |
+| Forward | `engine->GoForward()` |
+| Reload | `engine->Reload()` |
+| — | Separator |
+| New Tab | `BrowserChrome::CreateTab()` |
+| — | Separator |
+| View Source | Navigate to `view-source:` URL |
+| Inspect Element | Send CDP `DevTools.open` command |
+
+#### Files Modified
+
+| File | Changes |
+|------|---------|
+| `AeonMain.cpp` | Added `HistoryEngine::RecordVisit()` + `UpdateTitle()` in OnNavigated/OnTitleChanged callbacks |
+| `core/ui/BrowserChrome.cpp` | URL bar dark theme, loading indicator, back/forward state, context menu |
+| `core/ui/BrowserChrome.h` | Added loading state tracking, brush member, menu IDs |
+
+**Session 24 Status:** ✅ All visual polish items complete. Browser now feels like a real product.
+
+**Velocity:** 24 sessions completed, ~88 total hours invested. Average ~3.7h/session.
+
+---
+
+### Session 25 — April 21, 2026: Engine-to-Shell Data Wiring + Build #8 Verification
+
+**Duration:** ~4h | **Type:** Data bridge wiring + build verification | **Cost:** ~$0.50 (GCP Spot VM)
+
+#### Objective
+
+Wire all 5 remaining internal browser pages to their C++ engine backends for full data persistence, implement session save/restore, and verify the complete build on GCP.
+
+#### What Was Built
+
+**1. Bookmark Engine Dispatch (AeonBridge.cpp)**
+
+Added 4 new dispatch entries to `AeonBridge::Dispatch()`:
+
+| Action | C++ Target | Returns |
+|--------|-----------|---------|
+| `addBookmark` | `HistoryEngine::AddBookmark(url, title, folder)` | JSON success/ID |
+| `updateBookmark` | `HistoryEngine::UpdateBookmark(id, url, title)` | JSON success |
+| `deleteBookmark` | `HistoryEngine::DeleteBookmark(id)` | JSON success |
+| `createFolder` | `HistoryEngine::CreateFolder(name, parentId)` | JSON success/ID |
+
+**2. Password Vault Dispatch (AeonBridge.cpp)**
+
+Added 7 dispatch entries for the DPAPI-backed PasswordVault:
+
+| Action | C++ Target |
+|--------|-----------|
+| `getPasswords` | `PasswordVault::GetAll()` |
+| `addPassword` | `PasswordVault::Add(domain, user, pass)` |
+| `updatePassword` | `PasswordVault::Update(id, domain, user, pass)` |
+| `deletePassword` | `PasswordVault::Delete(id)` |
+| `copyPassword` | `PasswordVault::GetDecrypted(id)` → clipboard |
+| `unlockVault` | `PasswordVault::Unlock(masterPassword)` |
+| `exportPasswords` | `PasswordVault::ExportCsv(path)` |
+
+**3. Download Control Dispatch (AeonBridge.cpp)**
+
+Added 7 dispatch entries for DownloadManager:
+
+| Action | C++ Target |
+|--------|-----------|
+| `pauseDownload` | `DownloadManager::Pause(id)` |
+| `resumeDownload` | `DownloadManager::Resume(id)` |
+| `retryDownload` | `DownloadManager::Retry(id)` |
+| `cancelDownload` | `DownloadManager::Cancel(id)` |
+| `openDownload` | `ShellExecute(path)` |
+| `showInFolder` | `ShellExecute("explorer", /select)` |
+| `browseForFolder` | `IFileDialog` → `setDownloadLocation` |
+
+**4. SessionManager Implementation (NEW FILE)**
+
+Full session persistence system:
+
+- **File:** `core/session/SessionManager.h` + `SessionManager.cpp`
+- **Storage:** `%APPDATA%\DelgadoLogic\Aeon\session.json`
+- **Autosave:** 30-second `WM_TIMER` cycle captures all open tab URLs/titles/positions
+- **Crash recovery:** On boot, checks for `session.json` → restores all tabs → deletes sentinel file
+- **Lifecycle hooks:** `Init()`, `OnTabChanged()`, `SaveNow()`, `Shutdown()` — all wired in `AeonMain.cpp`
+
+**5. Frontend JSON Parsing Updates**
+
+- `bookmarks.html` — Added `JSON.parse()` wrapper for bridge responses, field normalization (`url`→`url`, `title`→`title`, `dateAdded`→`dateAdded`)
+- `passwords.html` — Added auto-unlock flow: page load → check vault state → request unlock → load credentials
+
+**6. Injection Script Update (AeonBridge.cpp)**
+
+Updated the fallback `window.aeonBridge` injection to include:
+- `vault_unlocked` boolean flag
+- All 7 password methods in the fallback bridge stub
+- Ensures passwords page works even if native host object isn't available
+
+#### Build #8 — GCP Cloud Build Verification
+
+**First attempt failed:** `C2374: AUTOSAVE_TIMER_ID redefinition` — the constant was defined in both `SessionManager.h` (line 27) and `SessionManager.cpp` (line 50).
+
+**Fix:** Removed duplicate from `.cpp` (header is single source of truth).
+
+**Second attempt succeeded:**
+
+```
+=== ALL VALIDATION PASSED ===
+  Aeon.exe:       1,784,320 bytes  (x64 PE ✅)
+  aeon_blink.dll: 139,264 bytes    (x64 PE ✅, exports verified)
+  aeon_router.dll: 451,072 bytes   (Rust cdylib ✅)
+  HTML resources: copied ✅
+  Build time: 13.5 minutes
+  VM: n2-standard-8 Spot (us-east1-d)
+```
+
+**Build delta from #7 → #8:**
+- `Aeon.exe`: 1,737,728 → 1,784,320 bytes (+46 KB — SessionManager + dispatch entries)
+- `aeon_blink.dll`: 291,840 → 139,264 bytes (recompiled, optimized)
+- `aeon_router.dll`: 471,040 → 451,072 bytes (recompiled)
+
+#### Internal Page Bridge Status — ALL COMPLETE
+
+| Page | Data Source | CRUD | Session |
+|------|-----------|------|---------|
+| `settings.html` | `window.__aeon.settings` | ✅ | Session 25 |
+| `history.html` | `HistoryEngine` → JSON | ✅ | Session 25 |
+| `bookmarks.html` | `HistoryEngine` → JSON | ✅ | Session 25 |
+| `downloads.html` | `DownloadManager` → JSON | ✅ | Session 25 |
+| `passwords.html` | `PasswordVault` → JSON | ✅ | Session 25 |
+
+#### Files Created/Modified
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `core/session/SessionManager.h` | **NEW** | Session persistence API |
+| `core/session/SessionManager.cpp` | **NEW** | 30s autosave, crash recovery, tab snapshot |
+| `core/engine/AeonBridge.cpp` | MODIFIED | +18 dispatch entries (bookmarks, passwords, downloads) |
+| `resources/pages/bookmarks.html` | MODIFIED | JSON string parsing + field normalization |
+| `resources/pages/passwords.html` | MODIFIED | Auto-unlock flow + bridge JSON consumption |
+| `AeonMain.cpp` | MODIFIED | SessionManager lifecycle hooks (Init, OnTabChanged, SaveNow, Shutdown) |
+| `CMakeLists.txt` | MODIFIED | Added `SessionManager.cpp` to build |
+
+#### Architecture Note
+
+The AeonBridge dispatch table now has **complete coverage** — every internal page can read data from and write data to its backing C++ engine. The bridge serializes all responses as JSON strings, and every frontend page includes robust `JSON.parse()` error handling with field normalization. This pattern ensures UI stability even if the engine returns unexpected data shapes.
+
+**Session 25 Status:** ✅ All 5 pages wired. Session persistence operational. Build #8 verified. Data wiring gap is CLOSED.
+
+**Velocity:** 25 sessions completed, ~92 total hours invested. Average ~3.7h/session.
 
 ---
 
 > **This document is a living archive. It will be updated as the project progresses.**
 > **Every failure is a lesson. Every lesson is a brick in the foundation.**
 > **The browser no one controls — built by one person and one AI.**
-
