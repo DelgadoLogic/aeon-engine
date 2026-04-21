@@ -26,8 +26,8 @@
 |-------|-------|
 | **Classification** | `CONFIDENTIAL — INTERNAL USE ONLY` |
 | **Owner** | Manuel A. Delgado · DelgadoLogic |
-| **Last Updated** | April 15, 2026 |
-| **Version** | 7.7 — Cloud Crash Pipeline Deployed & Session 21 Edition |
+| **Last Updated** | April 21, 2026 |
+| **Version** | 8.1 — AeonMind Vision + Session 25 Engine Wiring |
 
 </div>
 
@@ -86,11 +86,11 @@ Aeon is a **from-scratch sovereign browser** built for one reason: the user owns
 | **Pro** | Windows 10/11 | Blink (Chromium stripped) | TLS 1.3 native | ~150 MB |
 | **Modern** | Windows 8/8.1 | Blink stripped | TLS 1.3 native | ~120 MB |
 | **Extended** | Windows Vista/7 | Gecko (light build) | Schannel unlocked | ~80 MB |
-| **XP-Hi** | Windows XP + SSE2 | Blink XP build | WolfSSL | ~60 MB |
-| **XP-Lo** | Windows XP, no SSE2 | Gecko no-SSE2 | WolfSSL | ~45 MB |
-| **Win2000** | Windows 2000 | HTML4 GDI (`aeon_html4.dll`) | WolfSSL | ~30 MB |
-| **Win9x** | Windows 95/98/ME | HTML4 GDI 32-bit | WolfSSL 32-bit | ~20 MB |
-| **Win16** | Windows 3.1/3.11 | HTML4 GDI 16-bit | WolfSSL 16-bit | ~6 MB |
+| **XP-Hi** | Windows XP + SSE2 | Blink XP build | BearSSL | ~60 MB |
+| **XP-Lo** | Windows XP, no SSE2 | Gecko no-SSE2 | BearSSL | ~45 MB |
+| **Win2000** | Windows 2000 | HTML4 GDI (`aeon_html4.dll`) | BearSSL | ~30 MB |
+| **Win9x** | Windows 95/98/ME | HTML4 GDI 32-bit | BearSSL 32-bit | ~20 MB |
+| **Win16** | Windows 3.1/3.11 | HTML4 GDI 16-bit | BearSSL 16-bit | ~6 MB |
 
 Hardware is auto-detected at first launch via `HardwareProbe.cpp` → `TierDispatcher` loads the correct engine DLL automatically.
 
@@ -213,7 +213,7 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 - [x] Hardware probe + tier dispatcher, AeonBridge JS↔C++ IPC, all internal page HTML resources.
 
 ### Engine-to-Shell Wiring (Session 19 — April 15)
-- [x] **`AeonVersion.h`** — Single source of truth for version string (`0.19.0`).
+- [x] **`AeonVersion.h`** — Single source of truth for version string (`0.22.0`).
 - [x] **`SetCallbacks()` wired** — All 6 engine callbacks (OnProgress, OnTitleChanged, OnNavigated, OnLoaded, OnCrash, OnNewTab) implemented and registered.
 - [x] **`engine->Init()` wired** — `TierDispatcher` now calls Init() immediately after loading, stores vtable via `GetEngine()`.
 - [x] **`AeonBridge::Init()` wired** — JS navigate callback routes through active tab's engine vtable.
@@ -257,11 +257,11 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 
 ### Immediate (This Week)
 - [x] ~~**Wire Engine to Shell**~~ — ✅ DONE (Session 19) — `engine->Init()`, `SetCallbacks()`, `AeonBridge::Init()`, full WndProc wiring.
-- [ ] **Runtime IPC Validation** — Build, launch, verify Named Pipe responds to `ping`, engine callbacks fire.
-- [ ] **URL Bar Navigation** — Type URL → hit Enter → page loads (runtime test).
-- [ ] **Tab Management** — New tab, switch, close wired to engine calls (runtime test).
-- [ ] **Fix dangling lambda** — `InitWebView2ForTab` tabId capture by value.
-- [ ] **Bridge injection** — `AddScriptToExecuteOnDocumentCreated` for reliable `window.aeonBridge`.
+- [x] ~~**Runtime IPC Validation**~~ — ✅ DONE (Session 22) — 8/8 Named Pipe commands verified live, full engine→shell pipeline confirmed.
+- [ ] **URL Bar Navigation** — Type URL → hit Enter → page loads (UI trigger pending, works via agent pipe).
+- [x] ~~**Tab Management**~~ — ✅ DONE (Session 22) — tab.new, tab.list, tab.close all runtime-validated via Named Pipe.
+- [x] ~~**Fix dangling lambda**~~ — ✅ DONE (Session 19) — `InitWebView2ForTab` tabId capture by value.
+- [x] ~~**Bridge injection**~~ — ✅ DONE (Session 19) — `AddScriptToExecuteOnDocumentCreated` for reliable `window.aeonBridge`.
 - [ ] **Sectigo OV Certificate** — Secure Windows CA signature eliminating SmartScreen blocking (~$200).
 
 ### This Month
@@ -315,6 +315,13 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 
 2028+        ████████████████  PHASE 6: FULLY SOVEREIGN HIVE
              └── AeonHive scales to >100K nodes, lowering central compute metrics entirely.
+
+2028-2029    ████████████████  PHASE 7: AEONMIND — DISTRIBUTED AI
+             ├── Crowdsource LLM training via AeonHive mesh (PS3/Folding@home play)
+             ├── Federated fine-tuning: QLoRA adapters trained locally, ~5MB deltas via GossipSub
+             ├── Distributed inference: Petals-style 70B model sharding across mesh
+             ├── Economics: 1M users = ~6M GPU-hours/month free compute (≈ $3M/mo cloud value)
+             └── "The AI that belongs to everyone and no one."
 ```
 
 ---
@@ -344,6 +351,7 @@ Anyone can fork Chromium. **Nobody has built this entire stack together:**
 - **Autonomous issue patching loop:** CVE → AI PR Generation → Vote → Compilation → Silent signed update directly to disk.
 - Runs effortlessly down directly to **Windows 3.1**, tapping into millions of neglected enterprise and old hardware users globally.
 - Real autonomous execution without visual hackery (`WebMCP` bridge vs reading raw screenshot pixels out).
+- **AeonMind: Crowd-trained AI** — the only browser where the AI model is trained by its users' mesh compute, making it self-improving and impossible to censor. Every competitor (OpenAI, Google, Anthropic) charges $20/mo and runs agents in the cloud. AeonMind is free, local-first, and sovereign.
 
 ---
 
@@ -357,7 +365,8 @@ Anyone can fork Chromium. **Nobody has built this entire stack together:**
 ### 10.2 Index Directory Links
 - **AI Engines (`research/ai-engines/`):** `llama.cpp`, `ggml`, `ollama`, `phi-3-mini`, `whisper.cpp`, `CTranslate2`, `autogen`, `LiteRT`
 - **P2P Networks (`research/p2p/`):** `iroh`, `go-libp2p`, `libtorrent`, `automerge`, `veilid`
-- **Federated `research/federated/`):** `flower`, `PySyft`, `secretflow`, Cloudflare STAR
+- **Federated (`research/federated/`):** `flower`, `PySyft`, `secretflow`, Cloudflare STAR
+- **Distributed AI (`research/distributed-ai/`):** `Petals`, `Hivemind`, `DiLoCo`, `Flower`, `io.net` — AeonMind feasibility study at `internal_docs/aeonmind_distributed_ai_brainstorm.md`
 - **Circumvention (`research/circumvention/`):** `GoodbyeDPI`, `zapret`, `dnscrypt-proxy`, `Tor`
 - **Browser Automation (`research/browser-agent/`):** `agent-browser` clean-room study executed → Full architecture report at `internal_docs/agent_browser_architecture_report.md` (RefMap, CDP multiplexer, AX tree snapshot, cross-origin iframe handling)
 
@@ -373,6 +382,6 @@ Anyone can fork Chromium. **Nobody has built this entire stack together:**
 
 *Unauthorized disclosure is prohibited.*
 
-`AEON_MASTER_PLAN_v7.5 · April 2026 · Post-Engine Wiring Edition`
+`AEON_MASTER_PLAN_v8.0 · April 2026 · AeonMind Vision Edition`
 
 </div>

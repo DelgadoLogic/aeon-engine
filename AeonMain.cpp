@@ -210,12 +210,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
                 tab_id, title ? title : "(null)");
             if (g_MainHwnd)
                 BrowserChrome::UpdateTabTitle(g_MainHwnd, tab_id, title);
+
+            // Update history entry title (get URL from engine for the lookup)
+            if (g_Engine && title && title[0]) {
+                char tabUrl[2048] = {};
+                g_Engine->GetUrl(tab_id, tabUrl, sizeof(tabUrl));
+                if (tabUrl[0] &&
+                    strncmp(tabUrl, "aeon://", 7) != 0 &&
+                    strncmp(tabUrl, "file:///", 8) != 0 &&
+                    strncmp(tabUrl, "about:", 6) != 0) {
+                    HistoryEngine::RecordVisit(tabUrl, title);
+                }
+            }
         };
         cbs.OnNavigated = [](unsigned int tab_id, const char* url) {
             fprintf(stdout, "[Engine→Shell] Tab #%u navigated: %s\n",
                 tab_id, url ? url : "(null)");
             if (g_MainHwnd)
                 BrowserChrome::UpdateTabUrl(g_MainHwnd, tab_id, url);
+
+            // Record visit in history (skip internal/file URLs)
+            if (url && url[0] &&
+                strncmp(url, "aeon://", 7) != 0 &&
+                strncmp(url, "file:///", 8) != 0 &&
+                strncmp(url, "about:", 6) != 0) {
+                HistoryEngine::RecordVisit(url, nullptr);
+            }
         };
         cbs.OnLoaded = [](unsigned int tab_id) {
             fprintf(stdout, "[Engine→Shell] Tab #%u loaded\n", tab_id);
@@ -364,6 +384,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     // 9. Browser chrome (tab strip, nav bar, WebView2 host)
     BrowserChrome::Create(hWnd, &profile, engine);
 
+    // 9a. Session manager — wire to main window, start autosave
+    SessionManager::SetMainWindow(hWnd);
+
     // Captive portal — open in first tab if detected
     const NetworkSentinel::SentinelState& sentState = NetworkSentinel::GetState();
     if (sentState.need_captive_portal && sentState.captive_portal_url[0]) {
@@ -376,6 +399,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
 
     ShowWindow(hWnd, nShowCmd);
     UpdateWindow(hWnd);
+
+    // 9c. Restore previous session tabs (after window is visible)
+    SessionManager::RestorePreviousSession();
+
     fprintf(stdout, "[Boot] Ready.\n\n");
 
     // 10. Message loop
@@ -386,6 +413,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     }
 
     // 11. Cleanup
+    // Session — save all tabs before anything else shuts down
+    SessionManager::SaveAndExit();
+
     // AI engines — flush and free before tab/memory systems
     if (g_JourneyAI) { g_JourneyAI->Shutdown(); delete g_JourneyAI; g_JourneyAI = nullptr; }
     if (g_TabIntel) { g_TabIntel->Shutdown(); delete g_TabIntel; g_TabIntel = nullptr; }
@@ -526,6 +556,38 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         // ── Agent pipe command dispatch ─────────────────────────────────
         case WM_AEON_AGENT:
             AeonAgentPipe::HandleCommand(wParam, lParam);
+            return 0;
+
+        // ── Loading animation timer → repaint tab strip ──────────────────
+        case WM_TIMER:
+            if (wParam == 9002 /* ID_LOADING_TIMER */) {
+                // Invalidate only the tab strip region for spinner animation
+                RECT tabStrip;
+                GetClientRect(hWnd, &tabStrip);
+                tabStrip.top = 40;     // NAV_HEIGHT
+                tabStrip.bottom = 72;  // NAV_HEIGHT + TAB_HEIGHT
+                InvalidateRect(hWnd, &tabStrip, FALSE);
+                return 0;
+            }
+            if (wParam == SessionManager::AUTOSAVE_TIMER_ID) {
+                SessionManager::OnAutosaveTimer();
+                return 0;
+            }
+            break;
+
+        // ── URL bar dark theme (WM_CTLCOLOREDIT from EDIT child) ────────
+        case WM_CTLCOLOREDIT: {
+            HBRUSH br = BrowserChrome::OnCtlColorEdit(hWnd,
+                reinterpret_cast<HDC>(wParam),
+                reinterpret_cast<HWND>(lParam));
+            if (br) return reinterpret_cast<LRESULT>(br);
+            break;
+        }
+
+        // ── Right-click context menu in content area ─────────────────────
+        case WM_CONTEXTMENU:
+            BrowserChrome::OnContextMenu(hWnd,
+                GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
 
         case WM_DESTROY:
