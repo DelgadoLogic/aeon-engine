@@ -28,7 +28,7 @@
 
 Aeon is a **ground-up sovereign browser** engineered from first principles with one objective: **you own your browsing, completely**.
 
-No Google DNS resolvers phoning home. No Safe Browsing cloud calls. No sync servers we don't control. Telemetry (`OmniPulse`) is strictly opt-in (`ConsentLevel.None`, OFF by default on Community & Pro tiers) with zero IP persistence on disk. Built natively for Windows 10/11 (`win-x64`) with tiered legacy hardware compatibility.
+No Google DNS resolvers phoning home. No Safe Browsing cloud calls. No sync servers we don't control. Telemetry (`OmniPulse`) is strictly opt-in (`ConsentLevel.None`, OFF by default on Free & Pro tiers) with zero IP persistence on disk. Built natively for Windows 10/11 (`win-x64`) with tiered legacy hardware compatibility.
 
 ---
 

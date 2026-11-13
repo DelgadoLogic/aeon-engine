@@ -1,0 +1,12 @@
+# GitHub Linguist language classification
+*.h linguist-language=C++
+*.hpp linguist-language=C++
+*.cpp linguist-language=C++
+*.cc linguist-language=C++
+*.cxx linguist-language=C++
+
+# Generated / static site / assets excluded from primary language stats
+resources/pages/** linguist-vendored
+aeon-site/** linguist-vendored
+dev-site/** linguist-vendored
+third_party/** linguist-vendored

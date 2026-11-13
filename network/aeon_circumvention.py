@@ -330,7 +330,7 @@ class WebSocketTunnelStrategy:
     all WebSocket connections — which would break huge portions of the web.
     
     Protocol:
-      Aeon → wss://relay.aeonbrowser.com/ws/tunnel (looks like normal HTTPS)
+      Aeon → wss://relay.browseaeon.com/ws/tunnel (looks like normal HTTPS)
       Encrypted request frames → Relay forwards to target → encrypted responses
     """
     

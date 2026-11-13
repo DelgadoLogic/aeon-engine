@@ -3,33 +3,60 @@ name: Aeon CI
 on:
   push:
     branches: [ main ]
+    tags: ['v*.*.*']
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: read
 
 jobs:
   analyze:
     name: Code Analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Install cppcheck
-        run: sudo apt-get install -y cppcheck
-      - name: Run cppcheck on Aeon headers
-        run: cppcheck --enable=all --suppress=missingIncludeSystem --error-exitcode=1 core/ spell/ cast/ translate/ hive/ engines/ network/ 2>&1 | tee cppcheck.txt || true
-      - uses: actions/upload-artifact@v7
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cppcheck
+
+      - name: Run cppcheck on Aeon first-party C++ sources
+        run: |
+          cppcheck --enable=warning,performance,portability --suppress=missingIncludeSystem \
+            -i core/history/sqlite3.c -i core/session/nlohmann \
+            core/ spell/ cast/ translate/ hive/ engines/ network/ 2>&1 | tee cppcheck.txt
+
+      - name: Upload cppcheck report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: cppcheck-report
           path: cppcheck.txt
 
+  rust-tests:
+    name: Rust Router & Hive Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test aeon_router
+        run: cargo test --manifest-path router/Cargo.toml
+
+      - name: Test aeon_hive_core
+        run: cargo test --manifest-path hive/aeon_hive_core/Cargo.toml
+
   secret-scan:
     name: Sovereign Integrity Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: No private keys or tokens in source
         run: |
-          if grep -rE "BEGIN.*(PRIVATE|RSA|EC) KEY|ghp_|ghs_|glpat-" --include="*.h" --include="*.cpp" --include="*.py" . 2>/dev/null; then
+          if grep -rE "BEGIN.*(PRIVATE|RSA|EC) KEY|ghp_|ghs_|glpat-" --include="*.h" --include="*.cpp" --include="*.py" --include="*.rs" . 2>/dev/null; then
             echo "CRITICAL: Secret found in source!" && exit 1
           fi
           echo "Clean. No secrets detected."
@@ -38,12 +65,17 @@ jobs:
     name: Sovereign Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [analyze, secret-scan]
+    needs: [analyze, rust-tests, secret-scan]
+    environment: production
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: softprops/action-gh-release@v3
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create Draft GitHub Release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
+          draft: true
           generate_release_notes: true
           name: "Aeon Browser ${{ github.ref_name }}"

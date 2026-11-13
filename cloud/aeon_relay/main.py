@@ -7,7 +7,7 @@ Looks like normal HTTPS traffic to any Deep Packet Inspector.
 
 This is the core circumvention relay. When a user in China tries to
 access google.com, their Aeon browser:
-  1. Opens a WebSocket to relay.aeonbrowser.com (looks like normal HTTPS)
+  1. Opens a WebSocket to relay.browseaeon.com (looks like normal HTTPS)
   2. Sends an encrypted request: "GET google.com"
   3. AeonRelay fetches google.com from the open internet
   4. Returns the response through the encrypted WebSocket

@@ -2,7 +2,7 @@
 Add-Type -AssemblyName System.Drawing
 
 $iconsDir = $PSScriptRoot
-if (-not $iconsDir) { $iconsDir = "c:\Users\Manuel A Delgado\Desktop\DelgadoLogic\Products\AeonBrowser\resources\icons" }
+if (-not $iconsDir) { $iconsDir = (Get-Location).Path }
 
 function Make-Transparent {
     param([string]$FilePath)
