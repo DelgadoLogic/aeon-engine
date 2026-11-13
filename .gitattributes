@@ -10,3 +10,6 @@ resources/pages/** linguist-vendored
 aeon-site/** linguist-vendored
 dev-site/** linguist-vendored
 third_party/** linguist-vendored
+core/history/sqlite3.c linguist-vendored
+core/session/nlohmann/** linguist-vendored
+retro/bearssl/** linguist-vendored
