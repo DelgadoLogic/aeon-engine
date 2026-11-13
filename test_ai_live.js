@@ -2,35 +2,42 @@ const net = require('net');
 
 const PIPE_PATH = '\\\\.\\pipe\\aeon-agent';
 
-function sendCommand(cmdObj) {
-  return new Promise((resolve, reject) => {
-    const client = net.connect(PIPE_PATH, () => {
-      client.write(JSON.stringify(cmdObj) + '\n');
-    });
+async function sendCommand(cmdObj, maxRetries = 30) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await new Promise((resolve, reject) => {
+        const client = net.connect(PIPE_PATH, () => {
+          client.write(JSON.stringify(cmdObj) + '\n');
+        });
 
-    let buffer = '';
-    client.on('data', (data) => {
-      buffer += data.toString();
-      if (buffer.includes('\n')) {
-        client.end();
-        try {
-          const res = JSON.parse(buffer.trim());
-          resolve(res);
-        } catch (e) {
-          reject(e);
-        }
-      }
-    });
+        let buffer = '';
+        client.on('data', (data) => {
+          buffer += data.toString();
+          if (buffer.includes('\n')) {
+            client.end();
+            try {
+              const res = JSON.parse(buffer.trim());
+              resolve(res);
+            } catch (e) {
+              reject(e);
+            }
+          }
+        });
 
-    client.on('error', (err) => {
-      reject(err);
-    });
+        client.on('error', (err) => {
+          reject(err);
+        });
 
-    setTimeout(() => {
-      client.destroy();
-      reject(new Error('Timeout waiting for IPC response'));
-    }, 4000);
-  });
+        setTimeout(() => {
+          client.destroy();
+          reject(new Error('Timeout waiting for IPC response'));
+        }, 15000);
+      });
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
+      await sleep(500);
+    }
+  }
 }
 
 function sleep(ms) {
@@ -53,7 +60,8 @@ async function runLiveAiSuite() {
     console.log('\n[Test 2] Opening tab to Hacker News (https://news.ycombinator.com)...');
     const newTabRes = await sendCommand({ cmd: 'tab.new', url: 'https://news.ycombinator.com' });
     console.log('  -> Result:', JSON.stringify(newTabRes));
-    await sleep(300);
+    console.log('  -> Waiting 5s for page load...');
+    await sleep(5000);
 
     // 3. Summarize active page
     console.log('\n[Test 3] Requesting AI Webpage Summarization (ai.summarize)...');
@@ -63,7 +71,7 @@ async function runLiveAiSuite() {
 
     // 4. Execute AI Intent Navigation
     console.log('\n[Test 4] Requesting AI Natural Language Navigation (ai.navigate_intent)...');
-    const intentRes = await sendCommand({ cmd: 'ai.navigate_intent', intent: 'go to github' });
+    const intentRes = await sendCommand({ cmd: 'ai.navigate_intent', intent: 'go to github', tab_id: newTabRes.tab_id || 2 });
     console.log('  -> Result:', JSON.stringify(intentRes));
     await sleep(300);
 
@@ -84,9 +92,11 @@ async function runLiveAiSuite() {
     const webmcpRes = await sendCommand({ cmd: 'webmcp.tools' });
     console.log('  -> Result:', JSON.stringify(webmcpRes));
 
+    try { await sendCommand({ cmd: 'app.quit' }); } catch (e) {}
     console.log('\n====================================================');
     console.log('✅ ALL AI SUMMARIZATION & INTENT TESTS PASSED!');
     console.log('====================================================');
+    process.exit(0);
 
   } catch (err) {
     console.error('\n❌ AI Suite execution failed:', err.message);

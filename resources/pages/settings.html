@@ -1,107 +1,287 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aeon Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:        #0d0e14;
-    --surface:   #16182a;
-    --card:      #1e2140;
-    --border:    #2e3064;
-    --accent:    #6c63ff;
-    --accent2:   #a78bfa;
-    --text:      #e8e8f0;
-    --text-dim:  #8888aa;
-    --green:     #22c55e;
-    --red:       #ef4444;
-    --radius:    12px;
+    --bg-obsidian: #0b0616;
+    --bg-surface: #0e071c;
+    --bg-card: rgba(18, 20, 36, 0.65);
+    --bg-card-hover: rgba(28, 21, 56, 0.95);
+    --border-card: rgba(168, 85, 247, 0.18);
+    --border-card-hover: rgba(192, 132, 252, 0.55);
+    --border-glow: rgba(168, 85, 247, 0.35);
+    --accent-purple: #9333ea;
+    --accent-light: #c084fc;
+    --accent-glow: rgba(147, 51, 234, 0.45);
+    --neon-cyan: #38bdf8;
+    --neon-cyan-glow: rgba(56, 189, 248, 0.35);
+    --neon-pink: #ec4899;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f97316;
+    --text-white: #f8fafc;
+    --text-soft: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --radius-lg: 18px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background-color: #0b0616;
+    color: var(--text-white);
+    font-family: var(--font-main);
     min-height: 100vh;
     display: flex;
+    background-image: 
+      radial-gradient(ellipse 70% 55% at 50% 15%, rgba(112, 38, 206, 0.2) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 50% at 85% 80%, rgba(147, 51, 234, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 15% 90%, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+    background-attachment: fixed;
   }
 
-  /* Sidebar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(192, 132, 252, 0.6); }
+
+  /* Sidebar Navigation */
   nav {
-    width: 220px;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 24px 12px;
+    width: 240px;
+    background: linear-gradient(180deg, rgba(14, 7, 28, 0.96) 0%, rgba(10, 5, 20, 0.98) 100%);
+    border-right: 1px solid var(--border-card);
+    padding: 24px 14px;
     flex-shrink: 0;
     position: sticky;
     top: 0;
     height: 100vh;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(20px);
+    z-index: 10;
   }
 
   .nav-logo {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 0 8px 24px;
-    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    padding: 0 8px 20px;
+    border-bottom: 1px solid var(--border-card);
     margin-bottom: 16px;
+    cursor: pointer;
   }
+
   .nav-logo .badge {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 16px; color: #fff;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 16px rgba(147, 51, 234, 0.45);
   }
-  .nav-logo span { font-weight: 600; font-size: 15px; }
+
+  .nav-logo .badge svg {
+    width: 22px;
+    height: 22px;
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+  }
+
+  .nav-logo-text h1 {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #ffffff, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .nav-logo-text p {
+    font-size: 10px;
+    color: var(--neon-cyan);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .nav-group-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    padding: 12px 10px 4px;
+  }
 
   nav a {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 9px 12px;
-    border-radius: 8px;
-    color: var(--text-dim);
+    border-radius: 10px;
+    color: var(--text-soft);
     text-decoration: none;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 500;
-    transition: background .15s, color .15s;
+    transition: all 0.2s var(--ease);
     cursor: pointer;
     margin-bottom: 2px;
+    border: 1px solid transparent;
   }
-  nav a:hover  { background: var(--card); color: var(--text); }
-  nav a.active { background: var(--card); color: var(--accent2); }
-  nav a .icon  { width: 16px; text-align: center; font-size: 14px; }
-
-  /* Main content */
+  nav a:hover {
+    background: rgba(168, 85, 247, 0.12);
+    color: var(--text-white);
+    border-color: rgba(192, 132, 252, 0.25);
+    transform: translateX(2px);
+  }
+  nav a.active {
+    background: rgba(147, 51, 234, 0.25);
+    color: var(--text-white);
+    border-color: rgba(192, 132, 252, 0.45);
+    box-shadow: 0 0 14px rgba(147, 51, 234, 0.3);
+  }
+  nav a svg { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; }
+  /* Main content workspace */
   main {
     flex: 1;
-    padding: 40px 48px;
+    min-width: 0;
+    padding: 36px 48px 80px;
     overflow-y: auto;
-    max-width: 860px;
+    overflow-x: hidden;
+    max-width: 920px;
   }
 
-  h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
-  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 32px; }
+  .top-search-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    gap: 16px;
+  }
 
-  section { margin-bottom: 36px; }
-  h2 {
+  .settings-search {
+    flex: 1;
+    max-width: 440px;
+    position: relative;
+  }
+
+  .settings-search input {
+    width: 100%;
+    height: 40px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 9999px;
+    padding: 0 16px 0 40px;
+    color: var(--text-white);
+    font-family: var(--font-main);
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s var(--ease);
+    backdrop-filter: blur(12px);
+  }
+  .settings-search input:focus {
+    border-color: var(--accent-light);
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.35);
+    background: rgba(28, 21, 56, 0.9);
+  }
+  .settings-search svg {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--accent-light);
+    pointer-events: none;
+  }
+
+  .save-indicator-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    color: #fff;
+    font-family: var(--font-main);
     font-size: 12px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
+    border: 1px solid rgba(192, 132, 252, 0.5);
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(147, 51, 234, 0.35);
+    transition: all 0.2s var(--ease);
+  }
+  .save-indicator-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 20px rgba(192, 132, 252, 0.6);
+  }
+
+  .page-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, #ffffff, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 28px;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 12px;
   }
 
+  .section-header svg {
+    width: 18px;
+    height: 18px;
+    color: var(--neon-cyan);
+  }
+
+  h2 {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--neon-cyan);
+  }
+
   .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius);
     overflow: hidden;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    transition: border-color 0.2s var(--ease);
+  }
+  .card:hover {
+    border-color: rgba(168, 85, 247, 0.3);
   }
 
   .setting-row {
@@ -109,467 +289,927 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid rgba(168, 85, 247, 0.12);
     gap: 24px;
+    transition: background 0.15s var(--ease);
   }
   .setting-row:last-child { border-bottom: none; }
+  .setting-row:hover { background: rgba(168, 85, 247, 0.04); }
 
   .setting-info { flex: 1; min-width: 0; }
   .setting-label {
     font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 2px;
+    font-weight: 600;
+    color: var(--text-white);
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .setting-desc {
     font-size: 12px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.5;
   }
 
-  /* Toggle switch */
+  .badge-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-tag.purple { background: rgba(147, 51, 234, 0.2); color: var(--accent-light); border: 1px solid rgba(168, 85, 247, 0.4); }
+  .badge-tag.cyan { background: rgba(56, 189, 248, 0.2); color: var(--neon-cyan); border: 1px solid rgba(56, 189, 248, 0.4); }
+  .badge-tag.green { background: rgba(34, 197, 94, 0.2); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.4); }
+
+  /* Toggle Switch */
   .toggle {
     position: relative;
-    width: 44px; height: 24px;
+    width: 44px;
+    height: 24px;
     flex-shrink: 0;
   }
   .toggle input { opacity: 0; width: 0; height: 0; }
   .slider {
-    position: absolute; inset: 0;
-    background: var(--border);
+    position: absolute;
+    inset: 0;
+    background: #1e1b38;
+    border: 1px solid var(--border-card);
     border-radius: 24px;
     cursor: pointer;
-    transition: background .2s;
+    transition: all 0.25s var(--ease);
   }
   .slider::before {
     content: '';
     position: absolute;
-    width: 18px; height: 18px;
-    left: 3px; top: 3px;
-    background: #fff;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: #e2d9f3;
     border-radius: 50%;
-    transition: transform .2s;
+    transition: transform 0.25s var(--ease), background 0.2s;
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
   }
-  input:checked + .slider { background: var(--accent); }
-  input:checked + .slider::before { transform: translateX(20px); }
-
-  /* Select */
-  select {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 13px;
-    font-family: inherit;
-    padding: 7px 12px;
-    cursor: pointer;
-    outline: none;
-    min-width: 160px;
+  input:checked + .slider {
+    background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan));
+    border-color: var(--accent-light);
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.5);
   }
-  select:focus { border-color: var(--accent); }
+  input:checked + .slider::before {
+    transform: translateX(20px);
+    background: #ffffff;
+  }
 
-  /* Input */
-  input[type="text"], input[type="number"] {
-    background: var(--card);
-    border: 1px solid var(--border);
+  /* Form Controls */
+  select, input[type="text"], input[type="number"], textarea {
+    background: rgba(14, 10, 28, 0.85);
+    border: 1px solid var(--border-card);
     border-radius: 8px;
-    color: var(--text);
+    color: var(--text-white);
     font-size: 13px;
-    font-family: inherit;
+    font-family: var(--font-main);
     padding: 7px 12px;
     outline: none;
-    width: 240px;
+    transition: all 0.2s var(--ease);
   }
-  input[type="text"]:focus, input[type="number"]:focus {
-    border-color: var(--accent);
+  select { min-width: 180px; cursor: pointer; }
+  select:focus, input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+    border-color: var(--accent-light);
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.35);
   }
+  input[type="text"] { width: 260px; }
+  input[type="number"] { width: 90px; font-family: var(--font-mono); }
+  textarea { width: 100%; min-height: 80px; font-family: var(--font-mono); font-size: 12px; resize: vertical; }
 
-  /* Sentinel status */
-  .sentinel-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-  .sentinel-badge.safe { background: rgba(34,197,94,.15); color: var(--green); }
-  .sentinel-badge.warn { background: rgba(239,68,68,.15);  color: var(--red);  }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-
-  /* Save button */
-  .save-bar {
+  /* Toast Notification */
+  .toast {
     position: fixed;
-    bottom: 0; left: 220px; right: 0;
-    background: rgba(13,14,20,.9);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid var(--border);
-    padding: 14px 48px;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(18, 20, 36, 0.95);
+    border: 1px solid var(--accent-light);
+    border-radius: 12px;
+    padding: 12px 20px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6), 0 0 20px rgba(147, 51, 234, 0.4);
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s var(--ease);
+    z-index: 100;
   }
-  .btn {
-    padding: 9px 22px;
-    border-radius: 8px;
-    border: none;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity .15s;
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast svg { width: 18px; height: 18px; color: var(--green); flex-shrink: 0; }
+
+  /* =========================================================================
+     RESPONSIVE MEDIA QUERIES (<=900px and <=640px)
+     ========================================================================= */
+  @media (max-width: 900px) {
+    nav {
+      width: 72px;
+      padding: 20px 8px;
+    }
+    .nav-logo {
+      justify-content: center;
+      padding: 0 0 16px;
+      margin-bottom: 12px;
+    }
+    .nav-logo-text,
+    nav a span,
+    .nav-group-title {
+      display: none;
+    }
+    nav a {
+      justify-content: center;
+      padding: 10px;
+      margin-bottom: 4px;
+    }
+    main {
+      padding: 24px 24px 60px;
+      max-width: 100%;
+    }
+    .top-search-bar {
+      gap: 12px;
+    }
+    .settings-search {
+      max-width: 100%;
+    }
+    .setting-row {
+      gap: 16px;
+    }
+    input[type="text"] {
+      width: 100%;
+      max-width: 240px;
+    }
   }
-  .btn:hover { opacity: .85; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-ghost {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
+
+  @media (max-width: 640px) {
+    body {
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    nav {
+      width: 100%;
+      height: auto;
+      position: relative;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 10px 14px;
+      border-right: none;
+      border-bottom: 1px solid var(--border-card);
+      overflow-x: auto;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .nav-logo {
+      padding: 0 8px 0 0;
+      border-bottom: none;
+      margin-bottom: 0;
+      flex-shrink: 0;
+    }
+    .nav-logo .badge {
+      width: 32px;
+      height: 32px;
+    }
+    .nav-logo .badge svg {
+      width: 18px;
+      height: 18px;
+    }
+    .nav-logo-text,
+    .nav-group-title {
+      display: none;
+    }
+    nav a {
+      padding: 8px 12px;
+      font-size: 11.5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      justify-content: flex-start;
+      margin-bottom: 0;
+    }
+    nav a span {
+      display: inline;
+      font-size: 11.5px;
+    }
+    main {
+      padding: 16px 14px 60px;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    .top-search-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .settings-search {
+      width: 100%;
+      max-width: 100%;
+    }
+    .save-indicator-btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .page-title {
+      font-size: 20px;
+    }
+    .page-subtitle {
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+    .setting-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 14px;
+    }
+    .setting-info {
+      width: 100%;
+    }
+    select, input[type="text"], input[type="number"], textarea {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+    }
+    .card {
+      border-radius: var(--radius-sm);
+    }
+    .toast {
+      right: 14px;
+      left: 14px;
+      bottom: 14px;
+      transform: translateY(120px);
+      font-size: 12px;
+      padding: 10px 14px;
+    }
   }
-  .save-msg { font-size: 12px; color: var(--text-dim); }
+
 </style>
 </head>
 <body>
+  <!-- Sidebar -->
+  <nav>
+    <div class="nav-logo" onclick="location.href='aeon://newtab'">
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="nav-logo-text">
+        <h1>Aeon Settings</h1>
+        <p>Obsidian Pro</p>
+      </div>
+    </div>
 
-<nav>
-  <div class="nav-logo">
-    <div class="badge">A</div>
-    <span>Aeon Settings</span>
+        <div class="nav-group-title">Configuration</div>
+    <a href="#general" class="active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> <span>General</span></a>
+    <a href="#ai"><svg viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg> <span>Aeon Intelligence</span></a>
+    <a href="#privacy"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span>Privacy & Content Blocking</span></a>
+    <a href="#security"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> <span>Security & TLS</span></a>
+    <a href="#circumvention"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> <span>2026 Circumvention & DPI</span></a>
+    <a href="#network"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg> <span>Network & DNS</span></a>
+    <a href="#downloads"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span>Downloads</span></a>
+    <a href="#appearance"><svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg> <span>Appearance & Theme</span></a>
+    <a href="#about"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> <span>About Aeon</span></a>
+
+    <div class="nav-group-title">System Pages</div>
+    <a href="aeon://shields"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span>Shields & Tracker Stats</span></a>
+    <a href="aeon://extensions"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> <span>Extensions & MCP</span></a>
+    <a href="aeon://diagnostics"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> <span>Diagnostics</span></a>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    <div class="top-search-bar">
+      <div class="settings-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="filter-input" name="filter_settings" aria-label="Search settings" placeholder="Search settings..." oninput="filterSettings()">
+      </div>
+      <button class="save-indicator-btn" onclick="commitSettings()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save & Commit
+      </button>
+    </div>
+
+    <h1 class="page-title">Browser Settings</h1>
+    <p class="page-subtitle">Configure sovereignty, AI intelligence models, circumvention parameters, and system preferences.</p>
+
+    <!-- SECTION: General -->
+    <section id="general">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <h2>General Preferences</h2>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Default Search Engine</div>
+            <div class="setting-desc">The search provider used for queries entered directly into the omnibox address bar.</div>
+          </div>
+          <select id="search_engine" aria-label="Default Search Engine" onchange="saveSetting('search_engine', this.value)">
+            <option value="DuckDuckGo">DuckDuckGo (Privacy)</option>
+            <option value="Brave">Brave Search (Independent)</option>
+            <option value="Kagi">Kagi Search (Premium)</option>
+            <option value="Startpage">Startpage (Google Proxy)</option>
+            <option value="Google">Google Search</option>
+            <option value="Bing">Microsoft Bing</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">On Startup</div>
+            <div class="setting-desc">Choose what page opens when starting Aeon Browser.</div>
+          </div>
+          <select id="startup_behavior" aria-label="On Startup Behavior" onchange="saveSetting('startup_behavior', this.value)">
+            <option value="newtab">Open New Tab start page</option>
+            <option value="restore">Restore previous browsing session</option>
+            <option value="homepage">Open designated home page URL</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Home Page URL</div>
+            <div class="setting-desc">URL loaded when clicking the home button or on startup.</div>
+          </div>
+          <input type="text" id="homepage_url" aria-label="Home Page URL" value="aeon://newtab" onchange="saveSetting('homepage_url', this.value)">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Download Directory</div>
+            <div class="setting-desc">Local disk folder where downloaded files will be automatically saved.</div>
+          </div>
+          <input type="text" id="download_dir" aria-label="Download Directory" value="C:\Users\Downloads" onchange="saveSetting('download_dir', this.value)">
+        </div>
+      </div>
+    </section>
+    <!-- SECTION: Aeon Intelligence & Agent -->
+    <section id="ai">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+        <h2>Aeon Intelligence & Agent Configuration</h2>
+        <span class="badge-tag purple">Sovereign AI</span>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Primary AI Model Provider <span class="badge-tag cyan">Engine</span></div>
+            <div class="setting-desc">Global inference provider powering Aeon Intelligence, agentic workflows, and sidebar sparkle prompts.</div>
+          </div>
+          <select id="ai_provider" aria-label="Primary AI Model Provider" onchange="saveSetting('ai_provider', this.value); updateAiFields(this.value)">
+            <option value="gemini">Google Gemini 1.5 Pro / Flash</option>
+            <option value="groq">Groq (Llama 3.3 70B Versatile - Ultra Fast)</option>
+            <option value="deepseek">DeepSeek R1 / V3 (Reasoning)</option>
+            <option value="openai">OpenAI (GPT-4o / o3-mini)</option>
+            <option value="ollama">Ollama (Local Self-Hosted)</option>
+            <option value="lmstudio">LM Studio (Local Server)</option>
+            <option value="sovereign">Sovereign Gemma 4 (C++ In-Process aeon_ai.dll)</option>
+          </select>
+        </div>
+
+        <div class="setting-row" id="row_ai_apikey">
+          <div class="setting-info">
+            <div class="setting-label">Provider API Key</div>
+            <div class="setting-desc">API authentication token stored securely in DPAPI vault.</div>
+          </div>
+          <input type="password" id="ai_api_key" aria-label="Provider API Key" placeholder="AIzaSy... / gsk_... / sk-..." style="width:260px; background:rgba(14,10,28,0.85); border:1px solid var(--border-card); border-radius:8px; color:#fff; padding:7px 12px;" onchange="saveSetting('ai_api_key', this.value)">
+        </div>
+
+        <div class="setting-row" id="row_ai_endpoint">
+          <div class="setting-info">
+            <div class="setting-label">Inference Server Endpoint</div>
+            <div class="setting-desc">Custom local or remote server URL (e.g., http://localhost:11434 for Ollama).</div>
+          </div>
+          <input type="text" id="ai_endpoint" aria-label="Inference Server Endpoint" value="http://localhost:11434" onchange="saveSetting('ai_endpoint', this.value)">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Autonomous Agent IPC Named Pipe <span class="badge-tag green">\\.\pipe\aeon-agent</span></div>
+            <div class="setting-desc">Enables bidirectional Windows Named Pipe IPC to allow local scripts and external tools to orchestrate browser tasks.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="agent_pipe_enabled" onchange="saveSetting('agent_pipe_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Model Temperature & Reasoning</div>
+            <div class="setting-desc">Lower values yield deterministic factual analysis; higher values yield creative exploration.</div>
+          </div>
+          <input type="number" id="ai_temperature" aria-label="Model Temperature" min="0.0" max="1.5" step="0.1" value="0.7" onchange="saveSetting('ai_temperature', parseFloat(this.value))">
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Privacy & Sentinel -->
+    <section id="privacy">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <h2>Stealth & Privacy Sentinel</h2>
+        <span class="badge-tag cyan">Anti-Fingerprint</span>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Camoufox C++ Canvas Noise Injection</div>
+            <div class="setting-desc">Subtly perturbs HTML5 Canvas rendering data to prevent cryptographic browser hardware fingerprinting.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="canvas_noise" checked onchange="saveSetting('canvas_noise', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Camoufox WebGL Noise Injection</div>
+            <div class="setting-desc">Injects minor floating-point jitter into WebGL shader calculations and vendor strings.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="webgl_noise" checked onchange="saveSetting('webgl_noise', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">AudioContext Frequency Randomization</div>
+            <div class="setting-desc">Injects imperceptible harmonic noise into Web Audio API oscillators.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="audio_noise" checked onchange="saveSetting('audio_noise', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Ad & Tracker Shield Protection</div>
+            <div class="setting-desc">Native C++ content blocker powered by uBlock Origin / EasyList rule sets.</div>
+          </div>
+          <select id="adblock_level" aria-label="Ad and Tracker Shield Protection" onchange="saveSetting('adblock_level', this.value)">
+            <option value="aggressive">Aggressive (Block Ads, Trackers, Social Widgets)</option>
+            <option value="standard" selected>Standard (Recommended - High Compatibility)</option>
+            <option value="disabled">Disabled (Allow all scripts and ads)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Automatic HTTPS Upgrade</div>
+            <div class="setting-desc">Upgrades all unencrypted http:// connections to secure https:// TLS sockets.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="https_upgrade" checked onchange="saveSetting('https_upgrade', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Opt-In Pseudonymous Telemetry (OmniPulse)</div>
+            <div class="setting-desc">Disabled by default (ConsentLevel.None) on Free &amp; Pro tiers. When explicitly enabled, sends pseudonymous installId reliability heartbeats with zero IP address persistence on disk.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="telemetry_opt_in" aria-label="Opt-In Pseudonymous Telemetry (OmniPulse)" onchange="saveSetting('telemetry_opt_in', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+    
+    <!-- SECTION: Security & TLS -->
+    <section id="security">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <h2>Security, TLS 1.3 & Windows DPAPI</h2>
+        <span class="badge-tag green">Post-Quantum</span>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Post-Quantum Kyber-768 TLS 1.3 Key Exchange</div>
+            <div class="setting-desc">Secures sessions against future quantum decryption using NIST ML-KEM / Kyber-768 cryptography.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="kyber_enabled" checked onchange="saveSetting('kyber_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Encrypted Client Hello (ECH)</div>
+            <div class="setting-desc">Encrypts the Server Name Indication (SNI) in TLS 1.3 handshakes using DoH public keys.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="ech_enabled" checked onchange="saveSetting('ech_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Windows DPAPI Credential Vault Security</div>
+            <div class="setting-desc">Protects passwords and tokens with hardware-backed Windows DPAPI encryption and memory scrubbing.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="dpapi_vault_enabled" checked onchange="saveSetting('dpapi_vault_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: 2026 Circumvention & DPI -->
+    <section id="circumvention">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <h2>2026 Circumvention & DPI Engine</h2>
+        <span class="badge-tag green">Desync & Kyber</span>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Active DPI Circumvention Mode</div>
+            <div class="setting-desc">Low-level packet fragmentation and TCP desynchronization to defeat ISP deep packet inspection.</div>
+          </div>
+          <select id="circumvention_mode" aria-label="Active DPI Circumvention Mode" onchange="saveSetting('circumvention_mode', this.value)">
+            <option value="byedpi" selected>ByeDPI SOCKS5 (User-Mode TCP Splitter)</option>
+            <option value="goodbyedpi">GoodbyeDPI (Kernel Driver WinDivert Desync)</option>
+            <option value="tor">Tor Onion Routing (Anonymous 3-Hop Circuit)</option>
+            <option value="i2p">I2P SAM Darknet Bridge</option>
+            <option value="direct">Direct Connection (No DPI Bypass)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">GoodbyeDPI Desync Mode</div>
+            <div class="setting-desc">Select packet evasion technique preset (Mode 1 to Mode 9).</div>
+          </div>
+          <select id="goodbyedpi_mode" aria-label="GoodbyeDPI Desync Mode" onchange="saveSetting('goodbyedpi_mode', this.value)">
+            <option value="1">Mode 1: Fake Request with Wrong Checksum</option>
+            <option value="2">Mode 2: Split at SNI Hostname</option>
+            <option value="3">Mode 3: Out-of-Order TCP Segments</option>
+            <option value="4">Mode 4: Mixed Case Hostname Header</option>
+            <option value="5" selected>Mode 5: Full Auto Desync (Best Compatibility)</option>
+            <option value="6">Mode 6: Aggressive TCP Window Shrink</option>
+            <option value="9">Mode 9: Maximum DPI Stealth Bypass</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Encrypted Client Hello (ECH)</div>
+            <div class="setting-desc">Encrypts the Server Name Indication (SNI) in TLS 1.3 handshakes using DoH public keys.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="circumvention_ech_enabled" checked onchange="saveSetting('circumvention_ech_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Post-Quantum Kyber-768 TLS 1.3 Key Exchange</div>
+            <div class="setting-desc">Secures sessions against future quantum decryption using NIST ML-KEM / Kyber-768 cryptography.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="circumvention_kyber_enabled" checked onchange="saveSetting('circumvention_kyber_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">DNS-over-HTTPS (DoH) Provider</div>
+            <div class="setting-desc">Encrypted DNS resolver to prevent ISP query logging and DNS spoofing.</div>
+          </div>
+          <select id="doh_provider" aria-label="DNS-over-HTTPS Provider" onchange="saveSetting('doh_provider', this.value)">
+            <option value="cloudflare" selected>Cloudflare 1.1.1.1 (Fastest)</option>
+            <option value="quad9">Quad9 9.9.9.9 (Swiss Privacy & Threat Blocking)</option>
+            <option value="mullvad">Mullvad DNS (Adblock + Anti-Tracker)</option>
+            <option value="adguard">AdGuard DNS</option>
+            <option value="custom">Custom DoH URL</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Network & DNS -->
+    <section id="network">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        <h2>Network & DNS Configuration</h2>
+        <span class="badge-tag cyan">Sovereign Wire</span>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Secure DNS (DNS-over-HTTPS)</div>
+            <div class="setting-desc">Route all DNS queries through encrypted TLS tunnels to protect against ISP query hijacking.</div>
+          </div>
+          <select id="network_doh_resolver" aria-label="Secure DNS Resolver" onchange="saveSetting('network_doh_resolver', this.value); saveSetting('doh_provider', this.value);">
+            <option value="cloudflare" selected>Cloudflare 1.1.1.1 (https://cloudflare-dns.com/dns-query)</option>
+            <option value="quad9">Quad9 Secure 9.9.9.9 (https://dns.quad9.net/dns-query)</option>
+            <option value="google">Google DNS (https://dns.google/dns-query)</option>
+            <option value="mullvad">Mullvad Privacy (https://dns.mullvad.net/dns-query)</option>
+            <option value="custom">Custom DoH Endpoint URL</option>
+          </select>
+        </div>
+
+        <div class="setting-row" id="custom_doh_row" style="display:none;">
+          <div class="setting-info">
+            <div class="setting-label">Custom DoH Server URL</div>
+            <div class="setting-desc">Fully qualified HTTPS URL endpoint supporting RFC 8484 DNS-over-HTTPS.</div>
+          </div>
+          <input type="text" id="custom_doh_url" aria-label="Custom DoH Server URL" placeholder="https://example.com/dns-query" onchange="saveSetting('custom_doh_url', this.value)">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Encrypted Client Hello (ECH) Enforcement</div>
+            <div class="setting-desc">Guarantees that TLS SNI headers are fully masked against ISP / edge middlebox inspection.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="network_ech_enforced" checked onchange="saveSetting('network_ech_enforced', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Custom SOCKS5 / HTTP Proxy</div>
+            <div class="setting-desc">Route browser traffic through a dedicated SOCKS5 or HTTP proxy gateway.</div>
+          </div>
+          <div style="display:flex; gap:8px; width:100%; max-width:320px;">
+            <input type="text" id="proxy_host" aria-label="Custom Proxy Host" placeholder="127.0.0.1" style="flex:2;" onchange="saveSetting('proxy_host', this.value)">
+            <input type="number" id="proxy_port" aria-label="Custom Proxy Port" placeholder="1080" style="flex:1;" onchange="saveSetting('proxy_port', this.value)">
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Tor Snowflake / Pluggable Transports</div>
+            <div class="setting-desc">Use ephemeral WebRTC snowflake proxies to bypass censorship when standard networks are restricted.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="snowflake_enabled" onchange="saveSetting('snowflake_enabled', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Network Sentinel Captive Portal Watchdog</div>
+            <div class="setting-desc">Detect hotel / airport captive portals without exposing DNS leaks.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="captive_portal_detect" checked onchange="saveSetting('captive_portal_detect', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Downloads -->
+    <section id="downloads">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <h2>Downloads & Local Storage</h2>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Download Directory Location</div>
+            <div class="setting-desc">Default local filesystem directory for all downloaded files and artifacts.</div>
+          </div>
+          <input type="text" id="downloads_directory_path" aria-label="Download Directory Location" value="C:\Users\Downloads" onchange="saveSetting('download_dir', this.value)">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Parallel Download Streams</div>
+            <div class="setting-desc">Number of multi-segmented concurrent TCP streams per file download.</div>
+          </div>
+          <input type="number" id="dl_streams" aria-label="Parallel Download Streams" min="1" max="16" value="4" onchange="saveSetting('dl_streams', parseInt(this.value))">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Prompt for Download Save Location</div>
+            <div class="setting-desc">Always show the Windows Save File dialog before initiating a download.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="dl_prompt" onchange="saveSetting('dl_prompt', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Appearance & Chrome -->
+    <section id="appearance">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+        <h2>Appearance & Chrome Controls</h2>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Interface Theme Palette</div>
+            <div class="setting-desc">Select visual styling and accent color accents.</div>
+          </div>
+          <select id="theme_palette" aria-label="Interface Theme Palette" onchange="saveSetting('theme_palette', this.value)">
+            <option value="obsidian" selected>Obsidian Dark (DelgadoLogic Canonical)</option>
+            <option value="midnight">Midnight Violet (Deep Purple Neon)</option>
+            <option value="cyber">Cyber Neon (Cyan & Hot Pink)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Tab Strip Layout Style</div>
+            <div class="setting-desc">Switch between canonical top horizontal tabs and modern vertical sidebar tabs.</div>
+          </div>
+          <select id="tab_layout" aria-label="Tab Strip Layout Style" onchange="saveSetting('tab_layout', this.value)">
+            <option value="top" selected>Top Horizontal Tab Strip</option>
+            <option value="vertical">Vertical Sidebar Tabs</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Glassmorphic Blur & GPU Acceleration</div>
+            <div class="setting-desc">Enables DirectX/DWM glass acrylic blur and hardware-accelerated micro-animations.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="gpu_blur" checked onchange="saveSetting('gpu_blur', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: About -->
+    <section id="about">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <h2>About Aeon Browser</h2>
+      </div>
+      <div class="card" style="padding:24px 20px;">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+          <div style="width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg, #9333ea, #38bdf8); display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(147,51,234,0.5);">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:17px; font-weight:700; color:#fff;">Aeon Browser Pro</div>
+            <div style="font-size:12px; color:var(--text-muted);">Version 0.22.0 (Win64 • Release)</div>
+            <div style="font-size:11px; color:var(--accent-light); margin-top:2px;">Engine: Chromium WebView2 / Blink • Camoufox C++ Sentinel • Gemma 4 AI</div>
+          </div>
+        </div>
+        <div style="font-size:12.5px; color:var(--text-soft); line-height:1.6; border-top:1px solid rgba(168,85,247,0.15); padding-top:14px;">
+          Designed &amp; engineered by <strong>Delgado Creative Enterprises LLC d/b/a DelgadoLogic</strong>.<br>
+          6218 Georgia Avenue NW, Ste 1-698, Washington, DC 20011, USA • Age 16+ • 60-Day Money-Back Guarantee on Paid Plans.<br>
+          <a href="https://delgadologic.tech" style="color:var(--neon-cyan); text-decoration:none; font-weight:600;">delgadologic.tech</a> • <a href="https://github.com/DelgadoLogic/aeon-engine" style="color:var(--accent-light); text-decoration:none; font-weight:600;">GitHub: DelgadoLogic/aeon-engine</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="toast-msg">Settings saved successfully</span>
   </div>
-  <a class="active" href="#general"><span class="icon">⚙</span> General</a>
-  <a href="#privacy"><span class="icon">🛡</span> Privacy</a>
-  <a href="#network"><span class="icon">🌐</span> Network & DNS</a>
-  <a href="#security"><span class="icon">🔒</span> Security</a>
-  <a href="#appearance"><span class="icon">🎨</span> Appearance</a>
-  <a href="#downloads"><span class="icon">⬇</span> Downloads</a>
-  <a href="#passwords"><span class="icon">🗝</span> Passwords</a>
-  <a href="#advanced"><span class="icon">🔧</span> Advanced</a>
-  <a href="#about"><span class="icon">ℹ</span> About Aeon</a>
-</nav>
 
-<main>
+  <script>
+    const settingsState = {};
 
-  <h1>Settings</h1>
-  <p class="subtitle">Aeon Browser by DelgadoLogic</p>
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      const tm = document.getElementById('toast-msg');
+      if (tm) tm.textContent = msg || 'Settings saved & committed';
+      if (t) {
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2600);
+      }
+    }
 
-  <!-- GENERAL -->
-  <section id="general">
-    <h2>General</h2>
-    <div class="card">
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Default browser</div>
-          <div class="setting-desc">Make Aeon your default browser for https:// links</div>
-        </div>
-        <button class="btn btn-primary" onclick="aeon.setDefault()">Set as Default</button>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Startup page</div>
-          <div class="setting-desc">What Aeon opens when you launch it</div>
-        </div>
-        <select onchange="aeon.set('startup_page', this.value)">
-          <option value="newtab">New Tab page</option>
-          <option value="home">Homepage</option>
-          <option value="last">Restore last session</option>
-          <option value="blank">Blank page</option>
-        </select>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Homepage URL</div>
-          <div class="setting-desc">Used when startup page is set to "Homepage"</div>
-        </div>
-        <input type="text" id="homepage" value="aeon://newtab"
-               onchange="aeon.set('homepage', this.value)">
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Search engine</div>
-          <div class="setting-desc">Default search engine for the address bar</div>
-        </div>
-        <select onchange="aeon.set('search_engine', this.value)">
-          <option value="ddg">DuckDuckGo (Recommended)</option>
-          <option value="brave">Brave Search</option>
-          <option value="google">Google</option>
-          <option value="bing">Bing</option>
-          <option value="kagi">Kagi (Paid)</option>
-        </select>
-      </div>
-    </div>
-  </section>
+    function saveSetting(key, val) {
+      settingsState[key] = val;
+      try {
+        localStorage.setItem('aeon_settings_' + key, JSON.stringify(val));
+      } catch (e) {}
 
-  <!-- PRIVACY -->
-  <section id="privacy">
-    <h2>Privacy & Content Blocking</h2>
-    <div class="card">
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Block ads & trackers</div>
-          <div class="setting-desc">EasyList + uBlock rules — built-in, no extension needed</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('adblock', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Block cookie banners</div>
-          <div class="setting-desc">Fanboy Annoyances — auto-dismisses GDPR consent dialogs</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('cookie_banners', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Fingerprint randomization</div>
-          <div class="setting-desc">Randomizes Canvas, WebGL, AudioContext, and screen resolution APIs</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('fingerprint_guard', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Global Privacy Control (GPC)</div>
-          <div class="setting-desc">Sends Sec-GPC: 1 header on every request — legally binding opt-out in CA, EU</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('gpc', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Block third-party cookies</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('block_3p_cookies', this.checked)"><span class="slider"></span></label>
-      </div>
-    </div>
-  </section>
+      if (window.aeonBridge && typeof window.aeonBridge.setSetting === 'function') {
+        window.aeonBridge.setSetting(key, val);
+      } else if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({ type: 'setSetting', key: key, value: val });
+      }
+      showToast(`Updated ${key}`);
+    }
 
-  <!-- NETWORK & DNS -->
-  <section id="network">
-    <h2>Network & DNS</h2>
-    <div class="card">
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Network Sentinel</div>
-          <div class="setting-desc">Auto-detects your network type and adapts DNS, bypass, and TLS strategy</div>
-        </div>
-        <div class="sentinel-badge safe"><span class="dot"></span> Protected</div>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">DNS-over-HTTPS (DoH)</div>
-          <div class="setting-desc">Encrypts DNS queries — prevents ISP and network tracking of every site you visit</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('doh_enabled', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">DoH provider</div>
-          <div class="setting-desc">Cascades automatically if provider is unavailable</div>
-        </div>
-        <select onchange="aeon.set('doh_provider', this.value)">
-          <option value="cloudflare">Cloudflare 1.1.1.1 (ECH, no-log)</option>
-          <option value="google">Google 8.8.8.8</option>
-          <option value="quad9">Quad9 9.9.9.9 (malware filter)</option>
-          <option value="nextdns">NextDNS</option>
-          <option value="mullvad">Mullvad DNS</option>
-          <option value="auto">Auto (fastest)</option>
-        </select>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Tor routing</div>
-          <div class="setting-desc">Routes all traffic through Tor — much slower but maximum anonymity. .onion sites always use Tor.</div>
-        </div>
-        <label class="toggle"><input type="checkbox" onchange="aeon.set('tor_enabled', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">I2P routing</div>
-          <div class="setting-desc">Enables access to .i2p sites via integrated i2pd router</div>
-        </div>
-        <label class="toggle"><input type="checkbox" onchange="aeon.set('i2p_enabled', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">🔥 Firewall bypass mode</div>
-          <div class="setting-desc">Enables SNI fragmentation and DPI evasion (GoodbyeDPI). Use on restricted networks: school, corporate, national firewall.</div>
-        </div>
-        <label class="toggle"><input type="checkbox" onchange="aeon.set('bypass_enabled', this.checked)"><span class="slider"></span></label>
-      </div>
-    </div>
-  </section>
+    function commitSettings() {
+      if (window.aeonBridge && typeof window.aeonBridge.commitSettings === 'function') {
+        window.aeonBridge.commitSettings();
+      } else if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({ type: 'commitSettings' });
+      }
+      showToast('All settings committed to disk (%APPDATA%)');
+    }
 
-  <!-- SECURITY -->
-  <section id="security">
-    <h2>Security</h2>
-    <div class="card">
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Minimum TLS version</div>
-          <div class="setting-desc">Connections using older TLS will be blocked</div>
-        </div>
-        <select onchange="aeon.set('min_tls', this.value)">
-          <option value="tls12">TLS 1.2</option>
-          <option value="tls13" selected>TLS 1.3 (Recommended)</option>
-        </select>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Block mixed content</div>
-          <div class="setting-desc">Block HTTP sub-resources on HTTPS pages</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('mixed_content', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Safe browsing</div>
-          <div class="setting-desc">Local blocklist check — no data sent to Google</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('safe_browsing', this.checked)"><span class="slider"></span></label>
-      </div>
-    </div>
-  </section>
+    function updateAiFields(provider) {
+      const rowKey = document.getElementById('row_ai_apikey');
+      const rowEp = document.getElementById('row_ai_endpoint');
+      if (provider === 'sovereign') {
+        if (rowKey) rowKey.style.display = 'none';
+        if (rowEp) rowEp.style.display = 'none';
+      } else if (provider === 'ollama' || provider === 'lmstudio') {
+        if (rowKey) rowKey.style.display = 'none';
+        if (rowEp) rowEp.style.display = 'flex';
+      } else {
+        if (rowKey) rowKey.style.display = 'flex';
+        if (rowEp) rowEp.style.display = 'none';
+      }
+    }
 
-  <!-- DOWNLOADS -->
-  <section id="downloads">
-    <h2>Downloads</h2>
-    <div class="card">
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Download folder</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="text" id="dl_path" value="C:\Users\User\Downloads" onchange="aeon.set('dl_path', this.value)">
-          <button class="btn btn-ghost" onclick="aeon.browseDlPath()">Browse…</button>
-        </div>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Ask where to save each file</div>
-        </div>
-        <label class="toggle"><input type="checkbox" onchange="aeon.set('dl_ask', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Parallel connections per download</div>
-          <div class="setting-desc">More connections = faster downloads on most servers (max 16)</div>
-        </div>
-        <input type="number" value="4" min="1" max="16" style="width:80px" onchange="aeon.set('dl_streams', this.value)">
-      </div>
-    </div>
-  </section>
+    function loadSettings() {
+      const keys = [
+        'search_engine', 'startup_behavior', 'homepage_url', 'download_dir',
+        'ai_provider', 'ai_api_key', 'ai_endpoint', 'agent_pipe_enabled', 'ai_temperature',
+        'canvas_noise', 'webgl_noise', 'audio_noise', 'adblock_level', 'https_upgrade', 'telemetry_opt_in',
+        'circumvention_mode', 'goodbyedpi_mode', 'ech_enabled', 'kyber_enabled', 'circumvention_ech_enabled', 'circumvention_kyber_enabled', 'doh_provider',
+        'theme_palette', 'tab_layout', 'gpu_blur'
+      ];
 
-  <!-- ABOUT -->
-  <section id="about">
-    <h2>About</h2>
-    <div class="card">
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Aeon Browser</div>
-          <div class="setting-desc">Version 1.0.0-dev (Build 2026.03) · DelgadoLogic</div>
-        </div>
-        <button class="btn btn-ghost" onclick="aeon.checkUpdate()">Check for updates</button>
-      </div>
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">Telemetry</div>
-          <div class="setting-desc">Anonymous OS tier and crash reports only. Never URLs or personal data.</div>
-        </div>
-        <label class="toggle"><input type="checkbox" checked onchange="aeon.set('telemetry', this.checked)"><span class="slider"></span></label>
-      </div>
-    </div>
-  </section>
+      keys.forEach(k => {
+        let val = undefined;
+        if (window.aeonBridge && typeof window.aeonBridge.getSetting === 'function') {
+          val = window.aeonBridge.getSetting(k);
+        }
+        if (val === undefined || val === null) {
+          try {
+            const raw = localStorage.getItem('aeon_settings_' + k);
+            if (raw !== null) val = JSON.parse(raw);
+          } catch(e) {}
+        }
 
-  <div style="height:64px"></div><!-- spacer for save bar -->
-</main>
+        if (val !== undefined && val !== null) {
+          const el = document.getElementById(k);
+          if (el) {
+            if (el.type === 'checkbox') {
+              el.checked = Boolean(val);
+            } else {
+              el.value = val;
+            }
+          }
+        }
+      });
 
-<div class="save-bar">
-  <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
-  <button class="btn btn-ghost" onclick="revertSettings()">Revert</button>
-  <span class="save-msg" id="save_msg"></span>
-</div>
+      const aiProv = document.getElementById('ai_provider');
+      if (aiProv) updateAiFields(aiProv.value);
+    }
 
-<script>
-// aeon object — calls native C++ bridge via postMessage or custom protocol
-const aeon = {
-  set: (key, value) => {
-    try { window.aeonBridge?.setSetting(key, value); } catch(_) {}
-    document.getElementById('save_msg').textContent = 'Unsaved changes…';
-  },
-  setDefault: () => { try { window.aeonBridge?.setDefaultBrowser(); } catch(_) {} },
-  checkUpdate: () => { try { window.aeonBridge?.checkUpdate(); } catch(_) {} },
-  browseDlPath: () => { try { window.aeonBridge?.browseDlPath(); } catch(_) {} }
-};
+    function filterSettings() {
+      const q = (document.getElementById('filter-input')?.value || '').toLowerCase().trim();
+      const rows = document.querySelectorAll('.setting-row');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? 'flex' : 'none';
+      });
+    }
 
-function saveSettings() {
-  try { window.aeonBridge?.commitSettings(); } catch(_) {}
-  const msg = document.getElementById('save_msg');
-  msg.textContent = '✓ Settings saved';
-  setTimeout(() => msg.textContent = '', 2000);
-}
-function revertSettings() {
-  try { window.aeonBridge?.revertSettings(); } catch(_) {}
-  window.location.reload();
-}
+    // Smooth scroll for local section nav links
+    document.querySelectorAll('nav a').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const href = this.getAttribute('href') || '';
+        if (!href.startsWith('#')) return;
+        e.preventDefault();
+        document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+        this.classList.add('active');
+        const targetId = href.substring(1);
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
 
-// Sidebar navigation highlight
-document.querySelectorAll('nav a').forEach(a => {
-  a.addEventListener('click', function() {
-    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
-    this.classList.add('active');
-    const target = document.querySelector(this.getAttribute('href'));
-    if (target) target.scrollIntoView({ behavior: 'smooth' });
-  });
-});
-
-// ── Initialize controls from live C++ state ──────────────────────
-// window.__aeon.settings is injected by AeonBridge::BuildInjectionScript()
-// before this page loads. It contains the actual persisted settings.
-document.addEventListener('DOMContentLoaded', () => {
-  const s = window.__aeon?.settings;
-  if (!s) return;
-
-  // Helper: set toggle by setting key
-  function setToggle(key, checked) {
-    const el = document.querySelector(`[onchange*="'${key}'"]`);
-    if (el && el.type === 'checkbox') el.checked = !!checked;
-  }
-
-  // Helper: set select by setting key
-  function setSelect(key, value) {
-    const el = document.querySelector(`select[onchange*="'${key}'"]`);
-    if (el && value) el.value = value;
-  }
-
-  // Toggles
-  setToggle('adblock',          s.adblock);
-  setToggle('cookie_banners',   s.cookie_banners);
-  setToggle('fingerprint_guard',s.fingerprint_guard);
-  setToggle('gpc',              s.gpc);
-  setToggle('block_3p_cookies', s.block_3p_cookies);
-  setToggle('doh_enabled',      s.doh_enabled);
-  setToggle('tor_enabled',      s.tor_enabled);
-  setToggle('i2p_enabled',      s.i2p_enabled);
-  setToggle('bypass_enabled',   s.bypass_enabled);
-  setToggle('mixed_content',    s.mixed_content);
-  setToggle('safe_browsing',    s.safe_browsing);
-  setToggle('telemetry',        s.telemetry);
-  setToggle('dl_ask',           s.dl_ask);
-
-  // Selects
-  setSelect('startup_page',     s.startup_page);
-  setSelect('search_engine',    s.search_engine);
-  setSelect('doh_provider',     s.doh_provider);
-  setSelect('min_tls',          s.min_tls);
-
-  // Text inputs
-  const homepageEl = document.getElementById('homepage');
-  if (homepageEl && s.homepage) homepageEl.value = s.homepage;
-
-  const dlPathEl = document.getElementById('dl_path');
-  if (dlPathEl && s.dl_path) dlPathEl.value = s.dl_path;
-
-  // Number inputs (dl_streams)
-  const streamsEl = document.querySelector('input[type="number"][onchange*="dl_streams"]');
-  if (streamsEl && s.dl_streams) streamsEl.value = s.dl_streams;
-});
-</script>
+    window.addEventListener('DOMContentLoaded', loadSettings);
+    loadSettings();
+  </script>
 </body>
 </html>

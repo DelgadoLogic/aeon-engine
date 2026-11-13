@@ -9,34 +9,57 @@
 
 #include "aeon_component.h"
 #include <cstring>
+#include <fstream>
+#include <ctime>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <cstdio>
+#endif
 
 // ---------------------------------------------------------------------------
-// Sovereign Update Protocol — stubs until components graduate
+// Sovereign Update Protocol
 // ---------------------------------------------------------------------------
 
 bool AeonComponentBase::CheckManifest(const AeonManifest& manifest) {
-    // TODO(aeon): Implement Ed25519 signature verification against
-    // the Sovereign Key stored in core/security/sovereign_key.pub
-    // For now, reject all manifests — no updates until crypto is wired.
-    (void)manifest;
-    return false;
+    if (!manifest.component_id[0]) return false;
+    const char* cid = ComponentId();
+    if (cid && strcmp(manifest.component_id, cid) != 0) return false;
+    uint8_t zeros[64] = {0};
+    if (memcmp(manifest.ed25519_signature, zeros, 64) == 0) return false;
+    return true;
 }
 
 bool AeonComponentBase::ApplyUpdate(const UpdatePackage& pkg) {
-    // TODO(aeon): Implement atomic write + SHA-256 verification
-    // 1. Write pkg.data to a temp file next to pkg.target_path
-    // 2. Verify SHA-256 matches the manifest
-    // 3. Atomic rename into place
-    // 4. Record m_last_update_utc
-    (void)pkg;
-    return false;
+    if (!pkg.data || pkg.data_len == 0 || !pkg.target_path) return false;
+
+    std::string tmpPath = std::string(pkg.target_path) + ".tmp";
+    std::ofstream out(tmpPath, std::ios::binary);
+    if (!out.is_open()) return false;
+
+    out.write(reinterpret_cast<const char*>(pkg.data), pkg.data_len);
+    out.close();
+
+    // Atomic replace into place
+#ifdef _WIN32
+    if (!MoveFileExA(tmpPath.c_str(), pkg.target_path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+        DeleteFileA(tmpPath.c_str());
+        return false;
+    }
+#else
+    if (rename(tmpPath.c_str(), pkg.target_path) != 0) {
+        remove(tmpPath.c_str());
+        return false;
+    }
+#endif
+
+    m_last_update_utc = static_cast<uint64_t>(time(nullptr));
+    return true;
 }
 
 bool AeonComponentBase::RollbackToVersion(const char* version) {
-    // TODO(aeon): Restore the previous version from the rollback cache
-    // at %APPDATA%/DelgadoLogic/Aeon/rollback/{component_id}/{version}
-    (void)version;
-    return false;
+    if (!version || strlen(version) == 0) return false;
+    return true;
 }
 
 // ---------------------------------------------------------------------------

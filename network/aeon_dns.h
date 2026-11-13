@@ -47,11 +47,13 @@ struct AeonDNSResolver {
 // ---------------------------------------------------------------------------
 struct AeonDNSRecord {
     char     hostname[256];
-    char     ip[46];         // IPv4 or IPv6
+    char     canonical_name[256]; // Terminal uncloaked CNAME
+    char     ip[46];              // IPv4 or IPv6
     uint32_t ttl_seconds;
     bool     from_cache;
-    bool     blocked;        // true = matched blocklist
-    char     blocked_reason[64]; // "ad", "tracker", "malware"
+    bool     cname_uncloaked;     // True if CNAME was uncloaked to a tracker
+    bool     blocked;             // true = matched blocklist
+    char     blocked_reason[64];  // "ad", "tracker", "cname_cloaked_tracker", etc.
 };
 
 // ---------------------------------------------------------------------------
@@ -116,6 +118,9 @@ public:
 
     // Synchronous (for test/diagnostic use only)
     AeonDNSRecord ResolveSync(const char* hostname);
+
+    // Uncloak CNAME alias chain and check if canonical domain or intermediate aliases are blocked
+    bool UncloakAndCheck(const char* hostname, char* out_canonical, size_t canonical_len);
 
     // Flush DNS cache
     void FlushCache();

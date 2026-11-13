@@ -132,10 +132,7 @@ void Log(Level level, const char* category, const char* fmt, ...) {
     // Write to file
     if (g_File) {
         fputs(line, g_File);
-        // Auto-flush on WARN+ for timely crash diagnostics
-        if ((int)level >= (int)Level::Warn) {
-            fflush(g_File);
-        }
+        fflush(g_File);
         RotateIfNeeded();
     }
 

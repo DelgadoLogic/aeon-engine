@@ -1,16 +1,16 @@
 import React from 'react';
 
 const rows = [
-  { feature: 'Zero telemetry / call-home',       aeon: true,  chrome: false, firefox: false, brave: false },
-  { feature: 'Local-only AI (no cloud API)',      aeon: true,  chrome: false, firefox: false, brave: false },
-  { feature: 'P2P update distribution',           aeon: true,  chrome: false, firefox: false, brave: false },
-  { feature: 'Per-session fingerprint randomization', aeon: true, chrome: false, firefox: false, brave: true },
-  { feature: 'Autonomous CVE patching',           aeon: true,  chrome: false, firefox: false, brave: false },
-  { feature: 'Ed25519 signed updates',            aeon: true,  chrome: false, firefox: true,  brave: false },
-  { feature: 'Built-in ad/tracker blocker',       aeon: true,  chrome: false, firefox: false, brave: true },
-  { feature: 'No Google services dependency',     aeon: true,  chrome: false, firefox: true,  brave: false },
-  { feature: 'Runs on legacy OS (XP, Vista, 7)',  aeon: true,  chrome: false, firefox: false, brave: false },
-  { feature: 'Open source core',                  aeon: true,  chrome: true,  firefox: true,  brave: true },
+  { feature: 'Zero Google background pings',          aeon: true,  chrome: false, firefox: false, brave: false },
+  { feature: 'Local GGUF AI + WebMCP pipe',           aeon: true,  chrome: false, firefox: false, brave: false },
+  { feature: 'OmniHub ↔ LogicFlow workflow handoff',  aeon: true,  chrome: false, firefox: false, brave: false },
+  { feature: 'Per-session fingerprint randomization', aeon: true,  chrome: false, firefox: false, brave: true },
+  { feature: 'Opt-in crash diagnostics (zero IP disk)', aeon: true, chrome: false, firefox: false, brave: false },
+  { feature: 'Ed25519 + SHA-256 signed updates',      aeon: true,  chrome: false, firefox: true,  brave: false },
+  { feature: 'Built-in Rust ad/tracker blocker',      aeon: true,  chrome: false, firefox: false, brave: true },
+  { feature: 'No forced Google account sync',         aeon: true,  chrome: false, firefox: true,  brave: true },
+  { feature: 'Native Win32 DWM Mica + Split View',    aeon: true,  chrome: false, firefox: false, brave: false },
+  { feature: 'Windows 10 (1607+) & Windows 11 x64',   aeon: true,  chrome: true,  firefox: true,  brave: true },
 ];
 
 function Check({ val }) {
@@ -27,7 +27,7 @@ export default function Comparison() {
           How Aeon stacks up
         </h2>
         <p className="section-sub" style={{ textAlign: 'center', margin: '16px auto 0' }}>
-          We built Aeon because no browser met all of these criteria.
+          We built Aeon because no mainstream browser met all of these engineering criteria.
         </p>
       </div>
 

@@ -15,7 +15,7 @@ export default function Hero() {
         {/* Status badge */}
         <div className="hero-badge" style={{ animationDelay: '0.2s' }}>
           <span className="pulse"></span>
-          Network online · 0 central servers
+          Developer Preview v0.22 · Beta Waitlist Open
         </div>
 
         {/* Main headline */}
@@ -26,34 +26,34 @@ export default function Hero() {
 
         {/* Tagline */}
         <p className="hero-sub">
-          Aeon combines Brave-grade privacy shields and Chrome's sleek ergonomics with
-          an autonomous local AI agent pipe — 100% zero telemetry, zero fingerprinting,
-          and zero central servers.
+          Aeon combines Brave-grade privacy shields and Obsidian workspace ergonomics with
+          an autonomous local WebMCP AI bridge — zero Google background pings, Camoufox
+          stealth anti-fingerprinting, and Ed25519-signed updates.
         </p>
 
         {/* CTA buttons */}
         <div className="hero-actions">
           <a className="btn-primary" href="#waitlist" id="hero-download-btn">
-            Download Aeon Pro
+            Join Early Access
           </a>
-          <a className="btn-secondary" href="#how-it-works">
-            Explore Architecture →
+          <a className="btn-secondary" href="#pro">
+            View Editions →
           </a>
         </div>
 
-        {/* Sub-note with origin badge */}
-        <p className="hero-note">Free Community Edition · $29.99 One-Time Pro · Open source C++ core</p>
+        {/* Sub-note unified with FACTS.md & Pricing.jsx */}
+        <p className="hero-note">Core Browser $0 Forever · Optional Aeon Pro ($4.99/mo or $39/yr) · 60-Day Refund Guarantee</p>
 
         {/* Feature pills */}
         <div className="hero-pills">
-          {['Brave Shield Guard', 'Chrome Ergonomics', 'Local MCP AI', 'P2P Updates', 'Zero Telemetry', 'Ed25519 Signed'].map((pill, i) => (
+          {['Camoufox Stealth Shield', 'Obsidian Workspaces', 'Local WebMCP AI', 'OmniHub Bridge', 'Zero Google Pings', 'Ed25519 Signed'].map((pill, i) => (
             <span className="hero-pill" key={i} style={{ animationDelay: `${0.6 + i * 0.08}s` }}>
               {pill}
             </span>
           ))}
         </div>
 
-        {/* Brave + Chrome Live Interactive Browser Mockup */}
+        {/* Live Interactive Browser Mockup */}
         <BrowserMockupDemo />
 
         {/* Live terminal demo */}

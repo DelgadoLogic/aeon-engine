@@ -20,10 +20,20 @@
 #   Win9x build: use Open Watcom toolchain file: -DCMAKE_TOOLCHAIN_FILE=cmake/watcom.cmake
 
 cmake_minimum_required(VERSION 3.20)
-project(AeonBrowser VERSION 1.0.0 LANGUAGES C CXX)
+project(Aeon VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(MSVC)
+    add_compile_options(/bigobj /EHsc /MP /std:c++17)
+endif()
+
+# Global output directories for multi-config generators (Visual Studio)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+link_directories("${CMAKE_BINARY_DIR}/$<CONFIG>")
 
 # ---------------------------------------------------------------------------
 # Tier configuration
@@ -53,7 +63,44 @@ elseif(AEON_TARGET_TIER STREQUAL "Retro")
 endif()
 
 # ---------------------------------------------------------------------------
-# Browser core (C++)
+# Base component library (C++)
+# Shared static library to decouple common component sources
+# ---------------------------------------------------------------------------
+add_library(aeon_component_base STATIC
+    core/aeon_component.cpp
+    core/session/SessionManager.cpp
+    core/ui/TabGroupManager.cpp
+)
+target_include_directories(aeon_component_base PUBLIC
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/core/session
+    ${CMAKE_SOURCE_DIR}/core/ui
+)
+set_target_properties(aeon_component_base PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+)
+
+# ---------------------------------------------------------------------------
+# SQLite3 database engine (C) — isolated static library
+# ---------------------------------------------------------------------------
+add_library(aeon_sqlite STATIC
+    core/history/sqlite3.c
+)
+set_target_properties(aeon_sqlite PROPERTIES
+    LINKER_LANGUAGE C
+    COMPILE_FLAGS "/TC /bigobj /EHsc /FS"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+)
+target_compile_definitions(aeon_sqlite PRIVATE SQLITE_THREADSAFE=0 SQLITE_ENABLE_FTS5)
+target_include_directories(aeon_sqlite PUBLIC core/history)
+
+# ---------------------------------------------------------------------------
+# Core browser executable (Aeon.exe)
 # ---------------------------------------------------------------------------
 set(CORE_SOURCES
     AeonMain.cpp
@@ -61,11 +108,14 @@ set(CORE_SOURCES
     core/engine/TierDispatcher.cpp
     core/engine/AeonBridge.cpp
     core/ui/BrowserChrome.cpp
+    core/ui/SplitViewController.cpp
+    core/ui/OmniSuggestHUD.cpp
     core/ui/Aeon.rc
     core/ui/EraChrome.cpp
     core/ui/AppMenu.cpp
     core/ui/BookmarkBar.cpp
     core/ui/BookmarkToast.cpp
+    core/ui/ShieldHUD.cpp
     core/ui/DownloadButton.cpp
     core/network/CircumventionEngine.cpp
     core/network/NetworkSentinel.cpp
@@ -75,10 +125,8 @@ set(CORE_SOURCES
     core/settings/SettingsEngine.cpp
     core/security/PasswordVault.cpp
     core/history/HistoryEngine.cpp
-    core/history/sqlite3.c
     core/download/DownloadManager.cpp
     core/memory/TabSleepManager.cpp
-    core/session/SessionManager.cpp
     core/tls/TlsAbstraction.cpp
     core/crash/CrashHandler.cpp
     core/crash/CrashKeys.cpp
@@ -86,7 +134,6 @@ set(CORE_SOURCES
     core/crash/AeonLog.cpp
     core/extensions/ExtensionRuntime.cpp
     core/billing/OmniLicense.cpp
-    core/aeon_component.cpp
     updater/AutoUpdater.cpp
     privacy/ContentBlocker.cpp
     telemetry/PulseBridge.cpp
@@ -95,15 +142,13 @@ set(CORE_SOURCES
     core/agent/AeonAgentPipe.cpp
 )
 
-# SQLite3 — vendor, single-threaded (browser is single-process)
-set_source_files_properties(core/history/sqlite3.c PROPERTIES
-    COMPILE_DEFINITIONS "SQLITE_THREADSAFE=0;SQLITE_ENABLE_FTS5"
-)
-
 add_executable(Aeon WIN32 ${CORE_SOURCES})
+add_dependencies(Aeon aeon_sqlite)
 
 # Windows system libraries
-target_link_libraries(Aeon
+target_link_libraries(Aeon PRIVATE
+    aeon_sqlite
+    $<TARGET_FILE:aeon_component_base>
     kernel32 user32 gdi32 gdiplus shell32 advapi32 shlwapi ole32 oleaut32
     dwmapi uxtheme dbghelp
     crypt32     # DPAPI — password vault
@@ -119,19 +164,12 @@ target_link_libraries(Aeon
 add_custom_command(TARGET Aeon POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/newtab"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Aeon>/pages"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/resources/newtab/newtab.html"
-        "$<TARGET_FILE_DIR:Aeon>/newtab/"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/resources/pages/settings.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/history.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/downloads.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/bookmarks.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/passwords.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/crash.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/diagnostics.html"
-        "${CMAKE_SOURCE_DIR}/resources/pages/drm-info.html"
-        "$<TARGET_FILE_DIR:Aeon>/pages/"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/resources/newtab"
+        "$<TARGET_FILE_DIR:Aeon>/newtab"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/resources/pages"
+        "$<TARGET_FILE_DIR:Aeon>/pages"
     COMMENT "[Aeon] Copying HTML resources to output"
 )
 
@@ -141,18 +179,27 @@ add_custom_command(TARGET Aeon POST_BUILD
 # ---------------------------------------------------------------------------
 if(NOT AEON_TARGET_TIER STREQUAL "Retro")
     find_program(CARGO cargo REQUIRED)
-    set(ROUTER_LIB "${CMAKE_BINARY_DIR}/router/aeon_router.dll")
-
-    add_custom_target(aeon_router_build ALL
-        COMMAND ${CARGO} build --release
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/router
-        COMMENT "Building Rust protocol router..."
+    file(GLOB_RECURSE ROUTER_SOURCES
+        "${CMAKE_SOURCE_DIR}/router/src/*.rs"
+        "${CMAKE_SOURCE_DIR}/router/Cargo.toml"
     )
+    set(ROUTER_DLL "${CMAKE_SOURCE_DIR}/router/target/release/aeon_router.dll")
+    set(ROUTER_IMPLIB "${CMAKE_SOURCE_DIR}/router/target/release/aeon_router.dll.lib")
+
+    add_custom_command(
+        OUTPUT "${ROUTER_DLL}"
+        COMMAND ${CMAKE_COMMAND} -DCMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} -P "${CMAKE_SOURCE_DIR}/cmake/build_router.cmake"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        DEPENDS ${ROUTER_SOURCES}
+        COMMENT "Verifying / building Rust protocol router..."
+        VERBATIM
+    )
+
+    add_custom_target(aeon_router_build DEPENDS "${ROUTER_DLL}")
     add_dependencies(Aeon aeon_router_build)
 
     # Link import lib from Rust cdylib
-    target_link_libraries(Aeon
-        "${CMAKE_SOURCE_DIR}/router/target/release/aeon_router.dll.lib")
+    target_link_libraries(Aeon PRIVATE "${ROUTER_IMPLIB}")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -176,13 +223,6 @@ if(AEON_TARGET_TIER STREQUAL "Retro")
         SUFFIX ".dll"
     )
     install(TARGETS aeon_html4 DESTINATION bin)
-    # Copy alongside Aeon.exe post-build
-    add_custom_command(TARGET aeon_html4 POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-            "$<TARGET_FILE:aeon_html4>"
-            "$<TARGET_FILE_DIR:Aeon>/aeon_html4.dll"
-        COMMENT "[Aeon] Copying aeon_html4.dll to output"
-    )
     add_dependencies(Aeon aeon_html4)
 endif()
 
@@ -192,19 +232,17 @@ endif()
 # ---------------------------------------------------------------------------
 add_library(aeon_gecko_stealth SHARED
     engines/gecko_stealth/aeon_gecko_stealth.cpp
-    engines/gecko_stealth/aeon_gecko_stealth.h
 )
+add_dependencies(aeon_gecko_stealth aeon_component_base)
 target_compile_definitions(aeon_gecko_stealth PRIVATE AEON_GECKO_STEALTH_EXPORTS)
-target_link_libraries(aeon_gecko_stealth kernel32 user32 gdi32)
+target_link_libraries(aeon_gecko_stealth PRIVATE $<TARGET_FILE:aeon_component_base> kernel32 user32 gdi32)
 set_target_properties(aeon_gecko_stealth PROPERTIES
     OUTPUT_NAME "aeon_gecko_stealth"
+    PDB_NAME "aeon_gecko_stealth"
     SUFFIX ".dll"
-)
-add_custom_command(TARGET aeon_gecko_stealth POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:aeon_gecko_stealth>"
-        "$<TARGET_FILE_DIR:Aeon>/aeon_gecko_stealth.dll"
-    COMMENT "[Aeon] Copying aeon_gecko_stealth.dll to output"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
 )
 add_dependencies(Aeon aeon_gecko_stealth)
 
@@ -214,26 +252,73 @@ add_dependencies(Aeon aeon_gecko_stealth)
 # ---------------------------------------------------------------------------
 add_library(aeon_ai SHARED
     engines/aeon_ai.cpp
-    engines/aeon_ai.h
-    core/aeon_component.cpp
 )
+add_dependencies(aeon_ai aeon_component_base aeon_gecko_stealth)
 target_compile_definitions(aeon_ai PRIVATE AEON_AI_EXPORTS)
-target_link_libraries(aeon_ai kernel32 user32 gdi32)
+target_compile_options(aeon_ai PRIVATE /EHsc /std:c++17)
+target_compile_features(aeon_ai PRIVATE cxx_std_17)
+target_link_libraries(aeon_ai PRIVATE $<TARGET_FILE:aeon_component_base> kernel32 user32 gdi32 shell32 advapi32)
 set_target_properties(aeon_ai PROPERTIES
     OUTPUT_NAME "aeon_ai"
-    SUFFIX ".dll"
-)
-add_custom_command(TARGET aeon_ai POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "$<TARGET_FILE:aeon_ai>"
-        "$<TARGET_FILE_DIR:Aeon>/aeon_ai.dll"
-    COMMENT "[Aeon] Copying aeon_ai.dll to output"
+    PDB_NAME "aeon_ai"
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
 )
 add_dependencies(Aeon aeon_ai)
-target_link_libraries(Aeon aeon_ai)
+target_link_libraries(Aeon PRIVATE aeon_ai)
 
 install(FILES
     "${CMAKE_SOURCE_DIR}/router/target/release/aeon_router.dll"
     DESTINATION bin OPTIONAL)
 
+# ---------------------------------------------------------------------------
+# Unit & Integration Tests
+# ---------------------------------------------------------------------------
+add_executable(test_browser_chrome_m1 core/tests/test_browser_chrome_m1.cpp)
+target_compile_options(test_browser_chrome_m1 PRIVATE /EHsc /std:c++17)
+target_link_libraries(test_browser_chrome_m1 PRIVATE user32 gdi32)
 
+add_executable(test_loading_bar core/tests/test_loading_bar.cpp)
+target_compile_options(test_loading_bar PRIVATE /EHsc /std:c++17)
+target_link_libraries(test_loading_bar PRIVATE user32 gdi32)
+
+add_executable(test_browser_chrome_m2
+    core/tests/test_browser_chrome_m2.cpp
+    core/ui/TabGroupManager.cpp
+    core/ui/SplitViewController.cpp
+    core/memory/TabSleepManager.cpp
+    core/session/SessionManager.cpp
+)
+target_compile_options(test_browser_chrome_m2 PRIVATE /EHsc /std:c++17)
+target_include_directories(test_browser_chrome_m2 PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/core ${CMAKE_SOURCE_DIR}/core/session ${CMAKE_SOURCE_DIR}/core/ui)
+target_link_libraries(test_browser_chrome_m2 PRIVATE user32 gdi32 gdiplus dwmapi shell32)
+
+add_executable(test_browser_ui_m2_m3_m5 core/tests/test_browser_ui_m2_m3_m5.cpp)
+target_compile_options(test_browser_ui_m2_m3_m5 PRIVATE /EHsc /std:c++17)
+target_link_libraries(test_browser_ui_m2_m3_m5 PRIVATE user32 gdi32)
+
+add_executable(test_cname_and_window_ai
+    core/tests/test_cname_and_window_ai.cpp
+    core/network/DnsResolver.cpp
+    core/extensions/ExtensionRuntime.cpp
+    core/security/PasswordVault.cpp
+    core/probe/HardwareProbe.cpp
+)
+target_compile_options(test_cname_and_window_ai PRIVATE /EHsc /std:c++17)
+target_include_directories(test_cname_and_window_ai PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/engines
+    ${CMAKE_SOURCE_DIR}/network
+    ${CMAKE_SOURCE_DIR}/core/history
+)
+add_dependencies(test_cname_and_window_ai aeon_sqlite)
+target_link_libraries(test_cname_and_window_ai PRIVATE
+    aeon_ai
+    aeon_sqlite
+    $<TARGET_FILE:aeon_component_base>
+    user32 gdi32 shell32 advapi32 winhttp ws2_32 iphlpapi crypt32
+)

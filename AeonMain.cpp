@@ -1,4 +1,4 @@
-// AeonBrowser — AeonMain.cpp
+﻿// AeonBrowser — AeonMain.cpp
 // DelgadoLogic
 //
 // Main entry point — Win32 WinMain.
@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <objidl.h>
 #include <gdiplus.h>
+#include <thread>
 
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "gdiplus.lib")
@@ -26,6 +27,10 @@
 #include "core/engine/AeonEngine_Interface.h"
 #include "core/engine/AeonBridge.h"
 #include "core/ui/BrowserChrome.h"
+#include "core/ui/DwmHelper.h"
+#include "core/ui/ShieldHUD.h"
+#include "core/ui/BookmarkToast.h"
+#include "core/ui/AppMenu.h"
 #include "core/network/NetworkSentinel.h"
 #include "core/settings/SettingsEngine.h"
 #include "core/memory/TabSleepManager.h"
@@ -62,6 +67,7 @@ static HWND g_MainHwnd = nullptr;
 // Global AI engine pointers — initialized during boot, non-owning refs
 AeonTabIntelligence* g_TabIntel = nullptr;
 AeonJourneyAnalytics* g_JourneyAI = nullptr;
+static bool g_WantDebugTrace = false;
 
 // Declared in TierDispatcher.cpp — loads the engine DLL chain
 AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile);
@@ -78,6 +84,48 @@ struct GdiplusInit {
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
+    AeonDwm::EnablePerMonitorV2Dpi();
+    SetCurrentProcessExplicitAppUserModelID(L"DelgadoLogic.AeonBrowser.0.22.0");
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+    HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+    if (hK32) {
+        typedef BOOL(WINAPI* PFN_SetProcessErrorMode)(DWORD);
+        PFN_SetProcessErrorMode pfn = (PFN_SetProcessErrorMode)GetProcAddress(hK32, "SetProcessErrorMode");
+        if (pfn) pfn(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        typedef HRESULT(WINAPI* PFN_WerSetFlags)(DWORD);
+        PFN_WerSetFlags pfnWer = (PFN_WerSetFlags)GetProcAddress(hK32, "WerSetFlags");
+        if (pfnWer) pfnWer(1 /* WER_FAULT_REPORTING_NO_UI */);
+    }
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (hNtdll) {
+        typedef LONG(NTAPI* PFN_NtSetInformationProcess)(HANDLE, ULONG, PVOID, ULONG);
+        PFN_NtSetInformationProcess pfnNt = (PFN_NtSetInformationProcess)GetProcAddress(hNtdll, "NtSetInformationProcess");
+        if (pfnNt) {
+            ULONG hardErrorMode = 0;
+            pfnNt(GetCurrentProcess(), 12 /* ProcessDefaultHardErrorMode */, &hardErrorMode, sizeof(hardErrorMode));
+        }
+    }
+    _set_abort_behavior(_WRITE_ABORT_MSG, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+    _set_invalid_parameter_handler([](const wchar_t* expression, const wchar_t* function, const wchar_t* file, unsigned int line, uintptr_t) {
+        FILE* f = nullptr;
+        fopen_s(&f, "crt_error.log", "a");
+        if (f) {
+            fwprintf(f, L"[CRT Invalid Parameter] Expr: %s, Func: %s, File: %s:%u\n",
+                expression ? expression : L"(null)",
+                function ? function : L"(null)",
+                file ? file : L"(null)", line);
+            fclose(f);
+        }
+    });
+    _set_purecall_handler([]() {
+        FILE* f = nullptr;
+        fopen_s(&f, "crt_error.log", "a");
+        if (f) {
+            fwprintf(f, L"[CRT Purecall Error] Pure virtual function called.\n");
+            fclose(f);
+        }
+    });
+
     GdiplusInit gdiplusInit;
 
     // PHASE 0: Install crash handler FIRST — catches any init failures.
@@ -93,6 +141,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
         for (int i = 1; i < __argc; ++i) {
             if (strcmp(__argv[i], "--debug") == 0) { wantConsole = true; break; }
         }
+        g_WantDebugTrace = wantConsole;
         if (wantConsole) {
             AllocConsole();
             FILE* _f = nullptr;
@@ -109,7 +158,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     fputws(L"\n", stdout);
     fputws(L"\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n", stdout);
     fputws(L"\u2551  Aeon Browser  \u2014  by DelgadoLogic    \u2551\n", stdout);
-    fputws(L"\u2551  browseaeon.com              \u2551\n", stdout);
+    fputws(L"\u2551  aeon.delgadologic.tech      \u2551\n", stdout);
     fputws(L"\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n", stdout);
 
     // PHASE 1: Hardware probe — detect OS tier + CPU
@@ -131,13 +180,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
         fprintf(stderr, "[Boot] WARNING: TLS init failed — network features may not work.\n");
     }
 
+    // PHASE 1b-2: Network Sentinel — launch background probe and bypass monitoring.
+    NetworkSentinel::StartMonitor();
+
     // PHASE 1c: Session manager — restore previous tabs on crash/restart.
     SessionManager::Initialize(profile);
 
-    // PHASE 1d: Telemetry baseline ping + crash upload from previous session
+    // PHASE 1d: Telemetry baseline ping + crash upload (async background thread to never block UI)
     AeonCrash::SetKey("boot_phase", "telemetry");
-    PulseBridge::SendStartupPing(profile);
-    PulseBridge::UploadPendingCrash();
+    std::thread([profile]() {
+        PulseBridge::SendStartupPing(profile);
+        PulseBridge::UploadPendingCrash();
+    }).detach();
     AeonCrash::AddBreadcrumb("boot", "telemetry_initialized");
 
     // OmniLicense Hardware Check
@@ -195,11 +249,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     if (!engine) {
         MessageBoxW(nullptr,
             L"Aeon could not load a rendering engine for your system.\n"
-            L"Please visit browseaeon.com for troubleshooting.",
+            L"Please visit https://aeon.delgadologic.tech for troubleshooting.",
             L"Aeon Browser \u2014 Engine Error", MB_ICONERROR);
         return 1;
     }
     g_Engine = engine;
+    SessionManager::SetEngine(engine);
 
     // Initialize the engine (creates COM apartment, WebView2 env, etc.)
     if (!engine->Init(&profile, hInstance)) {
@@ -220,6 +275,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
         static AeonEngineCallbacks cbs = {};
         cbs.OnProgress = [](unsigned int tab_id, int pct) {
             fprintf(stdout, "[Engine→Shell] Tab #%u progress: %d%%\n", tab_id, pct);
+            if (g_MainHwnd)
+                BrowserChrome::SetTabProgress(g_MainHwnd, tab_id, pct);
         };
         cbs.OnTitleChanged = [](unsigned int tab_id, const char* title) {
             fprintf(stdout, "[Engine→Shell] Tab #%u title: \"%s\"\n",
@@ -375,16 +432,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     }
 
     // 7. Create main window
+    HICON hIconBig = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(101), IMAGE_ICON,
+        GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
+    if (!hIconBig) {
+        hIconBig = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(1), IMAGE_ICON,
+            GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
+    }
+    if (!hIconBig) {
+        hIconBig = LoadIconA(hInstance, "IDI_AEON");
+    }
+
+    HICON hIconSmall = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(101), IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+    if (!hIconSmall) {
+        hIconSmall = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(1), IMAGE_ICON,
+            GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+    }
+
     WNDCLASSEXW wc   = {};
     wc.cbSize        = sizeof(wc);
     wc.style         = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc   = AeonWndProc;
     wc.hInstance     = hInstance;
-    wc.hIcon         = LoadIconA(hInstance, "IDI_AEON");
+    wc.hIcon         = hIconBig;
+    wc.hIconSm       = hIconSmall;
     wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wc.hbrBackground = nullptr;
     wc.lpszClassName = AEON_WINDOW_CLASS;
     RegisterClassExW(&wc);
+
+    // Register popup window classes
+    ShieldHUD::RegisterClass(hInstance);
+    BookmarkToast::RegisterClass(hInstance);
+    AppMenu::RegisterClass(hInstance);
 
     int W = GetSystemMetrics(SM_CXSCREEN) * 85 / 100;
     int H = GetSystemMetrics(SM_CYSCREEN) * 85 / 100;
@@ -399,24 +479,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
 
     HWND hWnd = CreateWindowExW(
         exStyle, AEON_WINDOW_CLASS, AEON_TITLE,
-        WS_OVERLAPPEDWINDOW, X, Y, W, H,
+        WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, X, Y, W, H,
         nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd) return 1;
+
+    // Explicitly bind high-DPI icons to window handle for Taskbar and Alt+Tab
+    if (hIconBig)   SendMessageW(hWnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+    if (hIconSmall) SendMessageW(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
     g_MainHwnd = hWnd;  // Set before BrowserChrome::Create so callbacks are routed
 
-    // DWM frameless window setup (Win10+)
-    // NOTE: margins={-1} was removed — it extended DWM glass over the entire
-    // client area, covering our GDI-painted chrome. Mica backdrop was also
-    // removed as it requires WS_EX_NOREDIRECTIONBITMAP (incompatible with GDI).
-    // Use {0,0,1,0} for the DWM drop-shadow trick on frameless windows.
+    // DWM frameless window + Win11 Mica dark backdrop, rounded corners & obsidian border
     if (profile.osMajor >= 10) {
         MARGINS margins = { 0, 0, 1, 0 };
         DwmExtendFrameIntoClientArea(hWnd, &margins);
-        // Dark mode title bar (prevents white flash on any residual NC area)
-        BOOL darkMode = TRUE;
-        DwmSetWindowAttribute(hWnd, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/,
-            &darkMode, sizeof(darkMode));
+        AeonDwm::ApplyObsidianMainFrameDwm(hWnd);
     }
 
     // Force Windows to re-evaluate WM_NCCALCSIZE — this activates the
@@ -435,10 +512,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
                 BRIDGE_CMD_NAVIGATE, (LPARAM)urlCopy);
     });
 
+    AeonBridge::RegisterScriptEvaluator([](int tabId, const char* script) -> std::string {
+        if (!g_Engine || !g_Engine->ExecuteScript) return "";
+        char resultBuf[65536] = {0};
+        int len = g_Engine->ExecuteScript((unsigned int)tabId, script, resultBuf, sizeof(resultBuf));
+        if (len > 0) return std::string(resultBuf);
+        return "";
+    });
+
     // 9. Browser chrome (tab strip, nav bar, WebView2 host)
     BrowserChrome::Create(hWnd, &profile, engine);
 
     // 9a. Session manager — wire to main window, start autosave
+    SessionManager::SetUiHooks({
+        BrowserChrome::GetTabCount,
+        BrowserChrome::GetActiveTabIndex,
+        BrowserChrome::GetTabInfo,
+        BrowserChrome::CreateTab,
+        BrowserChrome::FocusTabById,
+        BrowserChrome::AddTabToGroup,
+        BrowserChrome::CloseTabById
+    });
     SessionManager::SetMainWindow(hWnd);
 
     // Captive portal — open in first tab if detected
@@ -451,19 +545,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     // 9b. Agent control pipe — Named Pipe IPC for shell control
     AeonAgentPipe::Start(hWnd);
 
-    ShowWindow(hWnd, nShowCmd);
+    int show = (nShowCmd <= 0 || nShowCmd == SW_HIDE) ? SW_SHOWNORMAL : nShowCmd;
+    ShowWindow(hWnd, show);
     UpdateWindow(hWnd);
+    SetForegroundWindow(hWnd);
 
     // 9c. Start fresh on new tab page (session restore disabled for clean boot)
     // SessionManager::RestorePreviousSession();
 
-    fprintf(stdout, "[Boot] Ready.\n\n");
+    fprintf(stdout, "[Boot] Ready. Entering message loop.\n\n");
+    if (g_WantDebugTrace) {
+        FILE* fTrace = nullptr;
+        fopen_s(&fTrace, "boot_trace.txt", "a");
+        if (fTrace) {
+            fprintf(fTrace, "[Boot] Ready. Window hWnd=0x%p, entering message loop.\n", (void*)hWnd);
+            fclose(fTrace);
+        }
+    }
 
     // 10. Message loop
     MSG msg = {};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
+    }
+
+    if (g_WantDebugTrace) {
+        FILE* fTrace = nullptr;
+        fopen_s(&fTrace, "boot_trace.txt", "a");
+        if (fTrace) {
+            fprintf(fTrace, "[Boot] Message loop exited. msg.wParam=%lld\n", (long long)msg.wParam);
+            fclose(fTrace);
+        }
     }
 
     // 11. Cleanup
@@ -488,19 +601,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
 
 // Window procedure
 LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (g_WantDebugTrace && (msg == WM_CLOSE || msg == WM_DESTROY || msg == WM_QUIT || msg == WM_SYSCOMMAND || msg == WM_NCDESTROY)) {
+        FILE* fTrace = nullptr;
+        fopen_s(&fTrace, "wndproc_trace.txt", "a");
+        if (fTrace) {
+            fprintf(fTrace, "[WndProc] hWnd=0x%p, msg=0x%04X, wParam=0x%llX, lParam=0x%llX\n",
+                (void*)hWnd, msg, (unsigned long long)wParam, (unsigned long long)lParam);
+            fclose(fTrace);
+        }
+    }
+
     switch (msg) {
         // ── Remove native title bar ──────────────────────────────────
         case WM_NCCALCSIZE: {
             if (wParam == TRUE) {
-                // Return 0 with TRUE wParam = client area fills entire window
-                // This eliminates the native title bar entirely.
-                // Preserve the auto-hide taskbar behavior by adjusting for it.
                 NCCALCSIZE_PARAMS* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
                 HMONITOR hMon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
                 MONITORINFO mi = { sizeof(mi) };
                 GetMonitorInfo(hMon, &mi);
                 if (IsZoomed(hWnd)) {
-                    // When maximized, respect taskbar area
                     params->rgrc[0] = mi.rcWork;
                 }
                 return 0;
@@ -508,37 +627,72 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             break;
         }
 
-        // ── Hit-test for drag, resize, and caption buttons ───────────
+        // ── Hit-test for drag, DPI resize borders & Win11 Snap Layouts ─
         case WM_NCHITTEST: {
             POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
             ScreenToClient(hWnd, &pt);
             RECT rc;
             GetClientRect(hWnd, &rc);
 
-            // Resize borders (6px) — always check first
-            const int BORDER = 6;
+            UINT dpi = AeonDwm::GetWindowDpiSafe(hWnd);
+            const int BORDER = AeonDwm::ScaleByDpi(6, dpi);
+            const int CORNER = BORDER * 2;
+
             if (!IsZoomed(hWnd)) {
                 if (pt.y < BORDER) {
-                    if (pt.x < BORDER) return HTTOPLEFT;
-                    if (pt.x > rc.right - BORDER) return HTTOPRIGHT;
+                    if (pt.x < CORNER) return HTTOPLEFT;
+                    if (pt.x >= rc.right - CORNER) return HTTOPRIGHT;
+                    int hit = BrowserChrome::HitTest(hWnd, pt.x, pt.y);
+                    if (hit == BrowserChrome::HIT_MAXIMIZE) return HTMAXBUTTON;
+                    if (hit >= 0) return HTCLIENT;
                     return HTTOP;
                 }
-                if (pt.y > rc.bottom - BORDER) {
-                    if (pt.x < BORDER) return HTBOTTOMLEFT;
-                    if (pt.x > rc.right - BORDER) return HTBOTTOMRIGHT;
+                if (pt.y >= rc.bottom - BORDER) {
+                    if (pt.x < CORNER) return HTBOTTOMLEFT;
+                    if (pt.x >= rc.right - CORNER) return HTBOTTOMRIGHT;
                     return HTBOTTOM;
                 }
                 if (pt.x < BORDER) return HTLEFT;
-                if (pt.x > rc.right - BORDER) return HTRIGHT;
+                if (pt.x >= rc.right - BORDER) return HTRIGHT;
             }
 
-            // Top 30px sidebar header area (except over Webview controls) = draggable caption
-            if (pt.y < 30 && pt.x < 260) {
+            int hit = BrowserChrome::HitTest(hWnd, pt.x, pt.y);
+            if (hit == BrowserChrome::HIT_MAXIMIZE) {
+                return HTMAXBUTTON;
+            }
+            if (hit < 0 && BrowserChrome::IsCaptionDragPoint(hWnd, pt.x, pt.y)) {
                 return HTCAPTION;
             }
-
             return HTCLIENT;
         }
+
+        case WM_NCMOUSEMOVE: {
+            POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            ScreenToClient(hWnd, &pt);
+            BrowserChrome::OnMouseMove(hWnd, pt.x, pt.y);
+            TRACKMOUSEEVENT tme = {};
+            tme.cbSize = sizeof(tme);
+            tme.dwFlags = TME_LEAVE | TME_NONCLIENT;
+            tme.hwndTrack = hWnd;
+            TrackMouseEvent(&tme);
+            if (wParam == HTMAXBUTTON) return 0;
+            break;
+        }
+
+        case WM_NCMOUSELEAVE:
+            BrowserChrome::OnMouseLeave(hWnd);
+            return 0;
+
+        case WM_NCLBUTTONDOWN:
+            if (wParam == HTMAXBUTTON) return 0;
+            break;
+
+        case WM_NCLBUTTONUP:
+            if (wParam == HTMAXBUTTON) {
+                ShowWindow(hWnd, IsZoomed(hWnd) ? SW_RESTORE : SW_MAXIMIZE);
+                return 0;
+            }
+            break;
 
         case WM_PAINT: {
             BrowserChrome::OnPaint(hWnd);
@@ -560,9 +714,33 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             BrowserChrome::OnLButtonUp(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
 
+        case WM_MBUTTONUP: {
+            int x = GET_X_LPARAM(lParam);
+            int y = GET_Y_LPARAM(lParam);
+            int hit = BrowserChrome::HitTest(hWnd, x, y);
+            if (hit >= 100 && hit < 200) {
+                // Middle click on tab = close tab
+                BrowserChrome::CloseTab(hWnd, hit - 100);
+            }
+            return 0;
+        }
+
         case WM_MOUSEMOVE:
             BrowserChrome::OnMouseMove(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
+
+        case WM_MOUSELEAVE:
+            BrowserChrome::OnMouseLeave(hWnd);
+            return 0;
+
+        case WM_PARENTNOTIFY: {
+            if (LOWORD(wParam) == WM_LBUTTONDOWN) {
+                int x = GET_X_LPARAM(lParam);
+                int y = GET_Y_LPARAM(lParam);
+                BrowserChrome::OnContentAreaClicked(hWnd, x, y);
+            }
+            break;
+        }
 
         case WM_AEON_AGENT: {
             AeonAgentPipe::HandleCommand(wParam, lParam);
@@ -572,12 +750,29 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         case WM_AEONBRIDGE: {
             if ((int)wParam == BRIDGE_CMD_NAVIGATE) {
                 char* url = reinterpret_cast<char*>(lParam);
-                if (g_Engine && g_Engine->Navigate && url && url[0])
-                    g_Engine->Navigate(0, url, nullptr);
+                if (url && url[0])
+                    BrowserChrome::OpenOrFocusUrl(hWnd, url);
                 free(url);
             } else {
                 AeonBridge::HandleWmAeonBridge(wParam, lParam);
             }
+            return 0;
+        }
+
+        // ── Mouse wheel (Ctrl + Wheel for Zoom) ──────────────────────────
+        case WM_MOUSEWHEEL: {
+            if (GetKeyState(VK_CONTROL) & 0x8000) {
+                short delta = GET_WHEEL_DELTA_WPARAM(wParam);
+                if (delta > 0) BrowserChrome::ZoomIn(hWnd);
+                else if (delta < 0) BrowserChrome::ZoomOut(hWnd);
+                return 0;
+            }
+            break;
+        }
+
+        // ── Download Button click notification ───────────────────────────
+        case WM_APP + 100: {
+            BrowserChrome::OpenOrFocusUrl(hWnd, "aeon://downloads");
             return 0;
         }
 
@@ -596,17 +791,8 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 
         // ── Loading animation timer → repaint tab strip ──────────────────
         case WM_TIMER:
-            if (wParam == 9005 /* ID_HOVER_TIMER */) {
+            if (wParam == 9005 /* ID_HOVER_TIMER */ || wParam == 9002 /* ID_LOADING_TIMER */) {
                 BrowserChrome::OnTimer(hWnd, wParam);
-                return 0;
-            }
-            if (wParam == 9002 /* ID_LOADING_TIMER */) {
-                // Invalidate only the tab strip region for spinner animation
-                RECT tabStrip;
-                GetClientRect(hWnd, &tabStrip);
-                tabStrip.top = 40;     // NAV_HEIGHT
-                tabStrip.bottom = 72;  // NAV_HEIGHT + TAB_HEIGHT
-                InvalidateRect(hWnd, &tabStrip, FALSE);
                 return 0;
             }
             if (wParam == SessionManager::AUTOSAVE_TIMER_ID) {
@@ -629,6 +815,22 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             BrowserChrome::OnContextMenu(hWnd,
                 GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
+
+        // ── PerMonitorV2 Multi-Monitor DPI scaling ────────────────────
+        case WM_DPICHANGED: {
+            int newDpi = HIWORD(wParam);
+            if (newDpi <= 0) newDpi = LOWORD(wParam);
+            BrowserChrome::OnDpiChanged(hWnd, newDpi);
+            const RECT* prcNewWindow = reinterpret_cast<const RECT*>(lParam);
+            if (prcNewWindow) {
+                SetWindowPos(hWnd, nullptr,
+                    prcNewWindow->left, prcNewWindow->top,
+                    prcNewWindow->right - prcNewWindow->left,
+                    prcNewWindow->bottom - prcNewWindow->top,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            return 0;
+        }
 
         case WM_DESTROY:
             AeonAgentPipe::Stop();

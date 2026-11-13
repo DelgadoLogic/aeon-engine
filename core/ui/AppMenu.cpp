@@ -13,6 +13,7 @@
 //   - Win11+ dark mode: DwmSetWindowAttribute DWMWA_USE_IMMERSIVE_DARK_MODE
 
 #include "AppMenu.h"
+#include "DwmHelper.h"
 #include <windowsx.h>
 #include <dwmapi.h>
 #include <cmath>
@@ -36,17 +37,17 @@ static const int RADIUS            = 12;
 static const int SHADOW_BLUR       = 20;
 static const int ICON_COL          = 36;  // X where text starts after icon col
 
-// Colors (matching Aeon dark theme)
-static const COLORREF C_BG         = RGB(0x16,0x18,0x2a);  // --bg-card
-static const COLORREF C_BORDER     = RGB(0x2a,0x28,0x55);  // --border solid
-static const COLORREF C_TEXT       = RGB(0xe8,0xe8,0xf0);  // --text-primary
-static const COLORREF C_DIM        = RGB(0x88,0x88,0xaa);  // --text-dim
-static const COLORREF C_FAINT      = RGB(0x44,0x44,0x5a);  // --text-faint
-static const COLORREF C_HOVERB     = RGB(0x1e,0x21,0x40);  // hover background
-static const COLORREF C_ACCENT     = RGB(0x6c,0x63,0xff);  // --accent
-static const COLORREF C_ACCENT2    = RGB(0xa7,0x8b,0xfa);  // --accent2
-static const COLORREF C_DANGER     = RGB(0xef,0x44,0x44);  // red
-static const COLORREF C_SEP        = RGB(0x22,0x24,0x38);  // separator
+// Colors (matching Aeon dark theme from app_menu.png)
+static const COLORREF C_BG         = RGB(0x10,0x08,0x22);  // Rich Midnight Purple
+static const COLORREF C_BORDER     = RGB(0x4c,0x1d,0x95);  // Neon Purple Border
+static const COLORREF C_TEXT       = RGB(0xf8,0xfa,0xfc);  // Crisp white
+static const COLORREF C_DIM        = RGB(0x94,0xa3,0xb8);  // Slate soft
+static const COLORREF C_FAINT      = RGB(0x64,0x74,0x8b);  // Faint
+static const COLORREF C_HOVERB     = RGB(0x2e,0x10,0x65);  // Hover row purple
+static const COLORREF C_ACCENT     = RGB(0x93,0x33,0xea);  // Purple
+static const COLORREF C_ACCENT2    = RGB(0xc0,0x84,0xfc);  // Purple Light
+static const COLORREF C_DANGER     = RGB(0xef,0x44,0x44);  // Red
+static const COLORREF C_SEP        = RGB(0x22,0x10,0x40);  // Separator
 
 // ─── Global state ─────────────────────────────────────────────────────────────
 static HWND        g_hwnd       = nullptr;
@@ -93,7 +94,7 @@ static std::vector<MenuItem> BuildMenuItems() {
         // Section 6: Tools
         { ItemType::Action,  ItemId::Print,      L"Print\u2026",          L"Ctrl+P",        L"\U0001F5A8" },
         { ItemType::Action,  ItemId::SavePageAs, L"Save page as\u2026",   L"Ctrl+S",        L"\U0001F4C4" },
-        { ItemType::Action,  ItemId::FindInPage, L"Find in page\u2026",   L"Ctrl+F",        L"\U0001F50D" },
+        { ItemType::Action,  ItemId::FindInPage, L"Find\u2026",           L"Ctrl+F",        L"\U0001F50D" },
         { ItemType::Submenu, ItemId::MoreTools,  L"More tools",           L"",              L"\U0001F527" },
         { ItemType::Separator },
 
@@ -204,14 +205,16 @@ static void Paint(HDC hdc, RECT rc) {
             DeleteObject(hb);
         }
 
-        // Firewall/Sentinel highlight: left accent bar
-        if (item.highlight && item.type == ItemType::Action || item.type == ItemType::Submenu) {
-            if (item.highlight) {
-                HBRUSH ab = CreateSolidBrush(C_ACCENT);
-                RECT bar = { 0, y + 6, 3, y + ih - 6 };
-                FillRect(hdc, &bar, ab);
-                DeleteObject(ab);
-            }
+        // Firewall/Sentinel highlight: rounded royal violet row fill matching app_menu.png
+        if (item.highlight && (item.type == ItemType::Action || item.type == ItemType::Submenu)) {
+            HBRUSH ab = CreateSolidBrush(RGB(0x43, 0x38, 0xca));
+            HPEN np = (HPEN)GetStockObject(NULL_PEN);
+            auto prevBr = SelectObject(hdc, ab);
+            auto prevPn = SelectObject(hdc, np);
+            RoundRect(hdc, PADDING_X - 4, y + 2, W - PADDING_X + 4, y + ih - 2, 8, 8);
+            SelectObject(hdc, prevBr);
+            SelectObject(hdc, prevPn);
+            DeleteObject(ab);
         }
 
         switch (item.type) {
@@ -227,29 +230,29 @@ static void Paint(HDC hdc, RECT rc) {
 
         case ItemType::ProfileRow: {
             // Avatar circle
-            HBRUSH avBr = CreateSolidBrush(C_ACCENT);
+            HBRUSH avBr = CreateSolidBrush(RGB(0x63, 0x66, 0xf1));
             HPEN avPn   = (HPEN)GetStockObject(NULL_PEN);
             auto prevBr = SelectObject(hdc, avBr);
             auto prevPn = SelectObject(hdc, avPn);
-            Ellipse(hdc, PADDING_X, y+10, PADDING_X+30, y+40);
+            Ellipse(hdc, PADDING_X + 2, y + 9, PADDING_X + 34, y + 41);
             SelectObject(hdc, prevBr); SelectObject(hdc, prevPn);
             DeleteObject(avBr);
 
             // "A" in avatar
             SelectObject(hdc, g_fontBold);
             SetTextColor(hdc, RGB(255,255,255));
-            RECT ar = { PADDING_X, y+10, PADDING_X+30, y+40 };
+            RECT ar = { PADDING_X + 2, y + 9, PADDING_X + 34, y + 41 };
             DrawTextW(hdc, L"A", -1, &ar, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
 
             // Name
             SelectObject(hdc, g_fontBold);
             SetTextColor(hdc, C_TEXT);
-            RECT nr = { PADDING_X+38, y+8, W-80, y+26 };
+            RECT nr = { PADDING_X + 42, y + 8, W - 80, y + 42 };
             DrawTextW(hdc, L"Manuel", -1, &nr, DT_LEFT|DT_VCENTER|DT_SINGLELINE);
 
-            // "Signed in" badge
-            HBRUSH bb = CreateSolidBrush(C_ACCENT);
-            RECT br = { W-76, y+15, W-PADDING_X, y+35 };
+            // "Signed in" badge pill
+            HBRUSH bb = CreateSolidBrush(RGB(0x43, 0x38, 0xca));
+            RECT br = { W - 80, y + 14, W - PADDING_X, y + 36 };
             HPEN bp = (HPEN)GetStockObject(NULL_PEN);
             SelectObject(hdc, bb); SelectObject(hdc, bp);
             RoundRect(hdc, br.left, br.top, br.right, br.bottom, 12, 12);
@@ -264,27 +267,30 @@ static void Paint(HDC hdc, RECT rc) {
             // Label
             SelectObject(hdc, g_fontMain);
             SetTextColor(hdc, C_TEXT);
-            RECT lr = { PADDING_X+ICON_COL, y, W/2, y+ZOOM_H };
+            RECT lr = { PADDING_X + ICON_COL, y, W/2, y+ZOOM_H };
             DrawTextW(hdc, L"Zoom", -1, &lr, DT_LEFT|DT_VCENTER|DT_SINGLELINE);
 
-            // — pct% +
+            // — pct% + ⛶
             wchar_t zstr[16];
             _snwprintf_s(zstr, sizeof(zstr)/sizeof(wchar_t), _TRUNCATE, L"%d%%", g_zoom);
             int cx = W/2;
 
             SetTextColor(hdc, C_DIM);
-            RECT minR = { cx, y, cx+24, y+ZOOM_H };
+            RECT minR = { cx, y, cx+20, y+ZOOM_H };
             DrawTextW(hdc, L"\u2212", -1, &minR, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
 
             SetTextColor(hdc, C_TEXT);
             SelectObject(hdc, g_fontBold);
-            RECT pctR = { cx+24, y, cx+70, y+ZOOM_H };
+            RECT pctR = { cx+20, y, cx+64, y+ZOOM_H };
             DrawTextW(hdc, zstr, -1, &pctR, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
 
             SetTextColor(hdc, C_DIM);
             SelectObject(hdc, g_fontMain);
-            RECT plusR = { cx+70, y, cx+94, y+ZOOM_H };
+            RECT plusR = { cx+64, y, cx+84, y+ZOOM_H };
             DrawTextW(hdc, L"+", -1, &plusR, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+
+            RECT fsR = { cx+86, y, W-PADDING_X, y+ZOOM_H };
+            DrawTextW(hdc, L"\u26F6", -1, &fsR, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
             break;
         }
 
@@ -337,16 +343,21 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         g_items = BuildMenuItems();
         return 0;
 
+    case WM_ERASEBKGND:
+        return 1;
+
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
         RECT rc; GetClientRect(hWnd, &rc);
+        int w = (std::max)(1L, rc.right);
+        int h = (std::max)(1L, rc.bottom);
         // Double-buffer
         HDC mem = CreateCompatibleDC(hdc);
-        HBITMAP bmp = CreateCompatibleBitmap(hdc, rc.right, rc.bottom);
+        HBITMAP bmp = CreateCompatibleBitmap(hdc, w, h);
         HBITMAP old = (HBITMAP)SelectObject(mem, bmp);
         Paint(mem, rc);
-        BitBlt(hdc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
+        BitBlt(hdc, 0, 0, w, h, mem, 0, 0, SRCCOPY);
         SelectObject(mem, old); DeleteObject(bmp); DeleteDC(mem);
         EndPaint(hWnd, &ps);
         return 0;
@@ -367,22 +378,53 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         break;
     }
 
-    case WM_LBUTTONUP: {
+    case WM_LBUTTONDOWN: {
         int mx = GET_X_LPARAM(lParam), my = GET_Y_LPARAM(lParam);
+        RECT rc; GetClientRect(hWnd, &rc);
+        POINT pt = { mx, my };
+        if (!PtInRect(&rc, pt)) {
+            ReleaseCapture();
+            Hide();
+            return 0;
+        }
         for (int i = 0; i < (int)g_items.size(); i++) {
             if (!IsClickable(g_items[i].type)) continue;
             int y = ItemTop(i);
             if (my >= y && my < y + ItemHeight(i)) {
+                ItemId id = g_items[i].id;
+                ReleaseCapture();
                 Hide();
-                if (g_callback) g_callback(g_items[i].id);
+                if (g_callback) g_callback(id);
                 return 0;
             }
         }
-        break;
+        return 0;
+    }
+
+    case WM_LBUTTONUP: {
+        int mx = GET_X_LPARAM(lParam), my = GET_Y_LPARAM(lParam);
+        RECT rc; GetClientRect(hWnd, &rc);
+        POINT pt = { mx, my };
+        if (!PtInRect(&rc, pt)) {
+            // Ignore release outside (initial button release)
+            return 0;
+        }
+        for (int i = 0; i < (int)g_items.size(); i++) {
+            if (!IsClickable(g_items[i].type)) continue;
+            int y = ItemTop(i);
+            if (my >= y && my < y + ItemHeight(i)) {
+                ItemId id = g_items[i].id;
+                ReleaseCapture();
+                Hide();
+                if (g_callback) g_callback(id);
+                return 0;
+            }
+        }
+        return 0;
     }
 
     case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) { Hide(); return 0; }
+        if (wParam == VK_ESCAPE) { ReleaseCapture(); Hide(); return 0; }
         if (wParam == VK_DOWN) {
             do { g_hoverIdx = (g_hoverIdx + 1) % (int)g_items.size(); }
             while (!IsClickable(g_items[g_hoverIdx].type));
@@ -395,13 +437,17 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         }
         if ((wParam == VK_RETURN || wParam == VK_SPACE) && g_hoverIdx >= 0) {
             ItemId id = g_items[g_hoverIdx].id;
+            ReleaseCapture();
             Hide();
             if (g_callback) g_callback(id);
         }
         return 0;
 
     case WM_KILLFOCUS:
-        Hide();
+    case WM_ACTIVATE:
+        if (LOWORD(wParam) == WA_INACTIVE && GetCapture() != hWnd) {
+            Hide();
+        }
         return 0;
 
     case WM_DESTROY:
@@ -431,45 +477,47 @@ bool RegisterClass(HINSTANCE hInst) {
 
 void Show(HWND parent, POINT anchorPt, MenuCallback callback) {
     if (g_visible) Hide();
+    if (!g_hInst) RegisterClass(GetModuleHandle(nullptr));
+
     g_callback = callback;
     g_items    = BuildMenuItems();
 
     int W = MENU_WIDTH;
     int H = TotalHeight();
 
-    // Position: below the anchor, flush right
+    // Position: below the anchor, flush right, clamped to active monitor work area
     int x = anchorPt.x - W;
     int y = anchorPt.y;
 
-    // Keep on-screen
-    int sw = GetSystemMetrics(SM_CXSCREEN);
-    int sh = GetSystemMetrics(SM_CYSCREEN);
-    if (x < 4) x = 4;
-    if (x + W > sw - 4) x = sw - W - 4;
-    if (y + H > sh - 4) y = anchorPt.y - H;
+    HMONITOR hMon = MonitorFromPoint(anchorPt, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi = { sizeof(mi) };
+    if (GetMonitorInfoW(hMon, &mi)) {
+        if (x < mi.rcWork.left + 4) x = mi.rcWork.left + 4;
+        if (x + W > mi.rcWork.right - 4) x = mi.rcWork.right - W - 4;
+        if (y + H > mi.rcWork.bottom - 4) y = anchorPt.y - H;
+    } else {
+        int sw = GetSystemMetrics(SM_CXSCREEN);
+        int sh = GetSystemMetrics(SM_CYSCREEN);
+        if (x < 4) x = 4;
+        if (x + W > sw - 4) x = sw - W - 4;
+        if (y + H > sh - 4) y = anchorPt.y - H;
+    }
 
     g_hwnd = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         L"AeonAppMenu", L"",
-        WS_POPUP,
+        WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         x, y, W, H,
         parent, nullptr, g_hInst, nullptr);
 
     if (!g_hwnd) return;
 
-    // Win11: request rounded corners
-#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
-#define DWMWA_WINDOW_CORNER_PREFERENCE 33
-#endif
-    DWORD corner = 2; // DWMWCP_ROUND
-    DwmSetWindowAttribute(g_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+    AeonDwm::ApplyObsidianTransientPopupDwm(g_hwnd, false);
 
-    // Win10+: dark mode title bar (not strictly needed for popup but good practice)
-    BOOL dark = TRUE;
-    DwmSetWindowAttribute(g_hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof(dark));
-
-    ShowWindow(g_hwnd, SW_SHOWNOACTIVATE);
+    ShowWindow(g_hwnd, SW_SHOW);
+    SetForegroundWindow(g_hwnd);
     SetFocus(g_hwnd);
+    SetCapture(g_hwnd);
     g_visible = true;
 }
 

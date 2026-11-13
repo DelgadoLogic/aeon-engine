@@ -25,7 +25,19 @@ import {
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { pipeSend, pipeHealthCheck } from "./pipe-client.js";
+import {
+  pipeSend,
+  pipeHealthCheck,
+  summarizePage,
+  navigateIntent,
+  getWebMCPTools,
+  stagehandObserve,
+  stagehandAct,
+  stagehandExtract,
+  stagehandAgent,
+  gemmaProcess,
+  multionWorkflow,
+} from "./pipe-client.js";
 import { cdpSend, cdpListTargets, cdpSendToTarget, cdpSendToFirstPage, cdpHealthCheck, cdpVersion } from "./cdp-client.js";
 import { generateSnapshot, formatSnapshotForLLM } from "./snapshot.js";
 import { runTask, getTaskState, formatTaskResult, setToolExecutor } from "./planner.js";
@@ -707,43 +719,107 @@ const tools: Tool[] = [
     },
   },
 
-  // ── Autonomous Task Planner ────────────────────────────────
+  // ── Milestone 1 R1 & Competitive Agentic Tools ─────────────
   {
-    name: "aeon_task",
-    description:
-      "Execute an autonomous browsing task using the Plan→Act→Observe→Validate loop. " +
-      "The LLM agent brain decomposes the goal into browser actions, executes them via CDP, " +
-      "observes the results, and replans on failure. Returns a structured task result. " +
-      "This is the primary autonomous browsing interface.",
+    name: "aeon_ai_summarize",
+    description: "Extract active page text & AX-tree, call Gemma 4 GGUF local model, return structured JSON summary.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        goal: {
-          type: "string",
-          description:
-            "Natural language description of what to accomplish. Examples: " +
-            "'Go to google.com and search for Aeon Browser', " +
-            "'Navigate to techcrunch.com and find the top headline', " +
-            "'Open github.com/nicbarker/clay and summarize what this project does'.",
-        },
+        tabId: { type: "number", description: "Tab ID to summarize. Default: active tab (-1)." },
+        maxBullets: { type: "number", description: "Max bullet points. Default: 5." },
+      },
+    },
+  },
+  {
+    name: "aeon_ai_navigate_intent",
+    description: "Parse natural language intent prompt and trigger browser navigation.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        intent: { type: "string", description: "Natural language intent prompt." },
+        tabId: { type: "number", description: "Tab ID. Default: active/new (-1)." },
+      },
+      required: ["intent"],
+    },
+  },
+  {
+    name: "aeon_webmcp_tools",
+    description: "Discover WebMCP tools exposed by active tab DOM forms and actions.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tabId: { type: "number", description: "Tab ID. Default: active tab (-1)." },
+      },
+    },
+  },
+  {
+    name: "aeon_stagehand_observe",
+    description: "Perception primitive: extract AX-tree element refs and bounds.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tabId: { type: "number", description: "Tab ID. Default: active (-1)." },
+      },
+    },
+  },
+  {
+    name: "aeon_stagehand_act",
+    description: "Motor primitive: execute click, type, scroll, hover actions on ref elements.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "Action type: click, type, scroll, hover." },
+        ref: { type: "number", description: "Element ref number." },
+        text: { type: "string", description: "Text for type action." },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "aeon_stagehand_extract",
+    description: "Extraction primitive: extract structured JSON data using prompt or schema.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        instruction: { type: "string", description: "Extraction prompt/instruction." },
+      },
+      required: ["instruction"],
+    },
+  },
+  {
+    name: "aeon_stagehand_agent",
+    description: "Autonomous primitive: execute Stagehand goal loop (Observe->Plan->Act->Validate).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        goal: { type: "string", description: "Goal string." },
       },
       required: ["goal"],
     },
   },
   {
-    name: "aeon_task_status",
-    description:
-      "Check the status of a running or completed autonomous task. " +
-      "Returns step history, current progress, and final result if complete.",
+    name: "aeon_gemma_process",
+    description: "On-device Gemma 4 GGUF local model text and vision processing.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        taskId: {
-          type: "string",
-          description: "The task ID returned by aeon_task.",
-        },
+        prompt: { type: "string", description: "Prompt string." },
+        imageBase64: { type: "string", description: "Optional base64 image." },
       },
-      required: ["taskId"],
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "aeon_multion_workflow",
+    description: "MultiOn motor cortex autonomous multi-step workflow execution with auth.json session reuse.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        goal: { type: "string", description: "Workflow goal." },
+        authJson: { type: "string", description: "Optional path to auth.json session file." },
+      },
+      required: ["goal"],
     },
   },
 ];
@@ -797,6 +873,44 @@ async function handleToolCall(
 
     case "aeon_navigate": {
       const result = await pipeSend({ cmd: "navigate", url: args.url });
+      return text(JSON.stringify(result, null, 2));
+    }
+
+    // ── Milestone 1 AI & Agentic ──
+    case "aeon_ai_summarize": {
+      const result = await summarizePage(args.tabId as number | undefined, args.maxBullets as number | undefined);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_ai_navigate_intent": {
+      const result = await navigateIntent(args.intent as string, args.tabId as number | undefined);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_webmcp_tools": {
+      const result = await getWebMCPTools(args.tabId as number | undefined);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_stagehand_observe": {
+      const result = await stagehandObserve(args.tabId as number | undefined);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_stagehand_act": {
+      const result = await stagehandAct(args.action as string, args.ref as number | undefined, args.text as string | undefined);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_stagehand_extract": {
+      const result = await stagehandExtract(args.instruction as string);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_stagehand_agent": {
+      const result = await stagehandAgent(args.goal as string);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_gemma_process": {
+      const result = await gemmaProcess(args.prompt as string, args.imageBase64 as string | undefined);
+      return text(JSON.stringify(result, null, 2));
+    }
+    case "aeon_multion_workflow": {
+      const result = await multionWorkflow(args.goal as string, args.authJson as string | undefined);
       return text(JSON.stringify(result, null, 2));
     }
 
@@ -1288,24 +1402,6 @@ async function handleToolCall(
 
       const status = allPassed ? "✅ VALIDATION PASSED" : "❌ VALIDATION FAILED";
       return text(`${status}\n\n${checks.join("\n")}`);
-    }
-
-    // ── Autonomous Task Planner ──
-    case "aeon_task": {
-      const goal = args.goal as string;
-      if (!goal) return text("Error: 'goal' is required.");
-
-      const taskState = await runTask(goal);
-      return text(formatTaskResult(taskState));
-    }
-
-    case "aeon_task_status": {
-      const taskId = args.taskId as string;
-      const taskState = getTaskState(taskId);
-      if (!taskState) {
-        return text(`No task found with ID: ${taskId}`);
-      }
-      return text(formatTaskResult(taskState));
     }
 
     case "aeon_llm_status": {

@@ -5,6 +5,9 @@
 // Provides C++ engine-level fingerprint spoofing logic and implements the full
 // AeonEngine_Interface.h ABI version 1 for protected anti-bot domain rendering.
 
+#ifndef AEON_GECKO_STEALTH_EXPORTS
+#define AEON_GECKO_STEALTH_EXPORTS 1
+#endif
 #include "aeon_gecko_stealth.h"
 #include <windows.h>
 
@@ -138,7 +141,7 @@ std::string AeonGeckoStealthConfig::BuildStealthBootstrapScript() const {
         stripCdc(document);
     } catch (e) {}
 
-    // 3. WebGL GPU Vendor & Renderer Spoofing
+    // 3. WebGL GPU Vendor, Renderer & readPixels Noise
     try {
         const getParamHook = function(origFn) {
             return function(param) {
@@ -148,21 +151,153 @@ std::string AeonGeckoStealthConfig::BuildStealthBootstrapScript() const {
                 if (param === 37446) { // UNMASKED_RENDERER_WEBGL
                     return ")JS" + safeRenderer + R"JS(";
                 }
+                if (param === 7936) return 'WebKit';
+                if (param === 7937) return 'WebKit WebGL';
+                if (param === 34024) return 16384;
                 return origFn.apply(this, arguments);
             };
         };
 
-        if (typeof WebGLRenderingContext !== 'undefined') {
-            const origGetParam = WebGLRenderingContext.prototype.getParameter;
-            WebGLRenderingContext.prototype.getParameter = getParamHook(origGetParam);
+        const hookGl = function(glProto) {
+            if (!glProto) return;
+            if (glProto.getParameter) {
+                glProto.getParameter = getParamHook(glProto.getParameter);
+            }
+            if (glProto.readPixels) {
+                const origRead = glProto.readPixels;
+                glProto.readPixels = function(x, y, w, h, format, type, pixels) {
+                    origRead.apply(this, arguments);
+                    if (pixels && pixels.length > 0) {
+                        for (let i = 0; i < pixels.length; i += 32) {
+                            pixels[i] = (pixels[i] ^ 1);
+                        }
+                    }
+                };
+            }
+        };
+
+        if (typeof WebGLRenderingContext !== 'undefined') hookGl(WebGLRenderingContext.prototype);
+        if (typeof WebGL2RenderingContext !== 'undefined') hookGl(WebGL2RenderingContext.prototype);
+    } catch (e) {}
+
+    // 4. Canvas 2D Noise Injection (toDataURL, toBlob, getImageData)
+    try {
+        let _seed = 0xae002026;
+        const pseudoRand = function() {
+            _seed = (_seed * 1664525 + 1013904223) >>> 0;
+            return (_seed & 0xFF) / 255.0;
+        };
+
+        const applyNoise = function(ctx, w, h) {
+            try {
+                const imgData = ctx.getImageData(0, 0, w, h);
+                const d = imgData.data;
+                for (let i = 0; i < d.length; i += 16) {
+                    const n = (pseudoRand() > 0.5 ? 1 : -1);
+                    d[i] = Math.max(0, Math.min(255, d[i] + n));
+                    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+                    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+                }
+                ctx.putImageData(imgData, 0, 0);
+            } catch (e) {}
+        };
+
+        if (typeof HTMLCanvasElement !== 'undefined') {
+            const origDataURL = HTMLCanvasElement.prototype.toDataURL;
+            HTMLCanvasElement.prototype.toDataURL = function() {
+                try {
+                    const ctx = this.getContext('2d');
+                    if (ctx && this.width > 0 && this.height > 0) applyNoise(ctx, this.width, this.height);
+                } catch (e) {}
+                return origDataURL.apply(this, arguments);
+            };
+
+            const origBlob = HTMLCanvasElement.prototype.toBlob;
+            HTMLCanvasElement.prototype.toBlob = function(cb, type, qual) {
+                try {
+                    const ctx = this.getContext('2d');
+                    if (ctx && this.width > 0 && this.height > 0) applyNoise(ctx, this.width, this.height);
+                } catch (e) {}
+                return origBlob.apply(this, arguments);
+            };
         }
-        if (typeof WebGL2RenderingContext !== 'undefined') {
-            const origGetParam2 = WebGL2RenderingContext.prototype.getParameter;
-            WebGL2RenderingContext.prototype.getParameter = getParamHook(origGetParam2);
+
+        if (typeof CanvasRenderingContext2D !== 'undefined') {
+            const origGetImg = CanvasRenderingContext2D.prototype.getImageData;
+            CanvasRenderingContext2D.prototype.getImageData = function(sx, sy, sw, sh) {
+                const res = origGetImg.apply(this, arguments);
+                try {
+                    const d = res.data;
+                    for (let i = 0; i < d.length; i += 16) {
+                        d[i] = Math.max(0, Math.min(255, d[i] + (pseudoRand() > 0.5 ? 1 : -1)));
+                    }
+                } catch (e) {}
+                return res;
+            };
+
+            // Font probing protection
+            const origMeasure = CanvasRenderingContext2D.prototype.measureText;
+            CanvasRenderingContext2D.prototype.measureText = function(text) {
+                const metrics = origMeasure.apply(this, arguments);
+                return new Proxy(metrics, {
+                    get: function(target, prop) {
+                        const val = target[prop];
+                        return (typeof val === 'number') ? (Math.round(val * 100) / 100) : val;
+                    }
+                });
+            };
         }
     } catch (e) {}
 
-    console.log('[CamoufoxStealth] Native C++ stealth engine active (webdriver=removed, cdc=stripped, webgl=spoofed)');
+    // 5. AudioContext & WebAudio Micro-Frequency Noise
+    try {
+        if (typeof AudioBuffer !== 'undefined') {
+            const origChan = AudioBuffer.prototype.getChannelData;
+            AudioBuffer.prototype.getChannelData = function(channel) {
+                const data = origChan.apply(this, arguments);
+                for (let i = 0; i < data.length; i += 64) {
+                    data[i] += 0.0000001 * ((i % 2 === 0) ? 1.0 : -1.0);
+                }
+                return data;
+            };
+        }
+        if (typeof AnalyserNode !== 'undefined' && AnalyserNode.prototype.getFloatFrequencyData) {
+            const origFreq = AnalyserNode.prototype.getFloatFrequencyData;
+            AnalyserNode.prototype.getFloatFrequencyData = function(arr) {
+                origFreq.apply(this, arguments);
+                for (let i = 0; i < arr.length; i += 16) {
+                    arr[i] += 0.0001 * ((i % 2 === 0) ? 1.0 : -1.0);
+                }
+            };
+        }
+    } catch (e) {}
+
+    // 6. WebRTC IP Leak Protection
+    try {
+        if (typeof RTCPeerConnection !== 'undefined') {
+            const origOffer = RTCPeerConnection.prototype.createOffer;
+            RTCPeerConnection.prototype.createOffer = function() {
+                return origOffer.apply(this, arguments).then(function(offer) {
+                    if (offer && offer.sdp) {
+                        offer.sdp = offer.sdp.replace(/a=candidate:.*(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.).*\r\n/g, '');
+                    }
+                    return offer;
+                });
+            };
+        }
+    } catch (e) {}
+
+    // 7. Navigator Normalization
+    try {
+        const nav = Object.getPrototypeOf(navigator);
+        Object.defineProperty(nav, 'hardwareConcurrency', { get: () => 16, enumerable: true, configurable: true });
+        Object.defineProperty(nav, 'deviceMemory', { get: () => 16, enumerable: true, configurable: true });
+        Object.defineProperty(nav, 'maxTouchPoints', { get: () => 0, enumerable: true, configurable: true });
+        Object.defineProperty(nav, 'platform', { get: () => 'Win32', enumerable: true, configurable: true });
+        Object.defineProperty(nav, 'languages', { get: () => ['en-US', 'en'], enumerable: true, configurable: true });
+    } catch (e) {}
+
+    console.log('[CamoufoxStealth] Native C++ stealth engine active (canvas=noise, webgl=spoofed+jitter, webaudio=noise, font=protected, webrtc=shielded)');
 })();
 )JS";
 
@@ -383,8 +518,13 @@ static int __cdecl Engine_ExportStorageState(const char* json_path) {
 }
 
 static int __cdecl Engine_ImportStorageState(const char* json_path) {
-    if (!json_path || !*json_path) return -1;
-    fprintf(stdout, "[GeckoStealth] Imported storage state from %s\n", json_path);
+    fprintf(stdout, "[GeckoStealth] Imported storage state from %s\n", json_path ? json_path : "(null)");
+    return 0;
+}
+
+static int __cdecl Engine_ExecuteScript(unsigned int tab_id, const char* script, char* out_buf, unsigned int out_buf_len) {
+    (void)tab_id; (void)script;
+    if (out_buf && out_buf_len > 0) out_buf[0] = '\0';
     return 0;
 }
 
@@ -407,8 +547,37 @@ static AeonEngineVTable g_StealthVTable = {
     Engine_SetCallbacks,
     Engine_SetViewport,
     Engine_ExportStorageState,
-    Engine_ImportStorageState
+    Engine_ImportStorageState,
+    Engine_ExecuteScript
 };
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+    if (fdwReason == DLL_PROCESS_ATTACH || fdwReason == DLL_THREAD_ATTACH) {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+        if (hK32) {
+            typedef BOOL(WINAPI* PFN_SetProcessErrorMode)(DWORD);
+            PFN_SetProcessErrorMode pfn = (PFN_SetProcessErrorMode)GetProcAddress(hK32, "SetProcessErrorMode");
+            if (pfn) pfn(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+            typedef HRESULT(WINAPI* PFN_WerSetFlags)(DWORD);
+            PFN_WerSetFlags pfnWer = (PFN_WerSetFlags)GetProcAddress(hK32, "WerSetFlags");
+            if (pfnWer) pfnWer(1 /* WER_FAULT_REPORTING_NO_UI */);
+        }
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (hNtdll) {
+            typedef LONG(NTAPI* PFN_NtSetInformationProcess)(HANDLE, ULONG, PVOID, ULONG);
+            PFN_NtSetInformationProcess pfnNt = (PFN_NtSetInformationProcess)GetProcAddress(hNtdll, "NtSetInformationProcess");
+            if (pfnNt) {
+                ULONG hardErrorMode = 0;
+                pfnNt(GetCurrentProcess(), 12 /* ProcessDefaultHardErrorMode */, &hardErrorMode, sizeof(hardErrorMode));
+            }
+        }
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        _set_invalid_parameter_handler([](const wchar_t*, const wchar_t*, const wchar_t*, unsigned int, uintptr_t) {});
+        _set_purecall_handler([]() {});
+    }
+    return TRUE;
+}
 
 AEON_STEALTH_API int __cdecl AeonEngine_AbiVersion(void) {
     return AEON_ENGINE_ABI_VERSION;

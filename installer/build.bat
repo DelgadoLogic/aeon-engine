@@ -1,10 +1,10 @@
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
 
-set IDIR=C:\Users\Manuel A Delgado\Desktop\DelgadoLogic\Products\AeonBrowser\installer
-set SRC=%IDIR%\src
-set BIN=%IDIR%\bin
-set OBJ=%IDIR%\obj
+set IDIR=%~dp0
+set SRC=%IDIR%src
+set BIN=%IDIR%bin
+set OBJ=%IDIR%obj
 
 if not exist "%BIN%" mkdir "%BIN%"
 if not exist "%OBJ%" mkdir "%OBJ%"
@@ -14,11 +14,11 @@ rc.exe /nologo /fo "%OBJ%\AeonInstaller.res" "%SRC%\AeonInstaller.rc"
 if errorlevel 1 ( echo RC FAILED & goto done )
 
 echo [2/3] C++ compile...
-cl.exe /nologo /W3 /O2 /std:c++17 /EHsc /DUNICODE /D_UNICODE /DWIN32 /DNDEBUG /Fo"%OBJ%\AeonInstaller.obj" /c "%SRC%\AeonInstaller.cpp"
+cl.exe /nologo /W3 /O2 /std:c++17 /EHsc /utf-8 /DUNICODE /D_UNICODE /DWIN32 /DNDEBUG /Fo"%OBJ%\AeonInstaller.obj" /c "%SRC%\AeonInstaller.cpp"
 if errorlevel 1 ( echo CL FAILED & goto done )
 
 echo [3/3] Link...
-link.exe /nologo /SUBSYSTEM:WINDOWS /MACHINE:X64 /OUT:"%BIN%\AeonSetup.exe" "%OBJ%\AeonInstaller.obj" "%OBJ%\AeonInstaller.res" gdiplus.lib shell32.lib shlwapi.lib user32.lib gdi32.lib ole32.lib kernel32.lib advapi32.lib wininet.lib
+link.exe /nologo /SUBSYSTEM:WINDOWS /MACHINE:X64 /OUT:"%BIN%\AeonSetup.exe" "%OBJ%\AeonInstaller.obj" "%OBJ%\AeonInstaller.res" gdiplus.lib shell32.lib shlwapi.lib user32.lib gdi32.lib ole32.lib kernel32.lib advapi32.lib wininet.lib dwmapi.lib msimg32.lib
 if errorlevel 1 ( echo LINK FAILED & goto done )
 
 echo.

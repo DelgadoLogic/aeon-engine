@@ -28,6 +28,7 @@ namespace ContentBlocker {
 
     // Fingerprint guard: randomize canvas/WebGL/audio fingerprints.
     void InjectFingerprintGuard(void* js_context);
+    const char* GetFingerprintGuardScript();
 
     // DNS-over-HTTPS: resolve hostname via our DoH provider.
     // Returns IP string into out_buf (max 64 chars). Returns true on success.

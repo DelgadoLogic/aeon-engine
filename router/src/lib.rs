@@ -79,10 +79,18 @@ pub type NavigateCallback = extern "C" fn(
     proxy: *const c_char,
 );
 
-// ─── DLL init / deinit ───────────────────────────────────────────────────────
+#[cfg(target_os = "windows")]
+extern "system" {
+    fn SetErrorMode(uMode: u32) -> u32;
+}
+
 /// Called once by TierDispatcher when loading the DLL.
 #[no_mangle]
 pub extern "C" fn AeonRouter_Init() -> i32 {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        SetErrorMode(0x0001 | 0x0002 | 0x8000);
+    }
     let _ = rt(); // Spin up Tokio
     // tracing_subscriber::fmt::init();
     eprintln!("[aeon_router] Initialized. Tokio runtime ready.");

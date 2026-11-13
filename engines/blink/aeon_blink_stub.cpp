@@ -39,6 +39,7 @@
 
 #include "AeonEngine_Interface.h"
 #include "ExtensionRuntime.h"
+#include "../aeon_ai.h"
 #include "../../core/session/nlohmann/json.hpp"
 using json = nlohmann::json;
 // AeonBridge injection is handled by the host process via InjectEarlyJS ABI
@@ -109,7 +110,16 @@ static bool g_ClassRegistered = false;
 // ---------------------------------------------------------------------------
 static std::string ResolveAeonUrl(const std::string& url) {
     if (url.rfind("aeon://", 0) != 0) return {};
-    std::string page = url.substr(7); // strip "aeon://"
+    std::string fullPage = url.substr(7); // strip "aeon://"
+
+    // Separate query string/hash from page name
+    std::string page = fullPage;
+    std::string queryStr;
+    size_t qPos = fullPage.find_first_of("?#");
+    if (qPos != std::string::npos) {
+        page = fullPage.substr(0, qPos);
+        queryStr = fullPage.substr(qPos);
+    }
 
     // Strip trailing slashes
     while (!page.empty() && page.back() == '/') page.pop_back();
@@ -118,25 +128,34 @@ static std::string ResolveAeonUrl(const std::string& url) {
     char path[MAX_PATH];
     if (page == "newtab") {
         _snprintf_s(path, sizeof(path), _TRUNCATE,
-            "%s\\resources\\newtab\\newtab.html", g_ExeDir);
+            "%s\\newtab\\newtab.html", g_ExeDir);
         if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
             _snprintf_s(path, sizeof(path), _TRUNCATE,
-                "%s\\newtab\\newtab.html", g_ExeDir);
+                "%s\\resources\\newtab\\newtab.html", g_ExeDir);
         }
     } else {
         _snprintf_s(path, sizeof(path), _TRUNCATE,
-            "%s\\resources\\%s\\%s.html", g_ExeDir, page.c_str(), page.c_str());
+            "%s\\pages\\%s.html", g_ExeDir, page.c_str());
         if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
             _snprintf_s(path, sizeof(path), _TRUNCATE,
-                "%s\\pages\\%s.html", g_ExeDir, page.c_str());
+                "%s\\resources\\pages\\%s.html", g_ExeDir, page.c_str());
+        }
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+            _snprintf_s(path, sizeof(path), _TRUNCATE,
+                "%s\\resources\\%s\\%s.html", g_ExeDir, page.c_str(), page.c_str());
         }
     }
 
-    // Verify file exists
+    // If still not found, fallback safely to newtab instead of passing unhandled scheme to WebView2
     if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
-        fprintf(stderr, "[Blink] aeon://%s → file not found: %s\n",
+        fprintf(stderr, "[Blink] aeon://%s not found at %s — falling back to newtab\n",
             page.c_str(), path);
-        return {};
+        _snprintf_s(path, sizeof(path), _TRUNCATE,
+            "%s\\newtab\\newtab.html", g_ExeDir);
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+            _snprintf_s(path, sizeof(path), _TRUNCATE,
+                "%s\\resources\\newtab\\newtab.html", g_ExeDir);
+        }
     }
 
     // Convert backslashes to forward slashes for file:// URI
@@ -146,8 +165,9 @@ static std::string ResolveAeonUrl(const std::string& url) {
         else if (*p == ' ') fileUrl += "%20";
         else fileUrl += *p;
     }
+    fileUrl += queryStr;
 
-    fprintf(stdout, "[Blink] aeon://%s → %s\n", page.c_str(), fileUrl.c_str());
+    fprintf(stdout, "[Blink] aeon://%s → %s\n", fullPage.c_str(), fileUrl.c_str());
     return fileUrl;
 }
 
@@ -167,6 +187,12 @@ static LRESULT CALLBACK WV2HostProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         }
         case WM_ERASEBKGND:
             return 1;
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+            EndPaint(hWnd, &ps);
+            return 0;
+        }
     }
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
@@ -177,7 +203,7 @@ static void EnsureWindowClass(HINSTANCE hInst) {
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = WV2HostProc;
     wc.hInstance = hInst;
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wc.hbrBackground = nullptr;
     wc.lpszClassName = AEON_WV2_CLASS;
     RegisterClassExW(&wc);
     g_ClassRegistered = true;
@@ -225,223 +251,361 @@ static void PaintFallback(const TabState& tab) {
 // WebView2 initialization per tab
 // ---------------------------------------------------------------------------
 #ifdef AEON_HAS_WEBVIEW2
-static void InitWebView2ForTab(TabState& tab) {
-    if (!tab.childHwnd) return;
+static ComPtr<ICoreWebView2Environment> g_SharedEnvironment = nullptr;
+static bool g_EnvironmentInitializing = false;
+static std::vector<unsigned int> g_PendingInitTabs;
 
-    // Get user data folder for WebView2 profile
-    char appData[MAX_PATH] = {};
-    SHGetFolderPathA(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appData);
-    char profileDir[MAX_PATH];
-    _snprintf_s(profileDir, sizeof(profileDir), _TRUNCATE,
-        "%s\\DelgadoLogic\\Aeon\\WebView2Profile", appData);
+static void CreateControllerForTab(ICoreWebView2Environment* env, unsigned int tabId) {
+    auto it = g_Tabs.find(tabId);
+    if (it == g_Tabs.end() || !it->second.childHwnd || !env) return;
+    TabState& tab = it->second;
 
-    wchar_t wProfileDir[MAX_PATH];
-    MultiByteToWideChar(CP_UTF8, 0, profileDir, -1, wProfileDir, MAX_PATH);
+    env->CreateCoreWebView2Controller(
+        tab.childHwnd,
+        Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+            [tabId, envPtr = ComPtr<ICoreWebView2Environment>(env)](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+                auto it2 = g_Tabs.find(tabId);
+                if (it2 == g_Tabs.end()) return S_OK; // Tab closed
+                TabState& tab = it2->second;
 
-    // Create environment with additional browser args:
-    //   - Disable unnecessary Google services for sovereign operation
-    //   - Enable CDP remote debugging on port 9222 for AI agent control
-    // Note: CoreWebView2EnvironmentOptions is provided by WebView2EnvironmentOptions.h
-    auto envOptions = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
-    envOptions->put_AdditionalBrowserArguments(
-        L"--disable-features=SafeBrowsing,PrintPreview,TranslateUI"
-        L" --disable-sync"
-        L" --no-first-run"
-        L" --disable-default-apps"
-        L" --disable-component-update"
-        L" --remote-debugging-port=9222"
-        L" --remote-allow-origins=*"
-    );
-
-    HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
-        nullptr,  // browserExecutableFolder — uses installed Edge
-        wProfileDir,
-        envOptions.Get(),
-        Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-            [tabId = tab.id](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
-                auto it = g_Tabs.find(tabId);
-                if (it == g_Tabs.end()) return S_OK; // Tab closed during init
-                TabState& tab = it->second;
-
-                if (FAILED(result) || !env) {
-                    fprintf(stderr, "[Blink] WebView2 env creation failed: 0x%08x\n", result);
+                if (FAILED(result) || !controller) {
+                    fprintf(stderr, "[Blink] WebView2 controller failed: 0x%08x\n", result);
                     PaintFallback(tab);
                     return S_OK;
                 }
 
-                env->CreateCoreWebView2Controller(
-                    tab.childHwnd,
-                    Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                        [tabId, envPtr = ComPtr<ICoreWebView2Environment>(env)](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
-                            auto it2 = g_Tabs.find(tabId);
-                            if (it2 == g_Tabs.end()) return S_OK; // Tab closed
-                            TabState& tab = it2->second;
+                tab.controller = controller;
+                controller->get_CoreWebView2(&tab.webview);
 
-                            if (FAILED(result) || !controller) {
-                                fprintf(stderr, "[Blink] WebView2 controller failed: 0x%08x\n", result);
-                                PaintFallback(tab);
+
+
+                // Set bounds to fill the child window
+                RECT bounds;
+                GetClientRect(tab.childHwnd, &bounds);
+                controller->put_Bounds(bounds);
+                bool shouldShow = (tab.w > 0 && tab.h > 0 && IsWindowVisible(tab.childHwnd));
+                controller->put_IsVisible(shouldShow ? TRUE : FALSE);
+
+                // Wire up navigation events
+                tab.webview->add_NavigationCompleted(
+                    Callback<ICoreWebView2NavigationCompletedEventHandler>(
+                        [tabId = tab.id](ICoreWebView2* sender,
+                            ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT {
+                            auto it = g_Tabs.find(tabId);
+                            if (it == g_Tabs.end()) return S_OK;
+
+                            BOOL isSuccess = FALSE;
+                            if (args) args->get_IsSuccess(&isSuccess);
+                            COREWEBVIEW2_WEB_ERROR_STATUS status = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
+                            if (args) args->get_WebErrorStatus(&status);
+
+                            if (!isSuccess && status == COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED) {
+                                if (it->second.loading) {
+                                    it->second.loading = false;
+                                    if (g_Callbacks.OnLoaded)
+                                        g_Callbacks.OnLoaded(tabId);
+                                }
                                 return S_OK;
                             }
 
-                            tab.controller = controller;
-                            controller->get_CoreWebView2(&tab.webview);
+                            bool wasLoading = it->second.loading;
+                            it->second.loading = false;
+                            if (wasLoading && g_Callbacks.OnProgress)
+                                g_Callbacks.OnProgress(tabId, 100);
+                            if (g_Callbacks.OnLoaded)
+                                g_Callbacks.OnLoaded(tabId);
 
-                            // Set bounds to fill the child window
-                            RECT bounds;
-                            GetClientRect(tab.childHwnd, &bounds);
-                            controller->put_Bounds(bounds);
-                            controller->put_IsVisible(TRUE);
+                            // ── Cosmetic CSS: element-hide rules ──
+                            // Inject after page load to hide ad containers,
+                            // cookie banners, and other unwanted elements.
+                            const char* css = NativeAdBlock::GetCosmeticCSS();
+                            if (css) {
+                                // Wrap in <style> injection via JS
+                                std::string js = "(() => { const s = document.createElement('style'); s.textContent = `";
+                                js += css;
+                                js += "`; document.head.appendChild(s); })();";
+                                free(const_cast<char*>(css));
 
-                            // Wire up navigation events
-                            tab.webview->add_NavigationCompleted(
-                                Callback<ICoreWebView2NavigationCompletedEventHandler>(
-                                    [tabId = tab.id](ICoreWebView2* sender,
-                                        ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT {
-                                        auto it = g_Tabs.find(tabId);
-                                        if (it == g_Tabs.end()) return S_OK;
-
-                                        it->second.loading = false;
-                                        if (g_Callbacks.OnProgress)
-                                            g_Callbacks.OnProgress(tabId, 100);
-                                        if (g_Callbacks.OnLoaded)
-                                            g_Callbacks.OnLoaded(tabId);
-
-                                        // ── Cosmetic CSS: element-hide rules ──
-                                        // Inject after page load to hide ad containers,
-                                        // cookie banners, and other unwanted elements.
-                                        const char* css = NativeAdBlock::GetCosmeticCSS();
-                                        if (css) {
-                                            // Wrap in <style> injection via JS
-                                            std::string js = "(() => { const s = document.createElement('style'); s.textContent = `";
-                                            js += css;
-                                            js += "`; document.head.appendChild(s); })();";
-                                            free(const_cast<char*>(css));
-
-                                            int wLen = MultiByteToWideChar(CP_UTF8, 0,
-                                                js.c_str(), -1, nullptr, 0);
-                                            wchar_t* wJs = new wchar_t[wLen];
-                                            MultiByteToWideChar(CP_UTF8, 0,
-                                                js.c_str(), -1, wJs, wLen);
-                                            sender->ExecuteScript(wJs, nullptr);
-                                            delete[] wJs;
-                                        }
-                                        return S_OK;
-                                    }).Get(), nullptr);
-
-                            tab.webview->add_DocumentTitleChanged(
-                                Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
-                                    [tabId = tab.id](ICoreWebView2* sender, IUnknown* args) -> HRESULT {
-                                        auto it = g_Tabs.find(tabId);
-                                        if (it == g_Tabs.end()) return S_OK;
-
-                                        LPWSTR wTitle = nullptr;
-                                        sender->get_DocumentTitle(&wTitle);
-                                        if (wTitle) {
-                                            char title[512];
-                                            WideCharToMultiByte(CP_UTF8, 0, wTitle, -1,
-                                                title, sizeof(title), nullptr, nullptr);
-                                            it->second.title = title;
-                                            if (g_Callbacks.OnTitleChanged)
-                                                g_Callbacks.OnTitleChanged(tabId, title);
-                                            CoTaskMemFree(wTitle);
-                                        }
-                                        return S_OK;
-                                    }).Get(), nullptr);
-
-                            tab.webview->add_SourceChanged(
-                                Callback<ICoreWebView2SourceChangedEventHandler>(
-                                    [tabId = tab.id](ICoreWebView2* sender,
-                                        ICoreWebView2SourceChangedEventArgs* args) -> HRESULT {
-                                        auto it = g_Tabs.find(tabId);
-                                        if (it == g_Tabs.end()) return S_OK;
-
-                                        LPWSTR wUrl = nullptr;
-                                        sender->get_Source(&wUrl);
-                                        if (wUrl) {
-                                            char url[2048];
-                                            WideCharToMultiByte(CP_UTF8, 0, wUrl, -1,
-                                                url, sizeof(url), nullptr, nullptr);
-                                            it->second.url = url;
-                                            if (g_Callbacks.OnNavigated)
-                                                g_Callbacks.OnNavigated(tabId, url);
-                                            CoTaskMemFree(wUrl);
-                                        }
-                                        return S_OK;
-                                    }).Get(), nullptr);
-
-                            // ── NativeAdBlock: WebResourceRequested ────────
-                            // Register a wildcard filter to intercept ALL
-                            // sub-resource requests (scripts, images, iframes,
-                            // XHR, etc.) and block ad/tracker domains.
-                            tab.webview->AddWebResourceRequestedFilter(
-                                L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
-
-                            tab.webview->add_WebResourceRequested(
-                                Callback<ICoreWebView2WebResourceRequestedEventHandler>(
-                                    [tabId = tab.id, envPtr](ICoreWebView2* sender,
-                                        ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
-
-                                        ComPtr<ICoreWebView2WebResourceRequest> request;
-                                        args->get_Request(&request);
-                                        if (!request) return S_OK;
-
-                                        LPWSTR wUri = nullptr;
-                                        request->get_Uri(&wUri);
-                                        if (!wUri) return S_OK;
-
-                                        // Convert to UTF-8 for NativeAdBlock
-                                        char uri[2048];
-                                        WideCharToMultiByte(CP_UTF8, 0, wUri, -1,
-                                            uri, sizeof(uri), nullptr, nullptr);
-                                        CoTaskMemFree(wUri);
-
-                                        // Check against loaded filter lists
-                                        if (NativeAdBlock::ShouldBlock(uri)) {
-                                            // Block: create proper 403 response
-                                            if (envPtr) {
-                                                ComPtr<ICoreWebView2WebResourceResponse> response;
-                                                envPtr->CreateWebResourceResponse(
-                                                    nullptr, 403,
-                                                    L"Blocked by Aeon Shield",
-                                                    L"", &response);
-                                                if (response)
-                                                    args->put_Response(response.Get());
-                                            }
-                                            fprintf(stdout, "[AdBlock] Blocked: %.80s\n", uri);
-                                        }
-                                        return S_OK;
-                                    }).Get(), nullptr);
-
-                            // NOTE: AeonBridge injection is handled by the
-                            // host process (BrowserChrome) via the InjectEarlyJS
-                            // ABI call — the DLL does not link AeonBridge.cpp.
-
-                            // Flush any early-JS scripts queued before
-                            // WebView2 was ready (e.g. AeonBridge bootstrap)
-                            for (const auto& script : tab.pendingEarlyJS) {
                                 int wLen = MultiByteToWideChar(CP_UTF8, 0,
-                                    script.c_str(), -1, nullptr, 0);
+                                    js.c_str(), -1, nullptr, 0);
                                 wchar_t* wJs = new wchar_t[wLen];
                                 MultiByteToWideChar(CP_UTF8, 0,
-                                    script.c_str(), -1, wJs, wLen);
-                                tab.webview->AddScriptToExecuteOnDocumentCreated(
-                                    wJs, nullptr);
+                                    js.c_str(), -1, wJs, wLen);
+                                sender->ExecuteScript(wJs, nullptr);
                                 delete[] wJs;
                             }
-                            if (!tab.pendingEarlyJS.empty()) {
-                                fprintf(stdout,
-                                    "[Blink] Flushed %zu queued early-JS scripts for tab #%u\n",
-                                    tab.pendingEarlyJS.size(), tab.id);
-                                tab.pendingEarlyJS.clear();
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                tab.webview->add_DocumentTitleChanged(
+                    Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
+                        [tabId = tab.id](ICoreWebView2* sender, IUnknown* args) -> HRESULT {
+                            auto it = g_Tabs.find(tabId);
+                            if (it == g_Tabs.end()) return S_OK;
+
+                            LPWSTR wTitle = nullptr;
+                            sender->get_DocumentTitle(&wTitle);
+                            if (wTitle) {
+                                char title[512];
+                                WideCharToMultiByte(CP_UTF8, 0, wTitle, -1,
+                                    title, sizeof(title), nullptr, nullptr);
+                                it->second.title = title;
+                                if (g_Callbacks.OnTitleChanged)
+                                    g_Callbacks.OnTitleChanged(tabId, title);
+                                CoTaskMemFree(wTitle);
+                            }
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                tab.webview->add_SourceChanged(
+                    Callback<ICoreWebView2SourceChangedEventHandler>(
+                        [tabId = tab.id](ICoreWebView2* sender,
+                            ICoreWebView2SourceChangedEventArgs* args) -> HRESULT {
+                            auto it = g_Tabs.find(tabId);
+                            if (it == g_Tabs.end()) return S_OK;
+
+                            LPWSTR wUrl = nullptr;
+                            sender->get_Source(&wUrl);
+                            if (wUrl) {
+                                char url[2048];
+                                WideCharToMultiByte(CP_UTF8, 0, wUrl, -1,
+                                    url, sizeof(url), nullptr, nullptr);
+                                it->second.url = url;
+                                if (g_Callbacks.OnNavigated)
+                                    g_Callbacks.OnNavigated(tabId, url);
+                                CoTaskMemFree(wUrl);
+                            }
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                // ── Intercept aeon:// scheme navigations to avoid OS protocol prompts ──
+                tab.webview->add_NavigationStarting(
+                    Callback<ICoreWebView2NavigationStartingEventHandler>(
+                        [tabId = tab.id](ICoreWebView2* sender,
+                            ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+                            LPWSTR wUri = nullptr;
+                            args->get_Uri(&wUri);
+                            char uri[2048] = {0};
+                            if (wUri) {
+                                WideCharToMultiByte(CP_UTF8, 0, wUri, -1, uri, sizeof(uri), nullptr, nullptr);
+                                CoTaskMemFree(wUri);
                             }
 
-                            // ── DRM Monitor: Detect Widevine EME failures ──
-                            // Intercepts requestMediaKeySystemAccess() to
-                            // catch Widevine-only DRM negotiation and show
-                            // a user-friendly fallback before the site's
-                            // own error message appears.
-                            {
-                                const wchar_t* drmMonitorJs = LR"JS(
+                            bool isInternalNewTab = (strncmp(uri, "aeon://newtab", 13) == 0 ||
+                                                     strstr(uri, "newtab.html") != nullptr ||
+                                                     strncmp(uri, "about:blank", 11) == 0);
+
+                            auto it = g_Tabs.find(tabId);
+                            if (it != g_Tabs.end()) {
+                                it->second.loading = !isInternalNewTab;
+                            }
+                            if (!isInternalNewTab && g_Callbacks.OnProgress)
+                                g_Callbacks.OnProgress(tabId, 20);
+
+                            if (strncmp(uri, "aeon://", 7) == 0) {
+                                args->put_Cancel(TRUE);
+                                std::string resolved = ResolveAeonUrl(uri);
+                                if (!resolved.empty()) {
+                                    wchar_t wResolved[2048];
+                                    MultiByteToWideChar(CP_UTF8, 0, resolved.c_str(), -1, wResolved, 2048);
+                                    sender->Navigate(wResolved);
+                                }
+                                if (g_Callbacks.OnNavigated)
+                                    g_Callbacks.OnNavigated(tabId, uri);
+                                return S_OK;
+                            }
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                // ── ContentLoading: advance loading progress when DOM parsing begins ──
+                tab.webview->add_ContentLoading(
+                    Callback<ICoreWebView2ContentLoadingEventHandler>(
+                        [tabId = tab.id](ICoreWebView2* sender,
+                            ICoreWebView2ContentLoadingEventArgs* args) -> HRESULT {
+                            auto it = g_Tabs.find(tabId);
+                            if (it != g_Tabs.end() && !it->second.loading) {
+                                return S_OK;
+                            }
+                            if (g_Callbacks.OnProgress)
+                                g_Callbacks.OnProgress(tabId, 65);
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                // ── Handle web messages (e.g. postMessage navigate and window.ai Prompt API) ──
+                tab.webview->add_WebMessageReceived(
+                    Callback<ICoreWebView2WebMessageReceivedEventHandler>(
+                        [tabId = tab.id](ICoreWebView2* sender,
+                            ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
+                            LPWSTR wMsg = nullptr;
+                            args->get_WebMessageAsJson(&wMsg);
+                            if (wMsg) {
+                                char msg[16384];
+                                WideCharToMultiByte(CP_UTF8, 0, wMsg, -1, msg, sizeof(msg), nullptr, nullptr);
+                                CoTaskMemFree(wMsg);
+
+                                std::string jsonStr = msg;
+
+                                // 1. Navigate message
+                                size_t navPos = jsonStr.find("\"navigate\"");
+                                if (navPos != std::string::npos) {
+                                    size_t urlKey = jsonStr.find("\"url\":", navPos);
+                                    if (urlKey != std::string::npos) {
+                                        size_t qStart = jsonStr.find("\"", urlKey + 6);
+                                        if (qStart != std::string::npos) {
+                                            size_t qEnd = jsonStr.find("\"", qStart + 1);
+                                            if (qEnd != std::string::npos) {
+                                                std::string targetUrl = jsonStr.substr(qStart + 1, qEnd - qStart - 1);
+                                                std::string resolved = ResolveAeonUrl(targetUrl);
+                                                const std::string& actualUrl = resolved.empty() ? targetUrl : resolved;
+                                                wchar_t wTarget[2048];
+                                                MultiByteToWideChar(CP_UTF8, 0, actualUrl.c_str(), -1, wTarget, 2048);
+                                                sender->Navigate(wTarget);
+                                                if (g_Callbacks.OnNavigated)
+                                                    g_Callbacks.OnNavigated(tabId, targetUrl.c_str());
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 2. window_ai_prompt (WICG Prompt API single-turn prompt)
+                                if (jsonStr.find("\"window_ai_prompt\"") != std::string::npos) {
+                                    std::string reqId = "ai_req_default";
+                                    std::string prompt;
+                                    try {
+                                        auto j = json::parse(jsonStr);
+                                        if (j.contains("id") && j["id"].is_string()) reqId = j["id"].get<std::string>();
+                                        if (j.contains("prompt") && j["prompt"].is_string()) prompt = j["prompt"].get<std::string>();
+                                    } catch (...) {}
+
+                                    ComPtr<ICoreWebView2> wvSender(sender);
+                                    AeonAIInstance().PromptAsync(prompt, [wvSender, reqId](const std::string& text, bool is_final) {
+                                        if (is_final) {
+                                            json resp;
+                                            resp["type"] = "window_ai_response";
+                                            resp["id"] = reqId;
+                                            resp["ok"] = true;
+                                            resp["text"] = text;
+                                            std::string respStr = resp.dump();
+
+                                            int wLen = MultiByteToWideChar(CP_UTF8, 0, respStr.c_str(), -1, nullptr, 0);
+                                            std::wstring wResp(wLen, L'\0');
+                                            MultiByteToWideChar(CP_UTF8, 0, respStr.c_str(), -1, &wResp[0], wLen);
+                                            wvSender->PostWebMessageAsJson(wResp.c_str());
+                                        }
+                                    });
+                                }
+
+                                // 3. window_ai_prompt_stream (WICG Prompt API streaming prompt)
+                                if (jsonStr.find("\"window_ai_prompt_stream\"") != std::string::npos) {
+                                    std::string reqId = "ai_stream_default";
+                                    std::string prompt;
+                                    try {
+                                        auto j = json::parse(jsonStr);
+                                        if (j.contains("id") && j["id"].is_string()) reqId = j["id"].get<std::string>();
+                                        if (j.contains("prompt") && j["prompt"].is_string()) prompt = j["prompt"].get<std::string>();
+                                    } catch (...) {}
+
+                                    ComPtr<ICoreWebView2> wvSender(sender);
+                                    AeonAIInstance().PromptAsync(prompt, [wvSender, reqId](const std::string& token, bool is_final) {
+                                        json resp;
+                                        resp["type"] = "window_ai_stream";
+                                        resp["id"] = reqId;
+                                        resp["chunk"] = token;
+                                        resp["done"] = is_final;
+                                        std::string respStr = resp.dump();
+
+                                        int wLen = MultiByteToWideChar(CP_UTF8, 0, respStr.c_str(), -1, nullptr, 0);
+                                        std::wstring wResp(wLen, L'\0');
+                                        MultiByteToWideChar(CP_UTF8, 0, respStr.c_str(), -1, &wResp[0], wLen);
+                                        wvSender->PostWebMessageAsJson(wResp.c_str());
+                                    });
+                                }
+                            }
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                // ── NativeAdBlock: WebResourceRequested with CNAME Uncloaking ──
+                // Register a wildcard filter to intercept ALL
+                // sub-resource requests (scripts, images, iframes,
+                // XHR, etc.) and block ad/tracker and cloaked tracker domains.
+                tab.webview->AddWebResourceRequestedFilter(
+                    L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+                tab.webview->add_WebResourceRequested(
+                    Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+                        [tabId = tab.id, envPtr](ICoreWebView2* sender,
+                            ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+
+                            ComPtr<ICoreWebView2WebResourceRequest> request;
+                            args->get_Request(&request);
+                            if (!request) return S_OK;
+
+                            LPWSTR wUri = nullptr;
+                            request->get_Uri(&wUri);
+                            if (!wUri) return S_OK;
+
+                            // Fast path: ignore non-HTTP requests instantly without UTF-8 conversion or mutex locks
+                            if (wUri[0] != L'h' && wUri[0] != L'H') {
+                                CoTaskMemFree(wUri);
+                                return S_OK;
+                            }
+                            if (_wcsnicmp(wUri, L"http://", 7) != 0 && _wcsnicmp(wUri, L"https://", 8) != 0) {
+                                CoTaskMemFree(wUri);
+                                return S_OK;
+                            }
+
+                            // Convert to UTF-8 for NativeAdBlock
+                            char uri[2048];
+                            WideCharToMultiByte(CP_UTF8, 0, wUri, -1,
+                                uri, sizeof(uri), nullptr, nullptr);
+                            CoTaskMemFree(wUri);
+
+                            // Check against loaded filter lists & recursive CNAME uncloaking
+                            std::string blockedDomain;
+                            if (NativeAdBlock::ShouldBlockWithCname(uri, blockedDomain)) {
+                                // Block: create proper 403 response
+                                if (envPtr) {
+                                    ComPtr<ICoreWebView2WebResourceResponse> response;
+                                    envPtr->CreateWebResourceResponse(
+                                        nullptr, 403,
+                                        L"Blocked by Aeon Shield (CNAME Uncloaked)",
+                                        L"X-Aeon-Shield: Blocked-CNAME-Tracker\r\nContent-Type: text/plain\r\n",
+                                        &response);
+                                    if (response)
+                                        args->put_Response(response.Get());
+                                }
+                                fprintf(stdout, "[AdBlock:CNAME] Blocked cloaked tracker: %s (uncloaked: %s)\n",
+                                    uri, blockedDomain.c_str());
+                            }
+                            return S_OK;
+                        }).Get(), nullptr);
+
+                // Flush any early-JS scripts queued before
+                // WebView2 was ready (e.g. AeonBridge bootstrap)
+                for (const auto& script : tab.pendingEarlyJS) {
+                    int wLen = MultiByteToWideChar(CP_UTF8, 0,
+                        script.c_str(), -1, nullptr, 0);
+                    wchar_t* wJs = new wchar_t[wLen];
+                    MultiByteToWideChar(CP_UTF8, 0,
+                        script.c_str(), -1, wJs, wLen);
+                    tab.webview->AddScriptToExecuteOnDocumentCreated(
+                        wJs, nullptr);
+                    delete[] wJs;
+                }
+                if (!tab.pendingEarlyJS.empty()) {
+                    fprintf(stdout,
+                        "[Blink] Flushed %zu queued early-JS scripts for tab #%u\n",
+                        tab.pendingEarlyJS.size(), tab.id);
+                    tab.pendingEarlyJS.clear();
+                }
+
+                // ── DRM Monitor: Detect Widevine EME failures ──
+                // Intercepts requestMediaKeySystemAccess() to
+                // catch Widevine-only DRM negotiation and show
+                // a user-friendly fallback before the site's
+                // own error message appears.
+                {
+                    const wchar_t* drmMonitorJs = LR"JS(
 (function() {
     'use strict';
     if (window.__aeonDrmMonitor) return;
@@ -555,29 +719,238 @@ static void InitWebView2ForTab(TabState& tab) {
     console.log('[AeonDRM] DRM monitor active — Widevine detection enabled');
 })();
 )JS";
-                                tab.webview->AddScriptToExecuteOnDocumentCreated(
-                                    drmMonitorJs, nullptr);
-                                fprintf(stdout,
-                                    "[Blink] DRM monitor injected for tab #%u\n",
-                                    tab.id);
-                            }
+                    tab.webview->AddScriptToExecuteOnDocumentCreated(
+                        drmMonitorJs, nullptr);
+                    fprintf(stdout,
+                        "[Blink] DRM monitor injected for tab #%u\n",
+                        tab.id);
+                }
 
-                            // Navigate to initial URL (resolve aeon:// → file://)
-                            if (!tab.url.empty() && tab.url != "about:blank") {
-                                std::string resolved = ResolveAeonUrl(tab.url);
-                                const std::string& navUrl = resolved.empty() ? tab.url : resolved;
-                                wchar_t wUrl[2048];
-                                MultiByteToWideChar(CP_UTF8, 0, navUrl.c_str(), -1,
-                                    wUrl, 2048);
-                                tab.webview->Navigate(wUrl);
-                            }
+                // ── window.ai Standard WICG Prompt API Polyfill ──
+                {
+                    const wchar_t* windowAiPolyfillJs = LR"JS(
+(function() {
+    'use strict';
+    if (window.ai && window.ai.createTextSession && window.ai.languageModel) return;
 
-                            fprintf(stdout, "[Blink] WebView2 ready for tab #%u (AdBlock: %d rules)\n",
-                                tab.id, NativeAdBlock::GetTotalRules());
-                            return S_OK;
-                        }).Get());
+    class AITextSession {
+        constructor(options = {}) {
+            this.options = {
+                topK: options.topK || 3,
+                temperature: options.temperature !== undefined ? options.temperature : 0.7,
+                systemPrompt: options.systemPrompt || ''
+            };
+            this._destroyed = false;
+        }
+
+        async prompt(input) {
+            if (this._destroyed) throw new Error('AITextSession has been destroyed');
+            const id = 'ai_req_' + Math.random().toString(36).substring(2, 11);
+
+            return new Promise((resolve, reject) => {
+                const handler = (e) => {
+                    let data = e.data;
+                    if (typeof data === 'string') {
+                        try { data = JSON.parse(data); } catch(err) {}
+                    }
+                    if (data && data.type === 'window_ai_response' && data.id === id) {
+                        if (window.chrome && window.chrome.webview) {
+                            window.chrome.webview.removeEventListener('message', handler);
+                        }
+                        if (data.ok === false) {
+                            reject(new Error(data.error || 'Inference failed'));
+                        } else {
+                            resolve(data.text || '');
+                        }
+                    }
+                };
+
+                if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+                    window.chrome.webview.addEventListener('message', handler);
+                    window.chrome.webview.postMessage({
+                        type: 'window_ai_prompt',
+                        id: id,
+                        prompt: input,
+                        options: this.options
+                    });
+                } else if (window.aeonBridge && window.aeonBridge.queryAI) {
+                    window.aeonBridge.queryAI(input, (res) => {
+                        if (res && res.ok !== false) resolve(res.text || res);
+                        else reject(new Error(res ? res.error : 'Bridge query failed'));
+                    });
+                } else {
+                    resolve('Aeon Sovereign AI response: ' + input);
+                }
+            });
+        }
+
+        promptStreaming(input) {
+            if (this._destroyed) throw new Error('AITextSession has been destroyed');
+            const id = 'ai_stream_' + Math.random().toString(36).substring(2, 11);
+
+            return new ReadableStream({
+                start(controller) {
+                    const handler = (e) => {
+                        let data = e.data;
+                        if (typeof data === 'string') {
+                            try { data = JSON.parse(data); } catch(err) {}
+                        }
+                        if (data && data.type === 'window_ai_stream' && data.id === id) {
+                            if (data.chunk) controller.enqueue(data.chunk);
+                            if (data.done) {
+                                if (window.chrome && window.chrome.webview) {
+                                    window.chrome.webview.removeEventListener('message', handler);
+                                }
+                                controller.close();
+                            }
+                        }
+                    };
+                    if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+                        window.chrome.webview.addEventListener('message', handler);
+                        window.chrome.webview.postMessage({
+                            type: 'window_ai_prompt_stream',
+                            id: id,
+                            prompt: input,
+                            options: this.options
+                        });
+                    } else if (window.aeonBridge && window.aeonBridge.queryAI) {
+                        window.aeonBridge.queryAI(input, (res) => {
+                            const text = (res && res.text) ? res.text : (res || '');
+                            controller.enqueue(text);
+                            controller.close();
+                        });
+                    } else {
+                        controller.enqueue('Aeon Sovereign AI streaming: ' + input);
+                        controller.close();
+                    }
+                }
+            });
+        }
+
+        destroy() {
+            this._destroyed = true;
+        }
+
+        clone() {
+            if (this._destroyed) throw new Error('AITextSession has been destroyed');
+            return new AITextSession(this.options);
+        }
+    }
+
+    const aiApi = {
+        canCreateTextSession: async () => 'readily',
+        defaultTextSessionOptions: async () => ({ topK: 3, temperature: 0.7 }),
+        createTextSession: async (options) => new AITextSession(options),
+        languageModel: {
+            capabilities: async () => ({ available: 'readily', defaultTopK: 3, maxTopK: 10, defaultTemperature: 0.7 }),
+            create: async (options) => new AITextSession(options)
+        }
+    };
+
+    window.ai = aiApi;
+    if (!window.modelContext) window.modelContext = window.ai;
+    console.log('[AeonAI] window.ai standard WICG Prompt API polyfill active');
+})();
+)JS";
+                    tab.webview->AddScriptToExecuteOnDocumentCreated(
+                        windowAiPolyfillJs, nullptr);
+                    fprintf(stdout,
+                        "[Blink] window.ai Prompt API polyfill injected for tab #%u\n",
+                        tab.id);
+                }
+
+                // Navigate to initial URL (resolve aeon:// → file://)
+                if (!tab.url.empty() && tab.url != "about:blank") {
+                    std::string resolved = ResolveAeonUrl(tab.url);
+                    const std::string& navUrl = resolved.empty() ? tab.url : resolved;
+                    wchar_t wUrl[2048];
+                    MultiByteToWideChar(CP_UTF8, 0, navUrl.c_str(), -1,
+                        wUrl, 2048);
+                    tab.webview->Navigate(wUrl);
+                }
+
+                fprintf(stdout, "[Blink] WebView2 ready for tab #%u (AdBlock: %d rules)\n",
+                    tab.id, NativeAdBlock::GetTotalRules());
                 return S_OK;
             }).Get());
+}
+
+static void InitWebView2ForTab(TabState& tab) {
+    if (!tab.childHwnd) return;
+
+    if (g_SharedEnvironment) {
+        CreateControllerForTab(g_SharedEnvironment.Get(), tab.id);
+        return;
+    }
+
+    g_PendingInitTabs.push_back(tab.id);
+    if (g_EnvironmentInitializing) {
+        return;
+    }
+    g_EnvironmentInitializing = true;
+
+    // Get user data folder for WebView2 profile
+    char appData[MAX_PATH] = {};
+    SHGetFolderPathA(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appData);
+    char profileDir[MAX_PATH];
+    _snprintf_s(profileDir, sizeof(profileDir), _TRUNCATE,
+        "%s\\DelgadoLogic\\Aeon\\WebView2Profile", appData);
+    SHCreateDirectoryExA(nullptr, profileDir, nullptr);
+
+    wchar_t wProfileDir[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, profileDir, -1, wProfileDir, MAX_PATH);
+
+    // Create environment with additional browser args:
+    //   - Disable unnecessary Google services for sovereign operation
+    //   - Enable CDP remote debugging on port 9222 for AI agent control
+    // Note: CoreWebView2EnvironmentOptions is provided by WebView2EnvironmentOptions.h
+    auto envOptions = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
+    envOptions->put_AdditionalBrowserArguments(
+        L"--enable-features=PostQuantumKyber,X25519Kyber768Draft00,X25519MLKEM768,ParallelDownloading"
+        L" --disable-features=SafeBrowsing,PrintPreview,TranslateUI"
+        L" --disable-sync"
+        L" --no-first-run"
+        L" --disable-default-apps"
+        L" --disable-component-update"
+        L" --remote-allow-origins=*"
+    );
+
+    HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
+        nullptr,  // browserExecutableFolder — uses installed Edge
+        wProfileDir,
+        envOptions.Get(),
+        Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+            [](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+                g_EnvironmentInitializing = false;
+                if (FAILED(result) || !env) {
+                    fprintf(stderr, "[Blink] WebView2 env creation failed: 0x%08x\n", result);
+                    for (unsigned int pendingId : g_PendingInitTabs) {
+                        auto it = g_Tabs.find(pendingId);
+                        if (it != g_Tabs.end()) PaintFallback(it->second);
+                    }
+                    g_PendingInitTabs.clear();
+                    return S_OK;
+                }
+
+                g_SharedEnvironment = env;
+                std::vector<unsigned int> pending = g_PendingInitTabs;
+                g_PendingInitTabs.clear();
+
+                for (unsigned int pendingId : pending) {
+                    CreateControllerForTab(g_SharedEnvironment.Get(), pendingId);
+                }
+                return S_OK;
+            }).Get());
+
+    if (FAILED(hr)) {
+        g_EnvironmentInitializing = false;
+        fprintf(stderr, "[Blink] CreateCoreWebView2EnvironmentWithOptions failed: 0x%08x\n", hr);
+        for (unsigned int pendingId : g_PendingInitTabs) {
+            auto it = g_Tabs.find(pendingId);
+            if (it != g_Tabs.end()) PaintFallback(it->second);
+        }
+        g_PendingInitTabs.clear();
+    }
 }
 #endif
 
@@ -613,6 +986,9 @@ static void __cdecl Engine_Shutdown() {
     for (auto& [id, tab] : g_Tabs) {
         if (tab.controller) tab.controller->Close();
     }
+    g_SharedEnvironment = nullptr;
+    g_PendingInitTabs.clear();
+    g_EnvironmentInitializing = false;
     CoUninitialize();
 #endif
     g_Tabs.clear();
@@ -631,9 +1007,13 @@ static unsigned int __cdecl Engine_Navigate(unsigned int tab_id,
 
     TabState& tab = it->second;
     tab.url     = url ? url : "about:blank";
-    tab.loading = true;
 
-    if (g_Callbacks.OnProgress) g_Callbacks.OnProgress(tab_id, 10);
+    bool isInternalNewTab = (tab.url == "aeon://newtab" ||
+                             tab.url.find("newtab.html") != std::string::npos ||
+                             tab.url == "about:blank");
+    tab.loading = !isInternalNewTab;
+
+    if (!isInternalNewTab && g_Callbacks.OnProgress) g_Callbacks.OnProgress(tab_id, 10);
 
 #ifdef AEON_HAS_WEBVIEW2
     if (tab.webview) {
@@ -645,14 +1025,14 @@ static unsigned int __cdecl Engine_Navigate(unsigned int tab_id,
         tab.webview->Navigate(wUrl);
     } else {
         PaintFallback(tab);
-        if (g_Callbacks.OnProgress) g_Callbacks.OnProgress(tab_id, 100);
+        if (!isInternalNewTab && g_Callbacks.OnProgress) g_Callbacks.OnProgress(tab_id, 100);
         if (g_Callbacks.OnLoaded)   g_Callbacks.OnLoaded(tab_id);
         tab.loading = false;
     }
 #else
     PaintFallback(tab);
     if (g_Callbacks.OnNavigated) g_Callbacks.OnNavigated(tab_id, tab.url.c_str());
-    if (g_Callbacks.OnProgress)  g_Callbacks.OnProgress(tab_id, 100);
+    if (!isInternalNewTab && g_Callbacks.OnProgress)  g_Callbacks.OnProgress(tab_id, 100);
     if (g_Callbacks.OnLoaded)    g_Callbacks.OnLoaded(tab_id);
     tab.loading = false;
 #endif
@@ -719,19 +1099,21 @@ static void __cdecl Engine_CloseTab(unsigned int tab_id) {
 }
 
 static void __cdecl Engine_FocusTab(unsigned int tab_id) {
-    // Hide all other tab windows, show this one
-    for (auto& [id, tab] : g_Tabs) {
-        if (tab.childHwnd) {
-            ::ShowWindow(tab.childHwnd, (id == tab_id) ? SW_SHOW : SW_HIDE);
-#ifdef AEON_HAS_WEBVIEW2
-            if (tab.controller)
-                tab.controller->put_IsVisible(id == tab_id ? TRUE : FALSE);
-#endif
-        }
-    }
     auto it = g_Tabs.find(tab_id);
-    if (it != g_Tabs.end() && !it->second.childHwnd) {
-        PaintFallback(it->second);
+    if (it != g_Tabs.end()) {
+        TabState& tab = it->second;
+        if (tab.childHwnd) {
+            ::ShowWindow(tab.childHwnd, SW_SHOW);
+            ::SetFocus(tab.childHwnd);
+#ifdef AEON_HAS_WEBVIEW2
+            if (tab.controller) {
+                tab.controller->put_IsVisible(TRUE);
+                tab.controller->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+            }
+#endif
+        } else {
+            PaintFallback(tab);
+        }
     }
 }
 
@@ -798,28 +1180,32 @@ static void __cdecl Engine_SetViewport(unsigned int tab_id,
     t.hostHwnd = static_cast<HWND>(hwnd);
     t.x = x; t.y = y; t.w = w; t.h = h;
 
+    bool shouldShow = (w > 0 && h > 0);
+
 #ifdef AEON_HAS_WEBVIEW2
     // Create child window for WebView2 if it doesn't exist
     if (!t.childHwnd && t.hostHwnd) {
         EnsureWindowClass(g_hInst);
         t.childHwnd = CreateWindowExW(
             0, AEON_WV2_CLASS, L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
-            x, y, w, h,
+            WS_CHILD | (shouldShow ? WS_VISIBLE : 0) | WS_CLIPCHILDREN,
+            x, y, (std::max)(1, w), (std::max)(1, h),
             t.hostHwnd, nullptr, g_hInst, nullptr);
         SetWindowLongPtr(t.childHwnd, GWLP_USERDATA, (LONG_PTR)tab_id);
 
         // Initialize WebView2 in the child window
         InitWebView2ForTab(t);
     } else if (t.childHwnd) {
-        MoveWindow(t.childHwnd, x, y, w, h, TRUE);
+        MoveWindow(t.childHwnd, x, y, (std::max)(0, w), (std::max)(0, h), TRUE);
+        ::ShowWindow(t.childHwnd, shouldShow ? SW_SHOW : SW_HIDE);
         if (t.controller) {
-            RECT bounds = { 0, 0, w, h };
+            RECT bounds = { 0, 0, (std::max)(0, w), (std::max)(0, h) };
             t.controller->put_Bounds(bounds);
+            t.controller->put_IsVisible(shouldShow ? TRUE : FALSE);
         }
     }
 #else
-    PaintFallback(t);
+    if (shouldShow) PaintFallback(t);
 #endif
 }
 
@@ -890,12 +1276,17 @@ static int __cdecl Engine_ExportStorageState(const char* json_path) {
             if (SUCCEEDED(tab.webview.As(&wv2_2)) && wv2_2) {
                 ComPtr<ICoreWebView2CookieManager> cookieManager;
                 if (SUCCEEDED(wv2_2->get_CookieManager(&cookieManager)) && cookieManager) {
-                    HANDLE hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-                    std::vector<StoredCookie> liveCookies;
+                    struct CookieContext {
+                        HANDLE hEvent = nullptr;
+                        std::vector<StoredCookie> liveCookies;
+                        std::atomic<bool> done{false};
+                    };
+                    auto cCtx = std::make_shared<CookieContext>();
+                    cCtx->hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 
                     HRESULT hr = cookieManager->GetCookies(nullptr,
                         Callback<ICoreWebView2GetCookiesCompletedHandler>(
-                            [hEvent, &liveCookies](HRESULT res, ICoreWebView2CookieList* list) -> HRESULT {
+                            [cCtx](HRESULT res, ICoreWebView2CookieList* list) -> HRESULT {
                                 if (SUCCEEDED(res) && list) {
                                     UINT count = 0;
                                     list->get_Count(&count);
@@ -938,26 +1329,33 @@ static int __cdecl Engine_ExportStorageState(const char* json_path) {
                                                 else if (kind == COREWEBVIEW2_COOKIE_SAME_SITE_KIND_NONE) sc.sameSite = "None";
                                                 else sc.sameSite = "Lax";
                                             }
-                                            liveCookies.push_back(sc);
+                                            cCtx->liveCookies.push_back(sc);
                                         }
                                     }
                                 }
-                                SetEvent(hEvent);
+                                cCtx->done.store(true);
+                                if (cCtx->hEvent) SetEvent(cCtx->hEvent);
                                 return S_OK;
                             }).Get());
 
                     if (SUCCEEDED(hr)) {
                         DWORD start = GetTickCount();
-                        while (WaitForSingleObject(hEvent, 0) != WAIT_OBJECT_0) {
+                        while (WaitForSingleObject(cCtx->hEvent, 0) != WAIT_OBJECT_0) {
                             MSG msg;
                             if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                                if (msg.message == WM_QUIT) {
+                                    PostQuitMessage((int)msg.wParam);
+                                    break;
+                                }
                                 TranslateMessage(&msg); DispatchMessageW(&msg);
                             } else Sleep(5);
                             if (GetTickCount() - start > 5000) break;
                         }
-                        if (!liveCookies.empty()) cookies = liveCookies;
+                        if (!cCtx->liveCookies.empty()) cookies = cCtx->liveCookies;
                     }
-                    CloseHandle(hEvent);
+                    HANDLE hEv = cCtx->hEvent;
+                    cCtx->hEvent = nullptr;
+                    if (hEv) CloseHandle(hEv);
                 }
             }
             break;
@@ -970,33 +1368,46 @@ static int __cdecl Engine_ExportStorageState(const char* json_path) {
             size_t slashPos = tab.url.find('/', 8);
             std::string originStr = (slashPos != std::string::npos) ? tab.url.substr(0, slashPos) : tab.url;
 
-            HANDLE hLsEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-            std::string lsJson;
+            struct LsContext {
+                HANDLE hLsEvent = nullptr;
+                std::string lsJson;
+                std::atomic<bool> done{false};
+            };
+            auto lsCtx = std::make_shared<LsContext>();
+            lsCtx->hLsEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+
             tab.webview->ExecuteScript(
                 L"(function(){ try { return JSON.stringify(Object.entries(localStorage)); } catch(e) { return '[]'; } })()",
                 Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
-                    [hLsEvent, &lsJson](HRESULT res, LPCWSTR resultObjectAsJson) -> HRESULT {
+                    [lsCtx](HRESULT res, LPCWSTR resultObjectAsJson) -> HRESULT {
                         if (SUCCEEDED(res) && resultObjectAsJson) {
                             char buf[16384] = {};
                             WideCharToMultiByte(CP_UTF8, 0, resultObjectAsJson, -1, buf, sizeof(buf), nullptr, nullptr);
-                            lsJson = buf;
+                            lsCtx->lsJson = buf;
                         }
-                        SetEvent(hLsEvent);
+                        lsCtx->done.store(true);
+                        if (lsCtx->hLsEvent) SetEvent(lsCtx->hLsEvent);
                         return S_OK;
                     }).Get());
 
             DWORD start = GetTickCount();
-            while (WaitForSingleObject(hLsEvent, 0) != WAIT_OBJECT_0) {
+            while (WaitForSingleObject(lsCtx->hLsEvent, 0) != WAIT_OBJECT_0) {
                 MSG msg;
                 if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                    if (msg.message == WM_QUIT) {
+                        PostQuitMessage((int)msg.wParam);
+                        break;
+                    }
                     TranslateMessage(&msg); DispatchMessageW(&msg);
                 } else Sleep(5);
                 if (GetTickCount() - start > 2000) break;
             }
-            CloseHandle(hLsEvent);
+            HANDLE hEv = lsCtx->hLsEvent;
+            lsCtx->hLsEvent = nullptr;
+            if (hEv) CloseHandle(hEv);
 
-            if (!lsJson.empty() && lsJson != "\"[]\"" && lsJson != "[]") {
-                std::string raw = lsJson;
+            if (!lsCtx->lsJson.empty() && lsCtx->lsJson != "\"[]\"" && lsCtx->lsJson != "[]") {
+                std::string raw = lsCtx->lsJson;
                 if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"') {
                     raw = raw.substr(1, raw.size() - 2);
                     std::string unesc;
@@ -1238,6 +1649,71 @@ static int __cdecl Engine_ImportStorageState(const char* json_path) {
     return static_cast<int>(importedCookies.size());
 }
 
+static int __cdecl Engine_ExecuteScript(unsigned int tab_id, const char* script, char* out_buf, unsigned int out_buf_len) {
+    if (!out_buf || out_buf_len == 0) return 0;
+    out_buf[0] = '\0';
+    if (!script || !*script) return 0;
+
+#ifdef AEON_HAS_WEBVIEW2
+    auto it = g_Tabs.find(tab_id);
+    if (it == g_Tabs.end() || !it->second.webview) return 0;
+
+    int wLen = MultiByteToWideChar(CP_UTF8, 0, script, -1, nullptr, 0);
+    if (wLen <= 0) return 0;
+    std::wstring wScript(wLen, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, script, -1, &wScript[0], wLen);
+
+    struct ExecContext {
+        HANDLE hEvent = nullptr;
+        std::string jsRes;
+        std::atomic<bool> done{false};
+    };
+    auto ctx = std::make_shared<ExecContext>();
+    ctx->hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+
+    HRESULT hr = it->second.webview->ExecuteScript(
+        wScript.c_str(),
+        Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+            [ctx](HRESULT res, LPCWSTR resultObjectAsJson) -> HRESULT {
+                if (SUCCEEDED(res) && resultObjectAsJson) {
+                    char buf[65536] = {};
+                    WideCharToMultiByte(CP_UTF8, 0, resultObjectAsJson, -1, buf, sizeof(buf), nullptr, nullptr);
+                    ctx->jsRes = buf;
+                }
+                ctx->done.store(true);
+                if (ctx->hEvent) SetEvent(ctx->hEvent);
+                return S_OK;
+            }).Get());
+
+    if (SUCCEEDED(hr)) {
+        DWORD start = GetTickCount();
+        while (WaitForSingleObject(ctx->hEvent, 0) != WAIT_OBJECT_0) {
+            MSG msg;
+            if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                if (msg.message == WM_QUIT) {
+                    PostQuitMessage((int)msg.wParam);
+                    break;
+                }
+                TranslateMessage(&msg); DispatchMessageW(&msg);
+            } else Sleep(5);
+            if (GetTickCount() - start > 3000) break;
+        }
+    }
+    HANDLE hEv = ctx->hEvent;
+    ctx->hEvent = nullptr;
+    if (hEv) CloseHandle(hEv);
+
+    if (!ctx->jsRes.empty()) {
+        strncpy_s(out_buf, out_buf_len, ctx->jsRes.c_str(), _TRUNCATE);
+        return static_cast<int>(strlen(out_buf));
+    }
+#else
+    (void)tab_id; (void)script;
+#endif
+
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Static VTable singleton
 // ---------------------------------------------------------------------------
@@ -1260,7 +1736,8 @@ static AeonEngineVTable g_VTable = {
     Engine_SetCallbacks,
     Engine_SetViewport,
     Engine_ExportStorageState,
-    Engine_ImportStorageState
+    Engine_ImportStorageState,
+    Engine_ExecuteScript
 };
 
 // ---------------------------------------------------------------------------
@@ -1281,6 +1758,30 @@ AEON_EXPORT AeonEngineVTable* __cdecl AeonEngine_Create() {
 
 // DLL entry point
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID) {
+    if (reason == DLL_PROCESS_ATTACH || reason == DLL_THREAD_ATTACH) {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+        if (hK32) {
+            typedef BOOL(WINAPI* PFN_SetProcessErrorMode)(DWORD);
+            PFN_SetProcessErrorMode pfn = (PFN_SetProcessErrorMode)GetProcAddress(hK32, "SetProcessErrorMode");
+            if (pfn) pfn(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+            typedef HRESULT(WINAPI* PFN_WerSetFlags)(DWORD);
+            PFN_WerSetFlags pfnWer = (PFN_WerSetFlags)GetProcAddress(hK32, "WerSetFlags");
+            if (pfnWer) pfnWer(1 /* WER_FAULT_REPORTING_NO_UI */);
+        }
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (hNtdll) {
+            typedef LONG(NTAPI* PFN_NtSetInformationProcess)(HANDLE, ULONG, PVOID, ULONG);
+            PFN_NtSetInformationProcess pfnNt = (PFN_NtSetInformationProcess)GetProcAddress(hNtdll, "NtSetInformationProcess");
+            if (pfnNt) {
+                ULONG hardErrorMode = 0;
+                pfnNt(GetCurrentProcess(), 12 /* ProcessDefaultHardErrorMode */, &hardErrorMode, sizeof(hardErrorMode));
+            }
+        }
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        _set_invalid_parameter_handler([](const wchar_t*, const wchar_t*, const wchar_t*, unsigned int, uintptr_t) {});
+        _set_purecall_handler([]() {});
+    }
     if (reason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
         fprintf(stdout, "[Blink] aeon_blink.dll loaded (WebView2 adapter).\n");

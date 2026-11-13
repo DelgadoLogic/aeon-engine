@@ -13,19 +13,30 @@ import Footer from './components/Footer';
 
 function App() {
   useEffect(() => {
+    const elements = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) {
+      elements.forEach((el) => el.classList.add('visible'));
+      return undefined;
+    }
+
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
         if (e.isIntersecting) {
           e.target.classList.add('visible');
         }
       });
-    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0.02, rootMargin: '200px 0px 200px 0px' });
 
-    const elements = document.querySelectorAll('.reveal');
     elements.forEach((el) => io.observe(el));
 
+    // Progressive enhancement safety timer so sections never remain invisible
+    const fallbackTimer = setTimeout(() => {
+      elements.forEach((el) => el.classList.add('visible'));
+    }, 450);
+
     return () => {
-      elements.forEach((el) => io.unobserve(el));
+      clearTimeout(fallbackTimer);
+      io.disconnect();
     };
   }, []);
 

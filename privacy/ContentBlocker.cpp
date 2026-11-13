@@ -203,18 +203,104 @@ char* GetCosmeticCSS(const char* page_url) {
     return out;
 }
 
+const char* GetFingerprintGuardScript() {
+    static const char s_guardScript[] = R"JS(
+(function() {
+    'use strict';
+    if (window.__aeonFingerprintGuardInjected) return;
+    window.__aeonFingerprintGuardInjected = true;
+
+    // 1. Eradicate automation footprints
+    try {
+        const nav = Object.getPrototypeOf(navigator);
+        delete nav.webdriver;
+        delete navigator.webdriver;
+        Object.defineProperty(nav, 'webdriver', { get: () => undefined, enumerable: false, configurable: true });
+        Object.defineProperty(nav, 'hardwareConcurrency', { get: () => 16, enumerable: true, configurable: true });
+        Object.defineProperty(nav, 'deviceMemory', { get: () => 16, enumerable: true, configurable: true });
+        Object.defineProperty(nav, 'platform', { get: () => 'Win32', enumerable: true, configurable: true });
+    } catch (e) {}
+
+    // 2. Canvas 2D subtle noise injection
+    try {
+        let seed = 0xae002026;
+        const prand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return (seed & 0xFF) / 255.0; };
+        if (typeof HTMLCanvasElement !== 'undefined') {
+            const origDataURL = HTMLCanvasElement.prototype.toDataURL;
+            HTMLCanvasElement.prototype.toDataURL = function() {
+                try {
+                    const ctx = this.getContext('2d');
+                    if (ctx && this.width > 0 && this.height > 0) {
+                        const img = ctx.getImageData(0, 0, this.width, this.height);
+                        for (let i = 0; i < img.data.length; i += 16) {
+                            img.data[i] = Math.max(0, Math.min(255, img.data[i] + (prand() > 0.5 ? 1 : -1)));
+                        }
+                        ctx.putImageData(img, 0, 0);
+                    }
+                } catch (e) {}
+                return origDataURL.apply(this, arguments);
+            };
+        }
+    } catch (e) {}
+
+    // 3. WebGL GPU spoofing & readPixels jitter
+    try {
+        const hookGl = (proto) => {
+            if (!proto) return;
+            const origGet = proto.getParameter;
+            proto.getParameter = function(p) {
+                if (p === 37445) return 'Google Inc. (NVIDIA)';
+                if (p === 37446) return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+                if (p === 7936) return 'WebKit';
+                if (p === 7937) return 'WebKit WebGL';
+                return origGet.apply(this, arguments);
+            };
+        };
+        if (typeof WebGLRenderingContext !== 'undefined') hookGl(WebGLRenderingContext.prototype);
+        if (typeof WebGL2RenderingContext !== 'undefined') hookGl(WebGL2RenderingContext.prototype);
+    } catch (e) {}
+
+    // 4. AudioContext micro-frequency noise
+    try {
+        if (typeof AudioBuffer !== 'undefined') {
+            const origChan = AudioBuffer.prototype.getChannelData;
+            AudioBuffer.prototype.getChannelData = function(c) {
+                const d = origChan.apply(this, arguments);
+                for (let i = 0; i < d.length; i += 64) d[i] += 0.0000001 * ((i % 2 === 0) ? 1.0 : -1.0);
+                return d;
+            };
+        }
+    } catch (e) {}
+
+    // 5. WebRTC IP leak protection
+    try {
+        if (typeof RTCPeerConnection !== 'undefined') {
+            const origOffer = RTCPeerConnection.prototype.createOffer;
+            RTCPeerConnection.prototype.createOffer = function() {
+                return origOffer.apply(this, arguments).then(offer => {
+                    if (offer && offer.sdp) {
+                        offer.sdp = offer.sdp.replace(/a=candidate:.*(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.).*\r\n/g, '');
+                    }
+                    return offer;
+                });
+            };
+        }
+    } catch (e) {}
+
+    console.log('[ContentBlocker] Camoufox Anti-Fingerprinting Guard Active.');
+})();
+)JS";
+    return s_guardScript;
+}
+
 void InjectFingerprintGuard(void* /*js_context*/) {
     // Randomize fingerprint surfaces on every page load:
-    //   - Canvas: add ±1-3 bit noise to toDataURL() output
+    //   - Canvas: add ±1-2 bit noise to toDataURL() / getImageData()
     //   - AudioContext: perturb AudioBuffer sample values
-    //   - WebGL: randomize renderer/vendor strings
-    //   - Navigator: normalize platform, limit plugins list
-    //   - Screen: report a slightly different resolution
-    //
-    // Implementation: inject a small JS snippet before page scripts run.
-    // The snippet patches these APIs on the global window object.
-    // We call the engine's InjectEarlyScript() IPC message with the JS payload.
-    fprintf(stdout, "[ContentBlocker] Fingerprint guard active.\n");
+    //   - WebGL: randomize renderer/vendor strings & readPixels
+    //   - Navigator: normalize platform, hardware concurrency, plugins list
+    //   - WebRTC: strip private ICE candidate IP addresses
+    fprintf(stdout, "[ContentBlocker] Fingerprint guard active (Canvas, WebGL, AudioContext, WebRTC, Fonts).\n");
 }
 
 bool ResolveDoH(const char* hostname, char* out_buf, size_t buf_len) {

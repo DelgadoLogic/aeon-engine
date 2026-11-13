@@ -99,7 +99,7 @@ nav {
   66% { transform: translate(-15px, 20px) scale(0.95); }
 }
 
-.hero-content { position: relative; z-index: 1; max-width: 800px; }
+.hero-content { position: relative; z-index: 1; width: 100%; max-width: 800px; min-width: 0; }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
   background: rgba(99,130,255,0.1); border: 1px solid var(--border);
@@ -300,9 +300,11 @@ h1 .gradient, .hero-h1-anim .gradient {
   font-size: 15px; font-weight: 800; flex-shrink: 0;
   box-shadow: 0 0 20px var(--glow);
 }
-.flow-content { padding-top: 8px; }
+.flow-content { padding-top: 8px; min-width: 0; }
 .flow-content h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
 .flow-content p { font-size: 15px; color: var(--muted); }
+code { overflow-wrap: anywhere; word-break: break-word; }
+.waitlist-section { position: relative; overflow: hidden; }
 
 /* ── Comparison table ── */
 .comparison-section { text-align: center; }
@@ -1335,21 +1337,33 @@ footer a { color: var(--accent); text-decoration: none; }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  nav { padding: 0 20px; }
+  nav { padding: 0 16px; }
   .nav-links { display: none; }
-  .section { padding: 64px 24px; }
-  .features-grid { grid-template-columns: 1fr; }
-  .stats-bar { gap: 40px; padding: 32px 24px; }
-  .terminal-body { min-height: 320px; }
-  .switch-grid { grid-template-columns: 1fr; }
-  .cmp-table-wrap { margin-left: -24px; margin-right: -24px; border-radius: 0; border-left: none; border-right: none; }
+  .hero { padding: 100px 16px 64px; }
+  .hero-h1-anim, h1 { font-size: clamp(36px, 9vw, 56px); letter-spacing: -1.5px; }
+  .hero-sub { font-size: 16px; }
+  .hero-actions .btn-primary, .hero-actions .btn-secondary { padding: 12px 20px; font-size: 14px; width: 100%; max-width: 320px; text-align: center; }
+  .section { padding: 64px 20px; }
+  .features-grid { grid-template-columns: minmax(0, 1fr); }
+  .stats-bar { gap: 32px; padding: 32px 20px; }
+  .terminal-body { min-height: 280px; padding: 16px; font-size: 12px; overflow-x: auto; }
+  .switch-grid { grid-template-columns: minmax(0, 1fr); }
+  .cmp-table-wrap { margin-left: -20px; margin-right: -20px; border-radius: 0; border-left: none; border-right: none; overflow-x: auto; }
   .cmp-table th, .cmp-table td { padding: 12px 10px; font-size: 13px; }
-  .trust-strip { gap: 24px; padding: 32px 24px; }
+  .trust-strip { gap: 20px; padding: 28px 20px; }
   .waitlist-input-wrap { flex-direction: column; border-radius: 12px; }
   .waitlist-btn { border-radius: 0 0 11px 11px; }
   .hero-pills { gap: 8px; }
   .hero-pill { font-size: 11px; padding: 5px 12px; }
-  .pricing-cards { grid-template-columns: 1fr; }
+  .pricing-cards { grid-template-columns: minmax(0, 1fr); }
   .waitlist-meta { flex-direction: column; gap: 8px; }
+  .arc-browser-shell { flex-direction: column; min-height: auto; }
+  .arc-sidebar, .arc-sidebar.collapsed { width: 100%; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+  .arc-content-wrapper { min-width: 0; width: 100%; }
+  .arc-top-nav, .chrome-nav-row { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .arc-url-bar, .url-bar { flex: 1 1 100%; min-width: 0; }
+  .url-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .page-header { flex-direction: column; gap: 8px; }
+  .log-line { flex-wrap: wrap; gap: 6px; word-break: break-word; }
 }
 

@@ -1,48 +1,29 @@
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #define _WINSOCKAPI_
-// AeonBrowser — AutoUpdater.cpp v2
-// Aeon Autonomous Update System
-//
-// HOW IT WORKS (from the user's perspective):
-//   Nothing. The browser gets better. They never notice.
-//
-// HOW IT ACTUALLY WORKS:
-//   1. Background thread polls GCS manifest every 6 hours
-//   2. If new version found: downloads in 4MB chunks via P2P
-//      (from AeonHive peers first, falls back to GCS if needed)
-//   3. Each chunk is Ed25519-verified before writing to disk
-//   4. Full binary assembled in %LOCALAPPDATA%\Aeon\staging\
-//   5. On NEXT COLD START: atomic rename before UI shows
-//      User sees: browser opens normally, slightly different version
-//
-// SILENCE RULES (enforced in C++):
-//   - All I/O runs at IDLE_PRIORITY_CLASS
-//   - Bandwidth capped at 64KB/s when GetLastInputInfo < 300s
-//   - No UI notifications unless user opens aeon://settings
-//   - Update install: ONLY before first window is painted
-//   - P2P connections: BACKGROUND socket priority (SO_PRIORITY)
-//
-// SECURITY:
-//   - Manifest signed with Ed25519 (key in Google Secret Manager)
-//   - Every 4MB chunk individually signed
-//   - Full binary SHA-256 verified before staging
-//   - WinTrust Authenticode check on final installer
-//   - Never executes code from unsigned sources
+// AeonBrowser — AutoUpdater.cpp v2.1
+// Sovereign Autonomous Update System (Canonical Sorted-JSON Ed25519 + SHA-256)
+// Matches OmniCore.Engine.AutoUpdateEngine and Infrastructure/aeon-update-server/main.py.
 
 #include "AutoUpdater.h"
 #include "../core/AeonVersion.h"
 #include "../core/settings/SettingsEngine.h"
+#include "../core/session/nlohmann/json.hpp"
+#include "../core/crypto/Ed25519.h"
 #include <windows.h>
 #include <shellapi.h>
 #include <wininet.h>
+#include <wincrypt.h>
 #include <wintrust.h>
 #include <softpub.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <shlobj.h>      // SHGetKnownFolderPath
-#include <bcrypt.h>      // SHA-256 (built-in, no OpenSSL needed)
+#include <shlobj.h>
+#include <bcrypt.h>
 #include <cstdio>
 #include <cstring>
+#include <cctype>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <thread>
@@ -51,11 +32,15 @@
 #include <filesystem>
 
 #pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "wintrust.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "bcrypt.lib")
 
-// Ed25519 magic constant — available in SDK 10.0.20348+, define fallback for older SDKs
+#ifndef BCRYPT_SUCCESS
+#define BCRYPT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+#endif
+
 #ifndef BCRYPT_EDDSA_PUBLIC_GENERIC_MAGIC
 #define BCRYPT_EDDSA_PUBLIC_GENERIC_MAGIC 0x47444445  // 'EDDG'
 #endif
@@ -64,18 +49,16 @@ namespace AutoUpdater {
 
 namespace fs = std::filesystem;
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-static constexpr char  CURRENT_VERSION[]  = AEON_VERSION;  // Set by build system
-static constexpr char  MANIFEST_URL[]     =
-    "https://storage.googleapis.com/aeon-chromium-artifacts/releases/latest/manifest.json";
+static constexpr char  CURRENT_VERSION[]  = AEON_VERSION;
 static constexpr DWORD CHUNK_SIZE         = 4 * 1024 * 1024;  // 4MB
 static constexpr int   HIVE_PORT          = 9797;
 static constexpr DWORD MAX_BW_ACTIVE_KBS  = 64;    // KB/s when user active
 static constexpr DWORD MAX_BW_IDLE_KBS    = 10240; // KB/s when user idle (10MB/s)
 static constexpr DWORD IDLE_THRESHOLD_MS  = 300000; // 5 minutes = "idle"
 
-// ── State ────────────────────────────────────────────────────────────────────
+static const BYTE kEd25519SpkiPrefix[12] = {
+    0x30, 0x2A, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x03, 0x21, 0x00
+};
 
 static std::atomic<bool>        g_running{false};
 static std::atomic<float>       g_download_progress{0.0f};
@@ -103,7 +86,39 @@ static DWORD GetBandwidthCapBytesPerSec() {
     return kbps * 1024;
 }
 
-// ── SHA-256 via BCrypt ─────────────────────────────────────────────────────
+// ── Integrity & URL Helpers (Fail-Closed) ─────────────────────────────────────
+
+bool IsTrustedHttpsUrl(const std::string& url) {
+    if (url.size() <= 8) return false;
+    std::string prefix = url.substr(0, 8);
+    std::transform(prefix.begin(), prefix.end(), prefix.begin(), [](unsigned char c) {
+        return (char)std::tolower(c);
+    });
+    if (prefix != "https://") return false;
+    return url[8] != '/' && url[8] != ' ' && url[8] != '\t';
+}
+
+bool IsValidSha256Hex(const std::string& hash) {
+    if (hash.size() != 64) return false;
+    for (unsigned char c : hash) {
+        bool ok = (c >= '0' && c <= '9') ||
+                  (c >= 'a' && c <= 'f') ||
+                  (c >= 'A' && c <= 'F');
+        if (!ok) return false;
+    }
+    return true;
+}
+
+static bool EqualsHexCaseInsensitive(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return false;
+    unsigned char diff = 0;
+    for (size_t i = 0; i < a.size(); i++) {
+        unsigned char ca = (unsigned char)std::tolower((unsigned char)a[i]);
+        unsigned char cb = (unsigned char)std::tolower((unsigned char)b[i]);
+        diff |= (ca ^ cb);
+    }
+    return diff == 0;
+}
 
 static bool ComputeFileSHA256(const std::wstring& path, std::string& out_hex) {
     BCRYPT_ALG_HANDLE hAlg = nullptr;
@@ -116,7 +131,10 @@ static bool ComputeFileSHA256(const std::wstring& path, std::string& out_hex) {
     BCryptGetProperty(hAlg, BCRYPT_HASH_LENGTH, (PUCHAR)&hashLen, sizeof(hashLen), &resultLen, 0);
     std::vector<BYTE> hashBuf(hashLen);
 
-    BCryptCreateHash(hAlg, &hHash, nullptr, 0, nullptr, 0, 0);
+    if (!BCRYPT_SUCCESS(BCryptCreateHash(hAlg, &hHash, nullptr, 0, nullptr, 0, 0))) {
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        return false;
+    }
 
     FILE* f = nullptr;
     _wfopen_s(&f, path.c_str(), L"rb");
@@ -138,34 +156,138 @@ static bool ComputeFileSHA256(const std::wstring& path, std::string& out_hex) {
 
     char hex[65] = {};
     for (DWORD i = 0; i < hashLen; i++)
-        sprintf_s(hex + i*2, 3, "%02x", hashBuf[i]);
+        sprintf_s(hex + i * 2, 3, "%02x", hashBuf[i]);
     out_hex = hex;
     return true;
 }
 
-// ── Ed25519 manifest verification via BCrypt ──────────────────────────────────
-//
-// The update manifest is signed with our Ed25519 private key (held in
-// Google Secret Manager, never leaves the build server). The 32-byte
-// public key is embedded here. Replace AEON_ED25519_PUBKEY_HEX at build
-// time with the real key via -D flag or config header.
-//
-// Signed message = "version|sha256|chunk0,chunk1,...,chunkN"
-// Signature     = hex-encoded 64-byte Ed25519 signature in manifest.signature
+// ── Canonical Sorted-Key JSON & Ed25519 Verification ──────────────────────────
+// Matches Python json.dumps(obj, sort_keys=True, separators=(",", ":"))
+// and OmniCore.Engine.AutoUpdateEngine.BuildCanonicalManifestJson.
 
-#ifndef AEON_ED25519_PUBKEY_HEX
-// PLACEHOLDER — CI must override this. If it ships, VerifyManifestSignature
-// will reject all manifests (correct fail-closed behavior).
-#define AEON_ED25519_PUBKEY_HEX \
-    "0000000000000000000000000000000000000000000000000000000000000000"
-#endif
+static void AppendCanonicalEscapedString(std::string& out, const std::string& utf8) {
+    out.push_back('"');
+    size_t i = 0;
+    while (i < utf8.size()) {
+        unsigned char c = (unsigned char)utf8[i];
+        if (c == '"') { out += "\\\""; i++; }
+        else if (c == '\\') { out += "\\\\"; i++; }
+        else if (c == '\b') { out += "\\b"; i++; }
+        else if (c == '\f') { out += "\\f"; i++; }
+        else if (c == '\n') { out += "\\n"; i++; }
+        else if (c == '\r') { out += "\\r"; i++; }
+        else if (c == '\t') { out += "\\t"; i++; }
+        else if (c < 0x20) {
+            char esc[7];
+            sprintf_s(esc, sizeof(esc), "\\u%04x", (unsigned)c);
+            out += esc;
+            i++;
+        } else if (c <= 0x7E) {
+            out.push_back((char)c);
+            i++;
+        } else {
+            // Decode UTF-8 multi-byte sequence to Unicode codepoint and escape as \uXXXX
+            uint32_t cp = 0;
+            size_t adv = 1;
+            if ((c & 0xE0) == 0xC0 && i + 1 < utf8.size()) {
+                cp = ((c & 0x1F) << 6) | ((unsigned char)utf8[i + 1] & 0x3F);
+                adv = 2;
+            } else if ((c & 0xF0) == 0xE0 && i + 2 < utf8.size()) {
+                cp = ((c & 0x0F) << 12) | (((unsigned char)utf8[i + 1] & 0x3F) << 6) | ((unsigned char)utf8[i + 2] & 0x3F);
+                adv = 3;
+            } else if ((c & 0xF8) == 0xF0 && i + 3 < utf8.size()) {
+                cp = ((c & 0x07) << 18) | (((unsigned char)utf8[i + 1] & 0x3F) << 12) |
+                     (((unsigned char)utf8[i + 2] & 0x3F) << 6) | ((unsigned char)utf8[i + 3] & 0x3F);
+                adv = 4;
+            } else {
+                cp = c;
+                adv = 1;
+            }
+            if (cp <= 0xFFFF) {
+                char esc[7];
+                sprintf_s(esc, sizeof(esc), "\\u%04x", cp);
+                out += esc;
+            } else {
+                cp -= 0x10000;
+                uint32_t high = 0xD800 + ((cp >> 10) & 0x3FF);
+                uint32_t low  = 0xDC00 + (cp & 0x3FF);
+                char esc[13];
+                sprintf_s(esc, sizeof(esc), "\\u%04x\\u%04x", high, low);
+                out += esc;
+            }
+            i += adv;
+        }
+    }
+    out.push_back('"');
+}
 
-static bool HexDecode(const char* hex, std::vector<BYTE>& out) {
-    size_t len = strlen(hex);
-    if (len % 2 != 0) return false;
-    out.resize(len / 2);
-    for (size_t i = 0; i < len; i += 2) {
-        char byte_str[3] = { hex[i], hex[i+1], '\0' };
+static void AppendCanonicalElement(std::string& out, const nlohmann::json& elem) {
+    if (elem.is_object()) {
+        out.push_back('{');
+        // nlohmann::json object uses std::map<std::string, json>, which iterates in sorted key order
+        bool first = true;
+        for (auto it = elem.begin(); it != elem.end(); ++it) {
+            if (!first) out.push_back(',');
+            first = false;
+            AppendCanonicalEscapedString(out, it.key());
+            out.push_back(':');
+            AppendCanonicalElement(out, it.value());
+        }
+        out.push_back('}');
+    } else if (elem.is_array()) {
+        out.push_back('[');
+        for (size_t i = 0; i < elem.size(); i++) {
+            if (i > 0) out.push_back(',');
+            AppendCanonicalElement(out, elem[i]);
+        }
+        out.push_back(']');
+    } else if (elem.is_string()) {
+        AppendCanonicalEscapedString(out, elem.get_ref<const std::string&>());
+    } else if (elem.is_boolean()) {
+        out += elem.get<bool>() ? "true" : "false";
+    } else if (elem.is_number_integer()) {
+        out += std::to_string(elem.get<int64_t>());
+    } else if (elem.is_number_unsigned()) {
+        out += std::to_string(elem.get<uint64_t>());
+    } else if (elem.is_number_float()) {
+        out += elem.dump();
+    } else {
+        out += "null";
+    }
+}
+
+std::string CanonicalizeJsonString(const std::string& rawManifestObjectJson) {
+    try {
+        nlohmann::json j = nlohmann::json::parse(rawManifestObjectJson);
+        if (!j.is_object()) return "";
+        std::string canonical;
+        canonical.reserve(rawManifestObjectJson.size());
+        AppendCanonicalElement(canonical, j);
+        return canonical;
+    } catch (...) {
+        return "";
+    }
+}
+
+static bool Base64DecodeBytes(const std::string& input, std::vector<BYTE>& out) {
+    if (input.empty()) return false;
+    DWORD outLen = 0;
+    if (!CryptStringToBinaryA(input.c_str(), (DWORD)input.size(), CRYPT_STRING_BASE64_ANY, nullptr, &outLen, nullptr, nullptr) || outLen == 0) {
+        return false;
+    }
+    out.resize(outLen);
+    if (!CryptStringToBinaryA(input.c_str(), (DWORD)input.size(), CRYPT_STRING_BASE64_ANY, out.data(), &outLen, nullptr, nullptr)) {
+        return false;
+    }
+    out.resize(outLen);
+    return true;
+}
+
+static bool HexDecodeBytes(const std::string& hex, std::vector<BYTE>& out) {
+    if (hex.empty() || (hex.size() % 2) != 0) return false;
+    out.resize(hex.size() / 2);
+    for (size_t i = 0; i < hex.size(); i += 2) {
+        char byte_str[3] = { hex[i], hex[i + 1], '\0' };
         char* end = nullptr;
         unsigned long val = strtoul(byte_str, &end, 16);
         if (end != byte_str + 2) return false;
@@ -174,139 +296,190 @@ static bool HexDecode(const char* hex, std::vector<BYTE>& out) {
     return true;
 }
 
-static bool VerifyManifestSignature(const UpdateManifest& m) {
-    if (m.signature.empty()) {
-        fprintf(stderr, "[AutoUpdater] Manifest has no signature — REJECTED\n");
-        return false;
-    }
-
-    // 1. Reconstruct the signed message: "version|sha256|chunk0,chunk1,..."
-    std::string message = m.version + "|" + m.sha256 + "|";
-    for (size_t i = 0; i < m.chunk_urls.size(); i++) {
-        if (i > 0) message += ",";
-        message += m.chunk_urls[i];
-    }
-
-    // 2. Decode public key and signature from hex
-    std::vector<BYTE> pubkey_raw, sig_raw;
-    if (!HexDecode(AEON_ED25519_PUBKEY_HEX, pubkey_raw) || pubkey_raw.size() != 32) {
-        fprintf(stderr, "[AutoUpdater] Invalid Ed25519 public key compile-time constant\n");
-        return false;
-    }
-    if (!HexDecode(m.signature.c_str(), sig_raw) || sig_raw.size() != 64) {
-        fprintf(stderr, "[AutoUpdater] Invalid Ed25519 signature in manifest (expected 128 hex chars)\n");
-        return false;
-    }
-
-    // 3. Import the public key into BCrypt
-    //    BCrypt Ed25519 key blob format:
-    //    BCRYPT_KEY_BLOB_HEADER (magic=0x4B455931 "1EKB"? — we use BCRYPT_ECCPUBLIC_BLOB)
-    //    For Ed25519: the blob is BCRYPT_ECCKEY_BLOB + 32 bytes of raw public key
-    BCRYPT_ALG_HANDLE hAlg = nullptr;
-    NTSTATUS st = BCryptOpenAlgorithmProvider(&hAlg, L"Ed25519", nullptr, 0);
-    if (!BCRYPT_SUCCESS(st)) {
-        // Ed25519 not available (pre-1809 Windows). Fail-closed.
-        fprintf(stderr, "[AutoUpdater] Ed25519 not supported on this OS (need Win10 1809+) — REJECTED\n");
-        return false;
-    }
-
-    // Build the BCRYPT_ECCKEY_BLOB for Ed25519 (32-byte public key)
-    // Structure: { ULONG Magic, ULONG cbKey, BYTE key[cbKey] }
-    struct {
-        BCRYPT_ECCKEY_BLOB header;
-        BYTE key[32];
-    } keyBlob;
-    keyBlob.header.dwMagic = BCRYPT_EDDSA_PUBLIC_GENERIC_MAGIC;
-    keyBlob.header.cbKey   = 32;
-    memcpy(keyBlob.key, pubkey_raw.data(), 32);
-
-    BCRYPT_KEY_HANDLE hKey = nullptr;
-    st = BCryptImportKeyPair(hAlg, nullptr, BCRYPT_ECCPUBLIC_BLOB,
-                             &hKey, (PUCHAR)&keyBlob, sizeof(keyBlob), 0);
-    if (!BCRYPT_SUCCESS(st)) {
-        fprintf(stderr, "[AutoUpdater] Ed25519 key import failed (0x%08X) — REJECTED\n", (unsigned)st);
-        BCryptCloseAlgorithmProvider(hAlg, 0);
-        return false;
-    }
-
-    // 4. Verify signature
-    st = BCryptVerifySignature(hKey, nullptr,
-                               (PUCHAR)message.data(), (ULONG)message.size(),
-                               sig_raw.data(), (ULONG)sig_raw.size(), 0);
-
-    BCryptDestroyKey(hKey);
-    BCryptCloseAlgorithmProvider(hAlg, 0);
-
-    if (BCRYPT_SUCCESS(st)) {
-        fprintf(stdout, "[AutoUpdater] Ed25519 signature VERIFIED for v%s\n",
-                m.version.c_str());
+static bool DecodePublicKey32(const std::string& keyMaterial, BYTE outKey[32]) {
+    std::vector<BYTE> bytes;
+    if (keyMaterial.size() == 64 && HexDecodeBytes(keyMaterial, bytes) && bytes.size() == 32) {
+        memcpy(outKey, bytes.data(), 32);
         return true;
-    } else {
-        fprintf(stderr, "[AutoUpdater] Ed25519 signature INVALID (0x%08X) — REJECTING manifest\n",
-                (unsigned)st);
+    }
+    if (Base64DecodeBytes(keyMaterial, bytes)) {
+        if (bytes.size() == 32) {
+            memcpy(outKey, bytes.data(), 32);
+            return true;
+        }
+        if (bytes.size() == 44 && memcmp(bytes.data(), kEd25519SpkiPrefix, 12) == 0) {
+            memcpy(outKey, bytes.data() + 12, 32);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool DecodeSignature64(const std::string& sigText, std::vector<BYTE>& outSig) {
+    if (sigText.size() == 128 && HexDecodeBytes(sigText, outSig) && outSig.size() == 64) {
+        return true;
+    }
+    if (Base64DecodeBytes(sigText, outSig) && outSig.size() == 64) {
+        return true;
+    }
+    return false;
+}
+
+static bool VerifyEd25519Payload(const std::string& canonicalJson, const std::string& sigText, const std::string& pubKeyMaterial) {
+    BYTE pubKey32[32] = {};
+    if (!DecodePublicKey32(pubKeyMaterial, pubKey32)) {
+        fprintf(stderr, "[AutoUpdater] Invalid Ed25519 public key format — REJECTED\n");
+        return false;
+    }
+
+    std::vector<BYTE> sigRaw;
+    if (!DecodeSignature64(sigText, sigRaw)) {
+        fprintf(stderr, "[AutoUpdater] Invalid Ed25519 signature encoding — REJECTED\n");
+        return false;
+    }
+
+    return AeonCrypto::Ed25519::VerifyDetached(
+        reinterpret_cast<const uint8_t*>(canonicalJson.data()),
+        canonicalJson.size(),
+        sigRaw.data(),
+        pubKey32);
+}
+
+bool TryParseAndVerifyEnvelope(
+    const std::string& rawEnvelopeJson,
+    UpdateManifest& outManifest,
+    const std::string& pubKeyOverrideB64)
+{
+    outManifest = UpdateManifest{};
+    if (rawEnvelopeJson.empty()) return false;
+
+    try {
+        // Strip UTF-8 BOM if present
+        std::string cleaned = rawEnvelopeJson;
+        if (cleaned.size() >= 3 &&
+            (unsigned char)cleaned[0] == 0xEF &&
+            (unsigned char)cleaned[1] == 0xBB &&
+            (unsigned char)cleaned[2] == 0xBF) {
+            cleaned.erase(0, 3);
+        }
+
+        nlohmann::json root = nlohmann::json::parse(cleaned);
+        if (!root.is_object()) return false;
+
+        if (!root.contains("manifest") || !root["manifest"].is_object()) return false;
+        if (!root.contains("signature") || !root["signature"].is_string()) return false;
+
+        const nlohmann::json& mObj = root["manifest"];
+        std::string sigText = root["signature"].get<std::string>();
+        if (sigText.empty()) return false;
+
+        std::string canonicalPayload;
+        AppendCanonicalElement(canonicalPayload, mObj);
+
+        std::string keyMat = pubKeyOverrideB64.empty() ? SOVEREIGN_ED25519_PUBKEY_B64 : pubKeyOverrideB64;
+        if (!VerifyEd25519Payload(canonicalPayload, sigText, keyMat)) {
+            fprintf(stderr, "[AutoUpdater] Ed25519 envelope signature INVALID — REJECTING manifest\n");
+            return false;
+        }
+
+        if (!mObj.contains("version") || !mObj["version"].is_string()) return false;
+        outManifest.version = mObj["version"].get<std::string>();
+        if (outManifest.version.empty()) return false;
+
+        if (mObj.contains("product") && mObj["product"].is_string())
+            outManifest.product = mObj["product"].get<std::string>();
+        if (mObj.contains("channel") && mObj["channel"].is_string())
+            outManifest.channel = mObj["channel"].get<std::string>();
+        if (mObj.contains("status") && mObj["status"].is_string())
+            outManifest.status = mObj["status"].get<std::string>();
+        if (mObj.contains("download_url") && mObj["download_url"].is_string())
+            outManifest.download_url = mObj["download_url"].get<std::string>();
+        if (mObj.contains("release_notes") && mObj["release_notes"].is_string())
+            outManifest.release_notes = mObj["release_notes"].get<std::string>();
+        if (mObj.contains("sha256") && mObj["sha256"].is_string())
+            outManifest.sha256 = mObj["sha256"].get<std::string>();
+        if (mObj.contains("size_bytes") && mObj["size_bytes"].is_number_integer())
+            outManifest.size_bytes = mObj["size_bytes"].get<int64_t>();
+        outManifest.signature = sigText;
+
+        if (mObj.contains("chunks") && mObj["chunks"].is_array()) {
+            for (const auto& item : mObj["chunks"]) {
+                if (item.is_string() && !item.get_ref<const std::string&>().empty()) {
+                    outManifest.chunk_urls.push_back(item.get<std::string>());
+                }
+            }
+        } else if (mObj.contains("chunk_urls") && mObj["chunk_urls"].is_array()) {
+            for (const auto& item : mObj["chunk_urls"]) {
+                if (item.is_string() && !item.get_ref<const std::string&>().empty()) {
+                    outManifest.chunk_urls.push_back(item.get<std::string>());
+                }
+            }
+        }
+
+        // If single HTTPS binary URL is provided without explicit P2P chunk array, treat download_url as chunk 0
+        if (outManifest.chunk_urls.empty() && !outManifest.download_url.empty()) {
+            outManifest.chunk_urls.push_back(outManifest.download_url);
+        }
+
+        // When an actual update is advertised, enforce HTTPS URLs + valid 64-hex SHA-256 (fail-closed)
+        if (outManifest.status != "no_update" && outManifest.version != "0.0.0") {
+            if (!IsValidSha256Hex(outManifest.sha256)) {
+                fprintf(stderr, "[AutoUpdater] Manifest for v%s rejected: missing valid 64-hex sha256\n",
+                        outManifest.version.c_str());
+                return false;
+            }
+            if (outManifest.chunk_urls.empty()) {
+                fprintf(stderr, "[AutoUpdater] Manifest for v%s rejected: missing download_url\n",
+                        outManifest.version.c_str());
+                return false;
+            }
+            for (const auto& u : outManifest.chunk_urls) {
+                if (!IsTrustedHttpsUrl(u)) {
+                    fprintf(stderr, "[AutoUpdater] Manifest for v%s rejected: untrusted non-HTTPS URL\n",
+                            outManifest.version.c_str());
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    } catch (...) {
         return false;
     }
 }
 
-// ── Manifest fetch (HTTPS, silent) ───────────────────────────────────────────
+// ── Manifest fetch (HTTPS via api.delgadologic.tech, silent) ──────────────────
 
-static bool FetchManifest(UpdateManifest& out) {
-    HINTERNET hNet = InternetOpenA("AeonUpdater/2.0",
+static bool FetchAndVerifyManifest(UpdateManifest& out) {
+    HINTERNET hNet = InternetOpenA(
+        "AeonUpdater/2.1 (Windows; DelgadoLogic)",
         INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
     if (!hNet) return false;
 
-    HINTERNET hReq = InternetOpenUrlA(hNet, MANIFEST_URL, nullptr, 0,
+    const char* headers = "Accept: application/json\r\nX-Client-Product: aeon\r\n";
+    HINTERNET hReq = InternetOpenUrlA(
+        hNet, MANIFEST_URL, headers, (DWORD)strlen(headers),
         INTERNET_FLAG_SECURE | INTERNET_FLAG_RELOAD |
         INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_NO_UI, 0);
 
-    if (!hReq) { InternetCloseHandle(hNet); return false; }
+    if (!hReq) {
+        InternetCloseHandle(hNet);
+        return false;
+    }
 
-    char resp[8192] = {}; DWORD read = 0;
-    InternetReadFile(hReq, resp, sizeof(resp)-1, &read);
+    std::string rawResp;
+    char buf[4096];
+    DWORD bytesRead = 0;
+    while (InternetReadFile(hReq, buf, sizeof(buf), &bytesRead) && bytesRead > 0) {
+        rawResp.append(buf, bytesRead);
+        if (rawResp.size() > 262144) break; // 256 KB safety cap on manifest JSON
+    }
+
     InternetCloseHandle(hReq);
     InternetCloseHandle(hNet);
 
-    // Parse minimal JSON: version, sha256, chunks[], signature
-    // Using same simple parser as existing code (no external JSON lib)
-    auto field = [&](const char* key, char* buf, int len) {
-        char pat[64];
-        _snprintf_s(pat, sizeof(pat), _TRUNCATE, "\"%s\":\"", key);
-        const char* p = strstr(resp, pat);
-        if (!p) { buf[0]='\0'; return; }
-        p += strlen(pat);
-        int i = 0;
-        while (*p && *p != '"' && i < len-1) buf[i++] = *p++;
-        buf[i] = '\0';
-    };
-
-    char ver[32]={}, sha[70]={}, sig[256]={};
-    field("version",  ver,  sizeof(ver));
-    field("sha256",   sha,  sizeof(sha));
-    field("signature",sig,  sizeof(sig));
-
-    if (!ver[0]) return false;
-
-    out.version   = ver;
-    out.sha256    = sha;
-    out.signature = sig;
-    
-    // Parse chunk_urls array (simplified)
-    const char* chunks_start = strstr(resp, "\"chunks\":[");
-    if (chunks_start) {
-        chunks_start += 10; // skip "chunks":[
-        while (*chunks_start && *chunks_start != ']') {
-            if (*chunks_start == '"') {
-                chunks_start++;
-                std::string url;
-                while (*chunks_start && *chunks_start != '"')
-                    url += *chunks_start++;
-                if (!url.empty()) out.chunk_urls.push_back(url);
-            }
-            chunks_start++;
-        }
-    }
-
-    return !out.version.empty();
+    if (rawResp.empty()) return false;
+    return TryParseAndVerifyEnvelope(rawResp, out);
 }
 
 // ── P2P chunk download from AeonHive peers ────────────────────────────────────
@@ -314,36 +487,34 @@ static bool FetchManifest(UpdateManifest& out) {
 static bool DownloadChunkFromPeer(const std::string& peer_ip,
                                   int chunk_index, int chunk_total,
                                   std::vector<BYTE>& out_data) {
-    // Connect to peer's AeonHive chunk server (port 9798)
     SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
     if (s == INVALID_SOCKET) return false;
 
-    // Non-blocking connect with 3s timeout
     DWORD timeout = 3000;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
     setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
 
-    // Set background priority (doesn't compete with user traffic)
-    int prio = 0; // IPTOS_THROUGHPUT equivalent
+    int prio = 0;
     setsockopt(s, IPPROTO_IP, IP_TOS, (char*)&prio, sizeof(prio));
 
     sockaddr_in addr = {};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(9798);
-    inet_pton(AF_INET, peer_ip.c_str(), &addr.sin_addr);
+    if (inet_pton(AF_INET, peer_ip.c_str(), &addr.sin_addr) != 1) {
+        closesocket(s);
+        return false;
+    }
 
     if (connect(s, (sockaddr*)&addr, sizeof(addr)) != 0) {
         closesocket(s);
         return false;
     }
 
-    // Request: GET_CHUNK <version> <index> <total>\n
     char req[128];
-    _snprintf_s(req, sizeof(req), _TRUNCATE, 
+    _snprintf_s(req, sizeof(req), _TRUNCATE,
         "GET_CHUNK %s %d %d\n", CURRENT_VERSION, chunk_index, chunk_total);
     send(s, req, (int)strlen(req), 0);
 
-    // Read chunk data
     out_data.clear();
     out_data.reserve(CHUNK_SIZE);
     char buf[16384];
@@ -354,8 +525,7 @@ static bool DownloadChunkFromPeer(const std::string& peer_ip,
 
     while ((n = recv(s, buf, sizeof(buf), 0)) > 0) {
         out_data.insert(out_data.end(), buf, buf + n);
-        
-        // Bandwidth throttle
+
         bytes_this_sec += n;
         DWORD elapsed = GetTickCount() - sec_start;
         if (elapsed < 1000 && bytes_this_sec > cap) {
@@ -363,35 +533,37 @@ static bool DownloadChunkFromPeer(const std::string& peer_ip,
             sec_start = GetTickCount();
             bytes_this_sec = 0;
         }
-        
-        if (out_data.size() >= CHUNK_SIZE * 2) break; // Safety limit
+
+        if (out_data.size() >= CHUNK_SIZE * 2) break;
     }
 
     closesocket(s);
-    return out_data.size() > 1024; // Got meaningful data
+    return out_data.size() > 1024;
 }
 
-// ── GCS fallback chunk download ───────────────────────────────────────────────
+// ── HTTPS fallback chunk/binary download ──────────────────────────────────────
 
-static bool DownloadChunkFromGCS(const std::string& url, 
-                                  std::vector<BYTE>& out_data) {
-    HINTERNET hNet = InternetOpenA("AeonUpdater/2.0",
+static bool DownloadChunkFromHttps(const std::string& url,
+                                   std::vector<BYTE>& out_data) {
+    if (!IsTrustedHttpsUrl(url)) return false;
+
+    HINTERNET hNet = InternetOpenA("AeonUpdater/2.1 (Windows; DelgadoLogic)",
         INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
     if (!hNet) return false;
 
     HINTERNET hReq = InternetOpenUrlA(hNet, url.c_str(), nullptr, 0,
-        INTERNET_FLAG_SECURE | INTERNET_FLAG_RELOAD, 0);
+        INTERNET_FLAG_SECURE | INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_UI, 0);
     if (!hReq) { InternetCloseHandle(hNet); return false; }
 
     out_data.clear();
-    char buf[65536]; DWORD read = 0;
+    char buf[65536];
+    DWORD read = 0;
     DWORD cap = GetBandwidthCapBytesPerSec();
     DWORD bytes_this_sec = 0, sec_start = GetTickCount();
 
     while (InternetReadFile(hReq, buf, sizeof(buf), &read) && read > 0) {
         out_data.insert(out_data.end(), buf, buf + read);
-        
-        // Bandwidth throttle
+
         bytes_this_sec += read;
         DWORD elapsed = GetTickCount() - sec_start;
         if (elapsed < 1000 && bytes_this_sec > cap) {
@@ -410,11 +582,13 @@ static bool DownloadChunkFromGCS(const std::string& url,
 
 static std::string GetStagingDir() {
     wchar_t* appdata = nullptr;
-    SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &appdata);
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &appdata)) || !appdata) {
+        return "";
+    }
     std::wstring path = std::wstring(appdata) + L"\\Aeon\\staging";
     CoTaskMemFree(appdata);
     fs::create_directories(path);
-    char narrow[MAX_PATH];
+    char narrow[MAX_PATH] = {};
     WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, narrow, MAX_PATH, nullptr, nullptr);
     return std::string(narrow);
 }
@@ -424,9 +598,12 @@ static std::string GetStagingDir() {
 static bool DownloadUpdate(const UpdateManifest& manifest,
                            const std::vector<std::string>& known_peers) {
     g_staging_dir = GetStagingDir();
+    if (g_staging_dir.empty() || manifest.chunk_urls.empty() || !IsValidSha256Hex(manifest.sha256)) {
+        return false;
+    }
+
     int total_chunks = (int)manifest.chunk_urls.size();
-    
-    fprintf(stdout, "[AutoUpdater] Starting P2P download: %s (%d chunks)\n",
+    fprintf(stdout, "[AutoUpdater] Starting verified download: v%s (%d segment(s))\n",
             manifest.version.c_str(), total_chunks);
 
     std::string assembled_path = g_staging_dir + "\\aeon_next.tmp";
@@ -435,33 +612,28 @@ static bool DownloadUpdate(const UpdateManifest& manifest,
     if (!out) return false;
 
     for (int i = 0; i < total_chunks; i++) {
-        // Wait if user became active (don't interrupt them)
         while (IsUserActive()) {
-            fprintf(stdout, "[AutoUpdater] User active — pausing download...\n");
-            Sleep(30000); // Wait 30s then recheck
+            Sleep(30000);
         }
 
-        g_download_progress = (float)i / total_chunks;
-        
+        g_download_progress = (float)i / (float)total_chunks;
+
         std::vector<BYTE> chunk_data;
         bool got_chunk = false;
 
-        // Try P2P peers first (random order for load balancing)
-        for (const auto& peer : known_peers) {
-            if (DownloadChunkFromPeer(peer, i, total_chunks, chunk_data)) {
-                got_chunk = true;
-                fprintf(stdout, "[AutoUpdater] Chunk %d/%d from peer %s\n",
-                        i+1, total_chunks, peer.c_str());
-                break;
+        if (total_chunks > 1) {
+            for (const auto& peer : known_peers) {
+                if (DownloadChunkFromPeer(peer, i, total_chunks, chunk_data)) {
+                    got_chunk = true;
+                    break;
+                }
             }
         }
 
-        // Fallback to GCS 
         if (!got_chunk) {
-            fprintf(stdout, "[AutoUpdater] Chunk %d/%d from GCS (no peer available)\n",
-                    i+1, total_chunks);
-            if (!DownloadChunkFromGCS(manifest.chunk_urls[i], chunk_data)) {
+            if (!DownloadChunkFromHttps(manifest.chunk_urls[i], chunk_data)) {
                 fclose(out);
+                DeleteFileA(assembled_path.c_str());
                 return false;
             }
         }
@@ -472,29 +644,42 @@ static bool DownloadUpdate(const UpdateManifest& manifest,
     fclose(out);
     g_download_progress = 1.0f;
 
-    // Verify full binary SHA-256
-    std::wstring w_path(assembled_path.begin(), assembled_path.end());
+    // Verify full binary SHA-256 (constant-time / case-insensitive 64-hex comparison)
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, assembled_path.c_str(), -1, nullptr, 0);
+    std::wstring w_path(wideLen > 0 ? wideLen - 1 : 0, L'\0');
+    if (wideLen > 1) {
+        MultiByteToWideChar(CP_UTF8, 0, assembled_path.c_str(), -1, &w_path[0], wideLen);
+    }
+
     std::string actual_sha;
     if (!ComputeFileSHA256(w_path, actual_sha)) {
         fprintf(stderr, "[AutoUpdater] SHA-256 computation failed\n");
-        return false;
-    }
-
-    if (actual_sha != manifest.sha256) {
-        fprintf(stderr, "[AutoUpdater] SHA-256 MISMATCH — update tampered!\n");
         DeleteFileA(assembled_path.c_str());
         return false;
     }
 
-    fprintf(stdout, "[AutoUpdater] SHA-256 verified: %s\n", actual_sha.c_str());
-    
-    // Move to final staging name
+    if (!EqualsHexCaseInsensitive(actual_sha, manifest.sha256)) {
+        fprintf(stderr, "[AutoUpdater] SHA-256 MISMATCH — update tampered! Deleting payload.\n");
+        DeleteFileA(assembled_path.c_str());
+        return false;
+    }
+
+    fprintf(stdout, "[AutoUpdater] ✓ SHA-256 verified: %s\n", actual_sha.c_str());
+
     std::string final_path = g_staging_dir + "\\aeon_" + manifest.version + ".exe";
     MoveFileExA(assembled_path.c_str(), final_path.c_str(), MOVEFILE_REPLACE_EXISTING);
-    
-    // Write ready marker (read by cold-start logic)
+
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        g_pending_info.update_available = true;
+        g_pending_info.version = manifest.version;
+        g_pending_info.download_url = manifest.download_url;
+        g_pending_info.sha256 = manifest.sha256;
+    }
+
     std::string marker = g_staging_dir + "\\update_ready.txt";
-    FILE* mf; fopen_s(&mf, marker.c_str(), "w");
+    FILE* mf = nullptr;
+    fopen_s(&mf, marker.c_str(), "w");
     if (mf) {
         fprintf(mf, "%s\n%s\n", manifest.version.c_str(), final_path.c_str());
         fclose(mf);
@@ -509,109 +694,93 @@ static bool DownloadUpdate(const UpdateManifest& manifest,
 
 void CheckAndInstallStagedUpdate() {
     std::string staging = GetStagingDir();
+    if (staging.empty()) return;
     std::string marker = staging + "\\update_ready.txt";
-    
-    FILE* mf; fopen_s(&mf, marker.c_str(), "r");
-    if (!mf) return; // No staged update
-    
-    char version[64]={}, path[MAX_PATH]={};
+
+    FILE* mf = nullptr;
+    fopen_s(&mf, marker.c_str(), "r");
+    if (!mf) return;
+
+    char version[64] = {}, path[MAX_PATH] = {};
     fscanf_s(mf, "%63s\n%259s", version, (unsigned)sizeof(version), path, (unsigned)sizeof(path));
     fclose(mf);
-    
+
     if (!path[0]) return;
-    
-    // Verify it's still there and signed
-    wchar_t wPath[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, path, -1, wPath, MAX_PATH);
-    
+
+    wchar_t wPath[MAX_PATH] = {};
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wPath, MAX_PATH);
     if (GetFileAttributesW(wPath) == INVALID_FILE_ATTRIBUTES) return;
 
     fprintf(stdout, "[AutoUpdater] Applying staged update %s on cold start\n", version);
-    
-    // Get path to running Aeon binary
-    wchar_t current_exe[MAX_PATH];
+
+    wchar_t current_exe[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, current_exe, MAX_PATH);
-    
-    // Atomic rename: current → backup, new → current
+
     std::wstring backup = std::wstring(current_exe) + L".old";
     MoveFileExW(current_exe, backup.c_str(), MOVEFILE_REPLACE_EXISTING);
     MoveFileExW(wPath, current_exe, MOVEFILE_REPLACE_EXISTING);
-    
-    // Clean up
+
     DeleteFileA(marker.c_str());
     DeleteFileW(backup.c_str());
-    
-    // Register new version
-    HKEY hKey;
+
+    HKEY hKey = nullptr;
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
         "SOFTWARE\\DelgadoLogic\\Aeon", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
         RegSetValueExA(hKey, "Version", 0, REG_SZ,
-            (BYTE*)version, (DWORD)strlen(version)+1);
+            (const BYTE*)version, (DWORD)strlen(version) + 1);
         RegCloseKey(hKey);
     }
-    
-    fprintf(stdout, "[AutoUpdater] Update installed: %s — browser ready\n", version);
-    // No restart needed — the renamed binary IS the running process now
-    // (Windows allows this because we renamed BEFORE the binary was loaded)
 }
 
 // ── Background poller ─────────────────────────────────────────────────────────
 
 void StartBackgroundPoller(std::vector<std::string> known_peers) {
-    g_running = true;  // Must be set BEFORE thread launch — thread reads on entry
+    g_running = true;
     std::thread([peers = std::move(known_peers)]() mutable {
-        // Run at IDLE priority — never competes with user tasks
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_IDLE);
         SetThreadDescription(GetCurrentThread(), L"AeonUpdatePoller");
-        
-        // Initial wait: don't check within first 60s of startup
+
         Sleep(60000);
-        
+
         while (g_running.load()) {
-            // Only check if not already downloading
             if (g_state != UpdateState::Downloading) {
+                g_state = UpdateState::Checking;
                 UpdateManifest manifest;
-                if (FetchManifest(manifest)) {
-                    // ── GATE: Verify Ed25519 signature before trusting ANY field ──
-                    if (!VerifyManifestSignature(manifest)) {
-                        fprintf(stderr, "[AutoUpdater] Untrusted manifest — skipping cycle\n");
-                        // Don't continue — fall through to sleep
+                if (FetchAndVerifyManifest(manifest)) {
+                    if (manifest.status == "no_update") {
+                        g_state = UpdateState::Idle;
                     } else {
-                    // Check if this is actually newer
-                    int cMaj=0,cMin=0,cPat=0, nMaj=0,nMin=0,nPat=0;
-                    sscanf_s(CURRENT_VERSION, "%d.%d.%d", &cMaj, &cMin, &cPat);
-                    sscanf_s(manifest.version.c_str(), "%d.%d.%d", &nMaj, &nMin, &nPat);
-                    bool newer = (nMaj>cMaj)||(nMaj==cMaj&&nMin>cMin)||
-                                 (nMaj==cMaj&&nMin==cMin&&nPat>cPat);
-                    
-                    if (newer && g_state != UpdateState::ReadyToInstall) {
-                        fprintf(stdout, "[AutoUpdater] Update available: %s\n",
-                                manifest.version.c_str());
-                        g_state = UpdateState::Downloading;
-                        
-                        // Wait for user to go idle before starting
-                        while (IsUserActive()) Sleep(60000);
-                        
-                        bool ok = DownloadUpdate(manifest, peers);
-                        if (!ok) {
-                            g_state = UpdateState::Failed;
-                            fprintf(stderr, "[AutoUpdater] Download failed\n");
+                        int cMaj = 0, cMin = 0, cPat = 0, nMaj = 0, nMin = 0, nPat = 0;
+                        sscanf_s(CURRENT_VERSION, "%d.%d.%d", &cMaj, &cMin, &cPat);
+                        sscanf_s(manifest.version.c_str(), "%d.%d.%d", &nMaj, &nMin, &nPat);
+                        bool newer = (nMaj > cMaj) ||
+                                     (nMaj == cMaj && nMin > cMin) ||
+                                     (nMaj == cMaj && nMin == cMin && nPat > cPat);
+
+                        if (newer && g_state != UpdateState::ReadyToInstall) {
+                            g_state = UpdateState::Downloading;
+                            while (IsUserActive() && g_running.load()) Sleep(60000);
+                            if (g_running.load()) {
+                                if (!DownloadUpdate(manifest, peers)) {
+                                    g_state = UpdateState::Failed;
+                                }
+                            }
+                        } else if (g_state != UpdateState::ReadyToInstall) {
+                            g_state = UpdateState::Idle;
                         }
                     }
-                    } // else (signature verified)
+                } else if (g_state != UpdateState::ReadyToInstall) {
+                    g_state = UpdateState::Idle;
                 }
             }
-            // Check every 6 hours
             for (int i = 0; i < 360 && g_running.load(); i++)
-                Sleep(60000); // 1 minute sleeps (responsive to shutdown)
+                Sleep(60000);
         }
     }).detach();
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
-UpdateState GetState()           { return g_state.load(); }
-float       GetProgress()        { return g_download_progress.load(); }
+UpdateState GetState()    { return g_state.load(); }
+float       GetProgress() { return g_download_progress.load(); }
 std::string GetStagedVersion() {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_pending_info.version;

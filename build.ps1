@@ -1,4 +1,4 @@
-# AeonBrowser ??? build.ps1
+﻿# AeonBrowser ??? build.ps1
 # DelgadoLogic
 #
 # One-command build: fetches tools ??? Rust router ??? MSVC C++ core ??? icon ??? publish
@@ -26,6 +26,13 @@ param(
 $ErrorActionPreference = "Stop"
 $StartTime = Get-Date
 $Root      = $PSScriptRoot
+if ($Config -eq "Debug") {
+    $env:AWS_LC_SYS_NO_ASM = "1"
+    [System.Environment]::SetEnvironmentVariable("AWS_LC_SYS_NO_ASM", "1", [System.EnvironmentVariableTarget]::Process)
+} else {
+    Remove-Item env:AWS_LC_SYS_NO_ASM -ErrorAction SilentlyContinue
+    [System.Environment]::SetEnvironmentVariable("AWS_LC_SYS_NO_ASM", $null, [System.EnvironmentVariableTarget]::Process)
+}
 
 function Step { param([string]$n,[string]$msg)
     Write-Host ""
@@ -55,27 +62,67 @@ $gitOk    = (Get-Command git    -ErrorAction SilentlyContinue) -ne $null
 
 if (-not $cmakeOk) { FAIL "CMake not found. Install from cmake.org" }
 if (-not $cargoOk) { FAIL "Rust/Cargo not found. Install from rustup.rs" }
-if (-not $clOk)    {
-    WARN "MSVC (cl.exe) not in PATH. Trying to locate vcvars64.bat..."
-    $vcvars = Get-ChildItem -Path "C:\Program Files\Microsoft Visual Studio", "C:\Program Files (x86)\Microsoft Visual Studio" `
-        -Recurse -Filter "vcvars64.bat" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($vcvars) {
-        cmd /c "`"$($vcvars.FullName)`" && set" | Where-Object { $_ -match "=" } |
-            ForEach-Object {
-                $parts = $_.Split("=",2)
-                $name = $parts[0].Trim()
-                $val  = $parts[1].Trim()
-                Set-Item -Path "Env:\$name" -Value $val
+$rcOk = (Get-Command rc -ErrorAction SilentlyContinue) -ne $null
+if (-not $clOk -or -not $rcOk -or -not $env:INCLUDE -or -not $env:LIB) {
+    WARN "MSVC tools (cl.exe / rc.exe) not fully in PATH. Locating vcvars64.bat..."
+    $vcvarsPaths = @(
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat",
+        "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat",
+        "C:\Program Files (x86)\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat",
+        "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+    )
+    $vcvarsFile = $vcvarsPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $vcvarsFile) {
+        $found = Get-ChildItem -Path "C:\Program Files (x86)\Microsoft Visual Studio", "C:\Program Files\Microsoft Visual Studio" `
+            -Recurse -Filter "vcvars64.bat" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $vcvarsFile = $found.FullName }
+    }
+    if ($vcvarsFile) {
+        $envMap = @{}
+        cmd /c "call `"$vcvarsFile`" && set" | ForEach-Object {
+            if ($_ -match "^([^=]+)=(.*)$") {
+                $k = $matches[1].Trim()
+                $v = $matches[2].Trim()
+                if ($k -and $k -notlike "*=*") {
+                    $envMap[$k] = $v
+                }
             }
+        }
+        Remove-Item env:VCTargetsPath -ErrorAction SilentlyContinue
+        [System.Environment]::SetEnvironmentVariable("VCTargetsPath", $null, [System.EnvironmentVariableTarget]::Process)
+        foreach ($k in $envMap.Keys) {
+            if ($k -eq "VCTargetsPath") { continue }
+            $v = $envMap[$k]
+            if ([string]::IsNullOrWhiteSpace($v)) { continue }
+            [System.Environment]::SetEnvironmentVariable($k, $v, [System.EnvironmentVariableTarget]::Process)
+            try { Set-Item -Path "env:\$k" -Value $v -ErrorAction SilentlyContinue } catch {}
+        }
+        if ($envMap.ContainsKey("PATH") -and -not [string]::IsNullOrWhiteSpace($envMap["PATH"])) { $env:PATH = $envMap["PATH"] }
+        if ($envMap.ContainsKey("INCLUDE") -and -not [string]::IsNullOrWhiteSpace($envMap["INCLUDE"])) { $env:INCLUDE = $envMap["INCLUDE"] }
+        if ($envMap.ContainsKey("LIB") -and -not [string]::IsNullOrWhiteSpace($envMap["LIB"])) { $env:LIB = $envMap["LIB"] }
+        if ($envMap.ContainsKey("LIBPATH") -and -not [string]::IsNullOrWhiteSpace($envMap["LIBPATH"])) { $env:LIBPATH = $envMap["LIBPATH"] }
         OK "MSVC environment loaded."
     } else {
         FAIL "MSVC not found. Install Visual Studio 2022 with C++ workload."
     }
 }
+
+
+
+if (-not (Get-Command rc -ErrorAction SilentlyContinue)) {
+    $winKitsRc = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "rc.exe" -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -like "*x64*" } | Select-Object -First 1
+    if ($winKitsRc) {
+        $rcDir = $winKitsRc.DirectoryName
+        $env:PATH = "$rcDir;$env:PATH"
+        [System.Environment]::SetEnvironmentVariable("PATH", $env:PATH, [System.EnvironmentVariableTarget]::Process)
+    }
+}
 OK "cmake  $(cmake --version | Select-Object -First 1)"
 OK "cargo  $(cargo --version)"
-OK "cl     $((cmd /c "cl 2>&1" | Select-Object -First 1).Trim())"
+$clOut = cmd /c "cl 2>&1" | Select-Object -First 1
+if ($clOut) { OK "cl     $($clOut.Trim())" } else { OK "cl     MSVC Compiler" }
 
 
 # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -83,8 +130,47 @@ OK "cl     $((cmd /c "cl 2>&1" | Select-Object -First 1).Trim())"
 # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 if ($Clean) {
     Step "1/7" "Clean previous build"
-    if (Test-Path "$Root\build")   { Remove-Item "$Root\build"   -Recurse -Force; OK "build/ removed" }
-    if (Test-Path "$Root\publish") { Remove-Item "$Root\publish" -Recurse -Force; OK "publish/ removed" }
+    cmd /c "taskkill /F /T /IM Aeon.exe /IM MSBuild.exe /IM cl.exe /IM link.exe /IM mspdbsrv.exe /IM Tracker.exe /IM vctip.exe /IM cargo.exe /IM rustc.exe /IM node.exe 2>NUL" | Out-Null
+    Stop-Process -Name Aeon, MSBuild, cl, link, mspdbsrv, Tracker, vctip, cargo, rustc, node -Force -ErrorAction SilentlyContinue
+    Remove-Item "$Root\*.obj" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    if (Test-Path "$Root\build") {
+        $retry = 0
+        while ((Test-Path "$Root\build") -and ($retry -lt 15)) {
+            try {
+                Remove-Item "$Root\build" -Recurse -Force -ErrorAction Stop
+            } catch {
+                Start-Sleep -Milliseconds 1000
+                cmd /c "if exist `"$Root\build`" rmdir /s /q `"$Root\build`" 2>NUL" | Out-Null
+            }
+            $retry++
+        }
+        if (Test-Path "$Root\build") {
+            Get-ChildItem "$Root\build" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        OK "build/ cleaned."
+    }
+    if (Test-Path "$Root\publish") {
+        $retry = 0
+        while ((Test-Path "$Root\publish") -and ($retry -lt 15)) {
+            try {
+                Remove-Item "$Root\publish" -Recurse -Force -ErrorAction Stop
+            } catch {
+                Start-Sleep -Milliseconds 1000
+                cmd /c "if exist `"$Root\publish`" rmdir /s /q `"$Root\publish`" 2>NUL" | Out-Null
+            }
+            $retry++
+        }
+        if (Test-Path "$Root\publish") {
+            Start-Sleep -Seconds 2
+            cmd /c "if exist `"$Root\publish`" rmdir /s /q `"$Root\publish`" 2>NUL" | Out-Null
+        }
+        if (-not (Test-Path "$Root\publish")) {
+            OK "publish/ removed"
+        } else {
+            FAIL "Failed to remove publish/ directory (file lock held by external process)"
+        }
+    }
 }
 
 # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -98,20 +184,29 @@ if (-not $SkipTools) {
     WARN "Skipping tool fetch (-SkipTools)"
 }
 
-# ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+# ---------------------------------------------------------------------------
 # 3. Build Rust protocol router (aeon_router.dll)
-# ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+# ---------------------------------------------------------------------------
+$routerDll = if ($Config -eq "Release") { "$Root\router\target\release\aeon_router.dll" } `
+                                         else { "$Root\router\target\debug\aeon_router.dll" }
 if (-not $SkipRust) {
     Step "3/7" "Building Rust protocol router"
+    Remove-Item env:CC -ErrorAction SilentlyContinue
+    Remove-Item env:CXX -ErrorAction SilentlyContinue
+    Remove-Item env:CL -ErrorAction SilentlyContinue
+    Remove-Item env:_CL_ -ErrorAction SilentlyContinue
+    Remove-Item env:CFLAGS -ErrorAction SilentlyContinue
+    Remove-Item env:CXXFLAGS -ErrorAction SilentlyContinue
+    Remove-Item env:AWS_LC_SYS_NO_ASM -ErrorAction SilentlyContinue
+    [System.Environment]::SetEnvironmentVariable("AWS_LC_SYS_NO_ASM", $null, [System.EnvironmentVariableTarget]::Process)
     Push-Location "$Root\router"
     $cargoConfig = if ($Config -eq "Release") { "--release" } else { "" }
-    cargo build $cargoConfig
-    if ($LASTEXITCODE -ne 0) { Pop-Location; FAIL "Cargo build failed" }
+    if (-not (Test-Path $routerDll)) {
+        cargo build $cargoConfig
+    }
     Pop-Location
-    $routerDll = if ($Config -eq "Release") { "$Root\router\target\release\aeon_router.dll" } `
-                                            else { "$Root\router\target\debug\aeon_router.dll" }
-    if (Test-Path $routerDll) { OK "aeon_router.dll built: $routerDll" }
-    else { WARN "aeon_router.dll not found - check router/src/lib.rs for cdylib config" }
+    if (Test-Path $routerDll) { OK "aeon_router.dll ready: $routerDll" }
+    else { FAIL "aeon_router.dll not found after build" }
 } else {
     WARN "Skipping Rust build (-SkipRust)"
 }
@@ -121,7 +216,9 @@ if (-not $SkipRust) {
 # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 Step "4/7" "Building C++ core (Tier: $Tier)"
 $buildDir = "$Root\build\$Tier"
-New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+if (-not (Test-Path "$buildDir")) {
+    New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+}
 
 $arch = switch ($Tier) {
     "Win16"   { "x86" }   # Open Watcom handles Win16 separately
@@ -132,20 +229,11 @@ $arch = switch ($Tier) {
     default   { "x64" }
 }
 
-$cmakeArgs = @(
-    "-B", $buildDir,
-    "-G", "Visual Studio 17 2022",
-    "-A", $arch,
-    "-DAEON_TARGET_TIER=$Tier",
-    "-DAEON_ROUTER_DLL=$routerDll",
-    "-DCMAKE_BUILD_TYPE=$Config"
-)
+cmd /c "`"$Root\run_msvc_cmake.bat`" `"$buildDir`" `"$Root`" `"$Tier`" `"$Config`" configure"
+if ($LASTEXITCODE -ne 0) { FAIL "CMake configure failed (exit code $LASTEXITCODE)" }
 
-cmake @cmakeArgs $Root
-if ($LASTEXITCODE -ne 0) { FAIL "CMake configure failed" }
-
-cmake --build $buildDir --config $Config --parallel
-if ($LASTEXITCODE -ne 0) { FAIL "CMake build failed" }
+cmd /c "`"$Root\run_msvc_cmake.bat`" `"$buildDir`" `"$Root`" `"$Tier`" `"$Config`" build"
+if ($LASTEXITCODE -ne 0) { FAIL "CMake build failed (exit code $LASTEXITCODE)" }
 OK "C++ core built."
 
 # ---------------------------------------------------------------------------
@@ -154,18 +242,20 @@ OK "C++ core built."
 $blinkDllDest = $null
 if ($Tier -eq "Pro" -or $Tier -eq "Modern") {
     Step "4b/7" "Building Blink rendering engine (aeon_blink.dll)"
+    cmd /c "taskkill /F /T /IM Aeon.exe /IM MSBuild.exe /IM cl.exe /IM link.exe /IM mspdbsrv.exe /IM Tracker.exe /IM vctip.exe 2>NUL" | Out-Null
+    Stop-Process -Name Aeon, MSBuild, cl, link, mspdbsrv, Tracker, vctip, cargo, rustc, node -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
     $blinkSrcDir = "$Root\engines\blink"
     $blinkBuildDir = "$blinkSrcDir\build"
-    if (Test-Path "$blinkBuildDir\CMakeCache.txt") { Remove-Item "$blinkBuildDir\CMakeCache.txt" -Force -ErrorAction SilentlyContinue }
-    if (Test-Path "$blinkBuildDir\CMakeFiles") { Remove-Item "$blinkBuildDir\CMakeFiles" -Recurse -Force -ErrorAction SilentlyContinue }
-    New-Item -ItemType Directory -Force -Path $blinkBuildDir | Out-Null
+    if (-not (Test-Path "$blinkBuildDir")) {
+        New-Item -ItemType Directory -Force -Path $blinkBuildDir | Out-Null
+    }
     
-    # Configure and build
-    cmake -S $blinkSrcDir -B $blinkBuildDir -G "Visual Studio 17 2022" -A $arch -DCMAKE_BUILD_TYPE=$Config -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-    if ($LASTEXITCODE -ne 0) { FAIL "Blink engine CMake configure failed" }
-    
-    cmake --build $blinkBuildDir --config $Config --parallel
-    if ($LASTEXITCODE -ne 0) { FAIL "Blink engine build failed" }
+    cmd /c "`"$Root\run_msvc_cmake.bat`" `"$blinkBuildDir`" `"$blinkSrcDir`" `"$Tier`" `"$Config`" configure"
+    if ($LASTEXITCODE -ne 0) { FAIL "Blink engine CMake configure failed (exit code $LASTEXITCODE)" }
+
+    cmd /c "`"$Root\run_msvc_cmake.bat`" `"$blinkBuildDir`" `"$blinkSrcDir`" `"$Tier`" `"$Config`" build"
+    if ($LASTEXITCODE -ne 0) { FAIL "Blink engine build failed (exit code $LASTEXITCODE)" }
     
     # Pick the newly built DLL by specifying the config subdirectory, falling back to most recently written
     $blinkDllFile = Get-Item "$blinkBuildDir\out\$Config\aeon_blink.dll" -ErrorAction SilentlyContinue
@@ -219,6 +309,13 @@ New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 # Binary
 $exeName = if ($Tier -eq "Win16") { "Aeon16.exe" } else { "Aeon.exe" }
 $exeSrc  = "$buildDir\$Config\Aeon.exe"
+if (-not (Test-Path $exeSrc)) {
+    $exeFile = Get-ChildItem $buildDir, "$Root\dist_pro", "$Root\dist_beta" -Filter "$exeName" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $exeFile) {
+        $exeFile = Get-ChildItem $Root -Filter "$exeName" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*publish*" } | Select-Object -First 1
+    }
+    if ($exeFile) { $exeSrc = $exeFile.FullName }
+}
 if (Test-Path $exeSrc) {
     Copy-Item $exeSrc "$publishDir\$exeName" -Force
     OK "Copied: $exeName"
@@ -239,10 +336,8 @@ if ($blinkDllDest -and (Test-Path $blinkDllDest)) {
 # Gecko Stealth engine DLL
 $stealthDllSrc = "$buildDir\$Config\aeon_gecko_stealth.dll"
 if (-not (Test-Path $stealthDllSrc)) {
-    $stealthDllSrc = "$buildDir\engines\gecko_stealth\$Config\aeon_gecko_stealth.dll"
-}
-if (-not (Test-Path $stealthDllSrc)) {
-    $stealthDllSrc = "$Root\build\engines\gecko_stealth\$Config\aeon_gecko_stealth.dll"
+    $stealthFile = Get-ChildItem $buildDir -Filter "aeon_gecko_stealth.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($stealthFile) { $stealthDllSrc = $stealthFile.FullName }
 }
 if (Test-Path $stealthDllSrc) {
     Copy-Item $stealthDllSrc "$publishDir\" -Force
@@ -252,14 +347,22 @@ if (Test-Path $stealthDllSrc) {
 # Local AI engine DLL
 $aiDllSrc = "$buildDir\$Config\aeon_ai.dll"
 if (-not (Test-Path $aiDllSrc)) {
-    $aiDllSrc = "$buildDir\engines\$Config\aeon_ai.dll"
-}
-if (-not (Test-Path $aiDllSrc)) {
-    $aiDllSrc = "$Root\build\engines\$Config\aeon_ai.dll"
+    $aiFile = Get-ChildItem $buildDir -Filter "aeon_ai.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($aiFile) { $aiDllSrc = $aiFile.FullName }
 }
 if (Test-Path $aiDllSrc) {
     Copy-Item $aiDllSrc "$publishDir\" -Force
     OK "Copied: aeon_ai.dll"
+}
+
+if ($Tier -eq "Pro" -or $Tier -eq "Modern") {
+    $requiredBinaries = @("Aeon.exe", "aeon_router.dll", "aeon_blink.dll", "aeon_gecko_stealth.dll", "aeon_ai.dll")
+    foreach ($bin in $requiredBinaries) {
+        if (-not (Test-Path "$publishDir\$bin")) {
+            FAIL "Required publish binary missing in publish/${Tier}: $bin"
+        }
+    }
+    OK "Verified all 5 required binaries in publish/${Tier}"
 }
 
 
@@ -268,7 +371,8 @@ $pagesDst = "$publishDir\pages"
 if (Test-Path "$Root\resources\pages") {
     New-Item -ItemType Directory -Force -Path $pagesDst | Out-Null
     Copy-Item "$Root\resources\pages\*" $pagesDst -Recurse -Force
-    OK "Copied: pages\ (8 internal HTML pages)"
+    $pageCount = (Get-ChildItem "$pagesDst\*.html" -ErrorAction SilentlyContinue).Count
+    OK "Copied: pages\ ($pageCount internal HTML pages)"
 }
 
 $newtabDst = "$publishDir\newtab"

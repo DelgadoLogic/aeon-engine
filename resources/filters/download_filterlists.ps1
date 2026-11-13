@@ -83,7 +83,8 @@ foreach ($list in $lists) {
         $age = (New-TimeSpan -Start (Get-Item $dest).LastWriteTime -End (Get-Date)).TotalHours
         if ($age -lt $MaxAgeHours) {
             $sz = [math]::Round((Get-Item $dest).Length / 1KB)
-            Write-Host "[filterlists] CACHED  $($list.FileName) (${sz} KB, ${age:F1}h old)" -ForegroundColor DarkGray
+            $ageR = [math]::Round($age, 1)
+            Write-Host "[filterlists] CACHED  $($list.FileName) ($sz KB, ${ageR}h old)" -ForegroundColor DarkGray
             $cached++
             continue
         }
@@ -121,9 +122,9 @@ foreach ($list in $lists) {
         $totalAfter  += $afterCount
         $downloaded++
 
-        Write-Host "[filterlists]   ✓ $($list.FileName): $afterCount rules (${sizeKB} KB, reduced ${savePct}%)" -ForegroundColor Green
+        Write-Host "[filterlists]   OK: $($list.FileName): $afterCount rules ($sizeKB KB, reduced $savePct%)" -ForegroundColor Green
     } catch {
-        Write-Warning "[filterlists]   ✗ Failed: $desc — $_"
+        Write-Warning "[filterlists]   Failed: $desc - $_"
     }
 }
 
@@ -151,11 +152,11 @@ if (-not (Test-Path $extraDest)) {
     Write-Host "[filterlists] Created starter aeon_extra.txt" -ForegroundColor Cyan
 }
 
-# ─── Summary ─────────────────────────────────────────────────────────────────
+# Summary
 $totalKB = [math]::Round((Get-ChildItem $OutDir -Filter "*.txt" | Measure-Object -Property Length -Sum).Sum / 1KB)
 
-Write-Host "`n[filterlists] ─────────────────────────────────────────"
+Write-Host "`n[filterlists] -----------------------------------------"
 Write-Host "[filterlists] Downloaded : $downloaded lists"
 Write-Host "[filterlists] Cached     : $cached lists"
-Write-Host "[filterlists] Total size : ${totalKB} KB"
+Write-Host "[filterlists] Total size : $totalKB KB"
 Write-Host "[filterlists] Ready for bundling in installer`n" -ForegroundColor Green

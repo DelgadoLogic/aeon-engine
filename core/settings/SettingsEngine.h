@@ -25,6 +25,7 @@
 #include <windows.h>
 #include <cstdint>
 #include <cstddef>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // Settings schema — all user-configurable settings in one struct.
@@ -60,6 +61,33 @@ struct AeonSettings {
     bool  firewall_mode;            // default: false
     char  ss_uri[256];              // Shadowsocks URI (used by CircumventionEngine)
 
+    // --- 2026 Circumvention & DPI Engine (R2) ---
+    bool  byedpi_enabled;           // default: false
+    char  byedpi_socks_addr[64];    // default: "127.0.0.1:1080"
+    bool  goodbyedpi_enabled;       // default: false
+    int   goodbyedpi_mode;          // default: 1 (modes 1-9)
+    bool  ech_enabled;              // default: true (Encrypted Client Hello)
+    bool  kyber_enabled;            // default: true (Kyber-768 TLS 1.3 Post-Quantum)
+
+    // --- Camoufox C++ Stealth & Privacy Sentinel (R2) ---
+    bool  camoufox_enabled;         // default: true
+    bool  canvas_noise_enabled;     // default: true
+    bool  webgl_noise_enabled;      // default: true
+    bool  audio_noise_enabled;      // default: true
+    char  tracker_blocking_mode[32];// default: "strict" ("strict", "balanced", "aggressive")
+
+    // --- Modern Appearance & Chrome Controls (R2) ---
+    char  theme_preset[32];         // default: "obsidian" ("obsidian", "midnight_violet", "cyber_neon")
+    bool  vertical_tabs;            // default: false
+
+    // --- Aeon Intelligence & AI Provider (R2) ---
+    char  ai_provider[32];          // default: "sovereign" ("sovereign", "gemini", "groq", "deepseek", "openai", "ollama", "lmstudio")
+    char  ai_api_key[256];          // default: ""
+    char  ai_model[128];            // default: "gemma-4-e2b"
+    char  ai_endpoint[256];         // default: "http://localhost:11434"
+    bool  agent_pipe_enabled;       // default: true (for \\.\pipe\aeon-agent)
+    double ai_temperature;          // default: 0.7
+
     // --- Downloads ---
     char  dl_path[MAX_PATH];        // default: %USERPROFILE%\Downloads
     bool  dl_ask;                   // default: false (auto-save to dl_path)
@@ -75,7 +103,7 @@ struct AeonSettings {
     char  homepage[512];            // default: "aeon://newtab"
     char  startup_page[32];         // default: "newtab"
     char  search_engine[64];        // default: "ddg"
-    char  theme;                    // 'A'=auto  'D'=dark  'L'=light  'R'=retro
+    char  theme;                    // 'A'=auto  'D'=dark  'L'=light  'R'=retro (legacy)
     bool  hardware_accel;           // default: true
 
     // --- Updates ---
@@ -96,6 +124,9 @@ namespace SettingsEngine {
 
     // Reset to factory defaults.
     AeonSettings Defaults();
+
+    // Serialize settings struct to clean JSON string.
+    std::string ToJson(const AeonSettings& s);
 
     // Read a single machine-level registry DWORD (e.g., ForceTier, TelemetryEnabled).
     // Returns defaultVal if key not present.

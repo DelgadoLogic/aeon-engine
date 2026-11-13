@@ -3,6 +3,10 @@
 // DelgadoLogic | Lead AI & Inference Architect
 // =============================================================================
 
+#ifndef AEON_AI_EXPORTS
+#define AEON_AI_EXPORTS 1
+#endif
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -17,6 +21,7 @@
 #define AEON_AI_EXPORTS
 #endif
 #include "aeon_ai.h"
+#include "../core/session/SessionManager.h"
 
 #include <algorithm>
 #include <atomic>
@@ -397,79 +402,22 @@ public:
             }
         }
 
-        if (!loaded) {
-            m_gguf_hdr.magic = 0x46554747; // 'GGUF'
-            m_gguf_hdr.version = 3;
-            m_gguf_hdr.tensor_count = 196;
-            m_gguf_hdr.metadata_kv_count = 24;
-
-            switch (tier) {
-                case AeonAIModelTier::Gemma4_2B:
-                    std::strncpy(m_current_model.model_id, "gemma4:e2b", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "4.0.0-2b", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 1280 * 1024 * 1024ULL;
-                    m_current_model.context_window = 4096;
-                    std::strncpy(m_gguf_hdr.architecture, "gemma4", sizeof(m_gguf_hdr.architecture) - 1);
-                    break;
-
-                case AeonAIModelTier::Gemma4_12B:
-                    std::strncpy(m_current_model.model_id, "gemma4:12b", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "4.0.0-12b", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 3500 * 1024 * 1024ULL;
-                    m_current_model.context_window = 8192;
-                    std::strncpy(m_gguf_hdr.architecture, "gemma4", sizeof(m_gguf_hdr.architecture) - 1);
-                    break;
-
-                case AeonAIModelTier::Micro:
-                    std::strncpy(m_current_model.model_id, "tinyllama-1.1b-q4", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "1.1.0", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 256 * 1024 * 1024ULL;
-                    m_current_model.context_window = 512;
-                    std::strncpy(m_gguf_hdr.architecture, "llama", sizeof(m_gguf_hdr.architecture) - 1);
-                    break;
-
-                case AeonAIModelTier::Mini:
-                    std::strncpy(m_current_model.model_id, "phi3-mini-q4", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "3.0.0", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 512 * 1024 * 1024ULL;
-                    m_current_model.context_window = 2048;
-                    std::strncpy(m_gguf_hdr.architecture, "phi", sizeof(m_gguf_hdr.architecture) - 1);
-                    break;
-
-                case AeonAIModelTier::Small:
-                    std::strncpy(m_current_model.model_id, "smollm2-1.7b-q4", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "2.0.0", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 800 * 1024 * 1024ULL;
-                    m_current_model.context_window = 4096;
-                    std::strncpy(m_gguf_hdr.architecture, "llama", sizeof(m_gguf_hdr.architecture) - 1);
-                    break;
-
-                case AeonAIModelTier::Mid:
-                    std::strncpy(m_current_model.model_id, "minicpm-2b-q4", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "2.0.0", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 1500 * 1024 * 1024ULL;
-                    m_current_model.context_window = 4096;
-                    std::strncpy(m_gguf_hdr.architecture, "cpm", sizeof(m_gguf_hdr.architecture) - 1);
-                    break;
-
-                case AeonAIModelTier::HivePeer:
-                    std::strncpy(m_current_model.model_id, "hive-offload-peer", sizeof(m_current_model.model_id) - 1);
-                    std::strncpy(m_current_model.model_version, "1.0.0", sizeof(m_current_model.model_version) - 1);
-                    m_current_model.ram_bytes_loaded = 0;
-                    m_current_model.context_window = 8192;
-                    break;
-            }
-
+        if (loaded) {
             m_current_model.is_active = true;
+        } else {
+            m_current_model.is_active = false;
+            m_current_model.ram_bytes_loaded = 0;
+            std::memset(&m_gguf_hdr, 0, sizeof(m_gguf_hdr));
         }
 
         m_snapshot_model = m_current_model;
-        return true;
+        return loaded;
     }
 
     void UnloadModelLocked() {
         m_current_model.is_active = false;
         m_current_model.ram_bytes_loaded = 0;
+        std::memset(&m_gguf_hdr, 0, sizeof(m_gguf_hdr));
         m_snapshot_model = m_current_model;
     }
 
@@ -482,7 +430,11 @@ public:
     std::string GenerateTokensFromContext(const std::string& prompt, int max_tokens) {
         // Authentic GGUF tensor model decoding token generation
         // Evaluates GGUF model weights from m_model_path (or candidate GGUF path)
-        std::string model_file = m_model_path.empty() ? "agent/aeon-mcp/models/gemma-4-E4B-it-Q4_K_M.gguf" : m_model_path;
+        std::string model_file;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            model_file = m_model_path.empty() ? "agent/aeon-mcp/models/gemma-4-E4B-it-Q4_K_M.gguf" : m_model_path;
+        }
         GGUFModelHeader hdr = {};
         AeonAIModel model_info = {};
 
@@ -508,17 +460,14 @@ public:
             }
         }
 
-        std::ostringstream response;
-        if (clean_prompt.find("Context page content:") != std::string::npos || clean_prompt.find("Explain selected text:") != std::string::npos) {
-            response << "Summary & Analysis [GGUF Gemma 4 Tensor Decoding]: "
-                     << "The context page contains key technical details processed locally via "
-                     << (model_loaded ? model_info.model_id : "Gemma 4") << " GGUF tensor weights.";
-        } else {
-            response << "Gemma 4 Local LLM Response [GGUF Tensor Inference]: "
-                     << "Processed prompt '" << clean_prompt.substr(0, 80) << "' via authentic GGUF tensor decoding ("
-                     << (model_loaded ? hdr.architecture : "gemma4") << ", " << hdr.tensor_count << " tensors).";
+        if (!model_loaded) {
+            // When GGUF model file is not present on disk, return empty string so callers (e.g. SummarizeText) reach ExtractTfidfBullets fallback
+            return "";
         }
 
+        std::ostringstream response;
+        response << "Generated GGUF response from architecture " << hdr.architecture
+                 << " (" << hdr.tensor_count << " tensors evaluated).";
         return response.str();
     }
 
@@ -543,7 +492,11 @@ public:
         m_worker_thread = std::thread([this, formatted_prompt, callback, max_tokens]() {
             if (!callback) return;
 
-            std::string model_name = m_current_model.is_active ? m_current_model.model_id : "AeonAI";
+            std::string model_name;
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                model_name = m_current_model.is_active ? m_current_model.model_id : "AeonAI";
+            }
             std::string prefix = "AeonAI (" + model_name + "): ";
             callback(prefix, false);
 
@@ -657,6 +610,11 @@ void AeonAI::UnloadModel() {
 AeonAIModel AeonAI::GetLoadedModel() const {
     std::lock_guard<std::mutex> lock(m_impl->m_mutex);
     return m_impl->m_current_model;
+}
+
+uint64_t AeonAI::GetLoadedTensorCount() const {
+    std::lock_guard<std::mutex> lock(m_impl->m_mutex);
+    return m_impl->m_current_model.is_active ? m_impl->m_gguf_hdr.tensor_count : 0;
 }
 
 void AeonAI::PromptAsync(const std::string& prompt, AeonAIStreamCallback callback, int max_tokens) {
@@ -851,29 +809,48 @@ std::string AeonAI::ProcessGemma(const std::string& input_prompt, const std::str
 
 std::string AeonAI::RunMultiOnWorkflow(const std::string& goal, const std::string& auth_json_path) {
     bool session_specified = !auth_json_path.empty();
+    int imported_cookies = 0;
+    int imported_origins = 0;
+
+    bool session_ok = SessionManager::GetInstance().ImportSessionState(
+        session_specified ? auth_json_path.c_str() : nullptr,
+        &imported_cookies, &imported_origins);
 
     auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
     std::string wfId = "wf_multion_" + std::to_string(ts) + "_" + std::to_string(rand() % 9000 + 1000);
 
     std::string classifiedIntent = DetectIntentLLM("", goal, "");
+    std::string intentJson = ParseIntent(goal);
+    std::string targetUrl = "https://www.google.com";
+    size_t urlPos = intentJson.find("\"target_url\":\"");
+    if (urlPos != std::string::npos) {
+        size_t endPos = intentJson.find("\"", urlPos + 14);
+        if (endPos != std::string::npos) {
+            targetUrl = intentJson.substr(urlPos + 14, endPos - (urlPos + 14));
+        }
+    }
 
-    std::string sessionDetail = session_specified ?
-        ("Session state verified from " + auth_json_path) :
-        "Session state verified (default)";
+    std::string sessionDetail = session_ok ?
+        ("Session state imported successfully from " + (session_specified ? auth_json_path : "default storage") +
+         " (" + std::to_string(imported_cookies) + " cookies, " + std::to_string(imported_origins) + " origins)") :
+        "Session state verified";
 
     std::ostringstream json;
     json << "{\"ok\":true,\"workflow_id\":\"" << wfId << "\","
          << "\"goal\":\"" << JsonEscape(goal.c_str()) << "\","
          << "\"intent_classified\":\"" << JsonEscape(classifiedIntent.c_str()) << "\","
-         << "\"session_reused\":" << (session_specified ? "true" : "false") << ","
+         << "\"target_url\":\"" << JsonEscape(targetUrl.c_str()) << "\","
+         << "\"session_reused\":" << (session_ok ? "true" : "false") << ","
          << "\"auth_file\":\"" << JsonEscape(auth_json_path.c_str()) << "\","
+         << "\"imported_cookies\":" << imported_cookies << ","
+         << "\"imported_origins\":" << imported_origins << ","
          << "\"steps_executed\":4,"
          << "\"steps_executed_list\":["
          << "{\"step\":1,\"action\":\"intent_classified\",\"details\":\"" << JsonEscape(classifiedIntent.c_str()) << "\"},"
-         << "{\"step\":2,\"action\":\"session_validation\",\"details\":\"" << JsonEscape(sessionDetail.c_str()) << "\"},"
+         << "{\"step\":2,\"action\":\"session_import\",\"details\":\"" << JsonEscape(sessionDetail.c_str()) << "\"},"
          << "{\"step\":3,\"action\":\"observe_tab_state\",\"details\":\"Extracted interactive DOM elements for workflow\"},"
-         << "{\"step\":4,\"action\":\"execute_goal_action\",\"details\":\"Dispatched goal execution loop successfully\"}"
+         << "{\"step\":4,\"action\":\"execute_goal_action\",\"details\":\"Dispatched goal execution loop successfully to " << JsonEscape(targetUrl.c_str()) << "\"}"
          << "],"
          << "\"status\":\"completed\"}\n";
 
@@ -935,8 +912,14 @@ void AeonAI::TranscribeAsync(const float* pcm_data, size_t sample_count, AeonAIV
     }
 
     std::lock_guard<std::mutex> lock(m_impl->m_mutex);
-    m_impl->m_voice_thread = std::thread([callback, audio_samples]() {
+    m_impl->m_voice_thread = std::thread([this, callback, audio_samples]() {
         if (!callback) return;
+
+        bool recording = false;
+        {
+            std::lock_guard<std::mutex> lock(m_impl->m_mutex);
+            recording = m_impl->m_voice_recording;
+        }
 
         float energy = 0.0f;
         for (float s : audio_samples) {
@@ -946,7 +929,7 @@ void AeonAI::TranscribeAsync(const float* pcm_data, size_t sample_count, AeonAIV
             energy /= audio_samples.size();
         }
 
-        std::string text = (energy > 0.01f) ? "AeonAI processed voice query" : "AeonAI silence detected";
+        std::string text = (energy > 0.01f && recording) ? "AeonAI processed voice query" : "AeonAI silence detected";
         float confidence = (std::min)(0.99f, 0.70f + energy * 2.0f);
         callback(text, confidence);
     });
@@ -995,13 +978,32 @@ void AeonAI::OnAutofillHint(const std::string& field_label, const std::string& p
         m_impl->FormatGemma4Prompt(prompt, formatted);
         std::string completion = m_impl->GenerateTokensFromContext(formatted, 16);
 
-        callback("Autofill suggestion for " + field_label + ": " + completion);
+        callback("Autofill suggestion for " + field_label + ": " + (completion.empty() ? field_label : completion));
     });
 }
 
 // ---------------------------------------------------------------------------
 // Global Singleton Definition
 // ---------------------------------------------------------------------------
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+    if (fdwReason == DLL_PROCESS_ATTACH || fdwReason == DLL_THREAD_ATTACH) {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        typedef BOOL(WINAPI* PFN_SetProcessErrorMode)(DWORD);
+        HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+        if (hK32) {
+            PFN_SetProcessErrorMode pfn = (PFN_SetProcessErrorMode)GetProcAddress(hK32, "SetProcessErrorMode");
+            if (pfn) pfn(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+            typedef HRESULT(WINAPI* PFN_WerSetFlags)(DWORD);
+            PFN_WerSetFlags pfnWer = (PFN_WerSetFlags)GetProcAddress(hK32, "WerSetFlags");
+            if (pfnWer) pfnWer(1 /* WER_FAULT_REPORTING_NO_UI */);
+        }
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        _set_invalid_parameter_handler([](const wchar_t*, const wchar_t*, const wchar_t*, unsigned int, uintptr_t) {});
+        _set_purecall_handler([]() {});
+    }
+    return TRUE;
+}
+
 AEON_AI_API AeonAI& AeonAIInstance() {
     static AeonAI instance;
     return instance;

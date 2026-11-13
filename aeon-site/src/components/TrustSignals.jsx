@@ -2,11 +2,11 @@ import React from 'react';
 
 const signals = [
   { icon: '🔐', text: 'Ed25519 Signed Updates' },
-  { icon: '📡', text: 'Zero Telemetry' },
-  { icon: '🧠', text: 'Local-Only AI' },
-  { icon: '🕸️', text: 'P2P Distribution' },
-  { icon: '🛡️', text: 'No Cloud Sync' },
-  { icon: '🔓', text: 'Open Source Core' },
+  { icon: '📡', text: 'Zero Google Pings' },
+  { icon: '🧠', text: 'Local GGUF AI' },
+  { icon: '🔗', text: 'OmniHub Handoff' },
+  { icon: '🛡️', text: 'Zero Ad Profiling' },
+  { icon: '🔒', text: 'DPAPI Local Vault' },
 ];
 
 export default function TrustSignals() {

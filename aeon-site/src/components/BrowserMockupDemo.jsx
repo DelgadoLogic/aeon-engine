@@ -107,6 +107,9 @@ export default function BrowserMockupDemo() {
               <div className="command-input-row">
                 <span className="command-icon">🔍</span>
                 <input
+                  id="aeon-command-input"
+                  name="commandQuery"
+                  aria-label="Aeon Command Bar"
                   type="text"
                   placeholder="Search web, execute AI action, or switch Space... (e.g. 'clean junk')"
                   className="command-input"

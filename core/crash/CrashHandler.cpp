@@ -140,22 +140,68 @@ static void WriteJsonReport(const char* jsonPath, const char* dmpPath,
     fclose(f);
 }
 
-static LONG WINAPI VectoredHandler(EXCEPTION_POINTERS* ep) {
-    // Don't handle C++ exceptions (__CxxFrameHandler) — those are caught
-    // by the runtime. Only intercept genuine hardware faults.
+static bool IsNonInteractiveOrHeadless() {
+    // 1. Check environment variables
+    const char* envHeadless = getenv("AEON_HEADLESS");
+    if (envHeadless && (strcmp(envHeadless, "1") == 0 || _stricmp(envHeadless, "true") == 0)) return true;
+
+    const char* envGenericHeadless = getenv("HEADLESS");
+    if (envGenericHeadless && (strcmp(envGenericHeadless, "1") == 0 || _stricmp(envGenericHeadless, "true") == 0)) return true;
+
+    const char* envCi = getenv("CI");
+    if (envCi && (strcmp(envCi, "1") == 0 || _stricmp(envCi, "true") == 0)) return true;
+
+    const char* envTest = getenv("AEON_TEST");
+    if (envTest && (strcmp(envTest, "1") == 0 || _stricmp(envTest, "true") == 0)) return true;
+
+    const char* envNonInteractive = getenv("AEON_NON_INTERACTIVE");
+    if (envNonInteractive && (strcmp(envNonInteractive, "1") == 0 || _stricmp(envNonInteractive, "true") == 0)) return true;
+
+    // 2. Check command line arguments
+    const wchar_t* cmdLine = GetCommandLineW();
+    if (cmdLine) {
+        if (wcsstr(cmdLine, L"--headless") || wcsstr(cmdLine, L"-headless") ||
+            wcsstr(cmdLine, L"--test") || wcsstr(cmdLine, L"-test") ||
+            wcsstr(cmdLine, L"--non-interactive") || wcsstr(cmdLine, L"-non-interactive") ||
+            wcsstr(cmdLine, L"--batch")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static LONG WINAPI UnhandledExceptionFilterImpl(EXCEPTION_POINTERS* ep) {
+    if (!ep || !ep->ExceptionRecord) return EXCEPTION_CONTINUE_SEARCH;
+
     DWORD code = ep->ExceptionRecord->ExceptionCode;
 
     // Skip debugger notifications
     if (code == EXCEPTION_BREAKPOINT || code == EXCEPTION_SINGLE_STEP) {
-        return EXCEPTION_CONTINUE_SEARCH; // debugger attached — skip
+        return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    // Skip all informational/warning exceptions (severity < 3).
-    // This filters out DBG_PRINTEXCEPTION_C (0x40010006) and
-    // DBG_PRINTEXCEPTION_WIDE_C (0x4001000A) which WebView2 emits via
-    // OutputDebugString(). Only severity 3 (0xC0xxxxxx) are real faults.
+    // Skip informational / warning exceptions
     if ((code >> 30) < 3) {
         return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    // Suppress all OS error dialogs before teardown
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+    HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+    if (hK32) {
+        typedef BOOL(WINAPI* PFN_SetProcessErrorMode)(DWORD);
+        PFN_SetProcessErrorMode pfn = (PFN_SetProcessErrorMode)GetProcAddress(hK32, "SetProcessErrorMode");
+        if (pfn) pfn(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+    }
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (hNtdll) {
+        typedef LONG(NTAPI* PFN_NtSetInformationProcess)(HANDLE, ULONG, PVOID, ULONG);
+        PFN_NtSetInformationProcess pfnNt = (PFN_NtSetInformationProcess)GetProcAddress(hNtdll, "NtSetInformationProcess");
+        if (pfnNt) {
+            ULONG hardErrorMode = 0;
+            pfnNt(GetCurrentProcess(), 12 /* ProcessDefaultHardErrorMode */, &hardErrorMode, sizeof(hardErrorMode));
+        }
     }
 
     // ── Capture paths ──────────────────────────────────────────────────
@@ -181,8 +227,6 @@ static LONG WINAPI VectoredHandler(EXCEPTION_POINTERS* ep) {
         mei.ExceptionPointers = ep;
         mei.ClientPointers    = FALSE;
 
-        // Rich dump: includes thread stacks, loaded modules, handle data,
-        // and data segments. ~2-10MB — much more useful than MiniDumpNormal.
         MINIDUMP_TYPE dumpType = static_cast<MINIDUMP_TYPE>(
             MiniDumpWithDataSegs |
             MiniDumpWithHandleData |
@@ -208,21 +252,45 @@ static LONG WINAPI VectoredHandler(EXCEPTION_POINTERS* ep) {
         fclose(f);
     }
 
-    // Show minimal crash dialog (not the Windows one — ours is branded)
-    MessageBoxW(nullptr,
-        L"Aeon Browser encountered an error and needs to close.\n\n"
-        L"Your browsing session has been saved and will be restored on restart.\n"
-        L"(Crash report queued for DelgadoLogic \x2014 thank you for helping us improve.)",
-        L"Aeon Browser \x2014 Crash", MB_ICONERROR | MB_OK);
+    // Terminate without passing unhandled hard error to CSRSS
+    ExitProcess(static_cast<UINT>(code));
+    return EXCEPTION_EXECUTE_HANDLER;
+}
 
-    // Terminate cleanly — do NOT let Windows show the "Send to Microsoft" dialog
-    TerminateProcess(GetCurrentProcess(), static_cast<UINT>(code));
-    return EXCEPTION_EXECUTE_HANDLER; // never reached
+LONG WINAPI UnhandledExceptionFilter(EXCEPTION_POINTERS* ep) {
+    return UnhandledExceptionFilterImpl(ep);
 }
 
 void Install() {
-    // AddVectoredExceptionHandler: 1 = call first (highest priority)
-    AddVectoredExceptionHandler(1, VectoredHandler);
+    // Suppress OS error dialogs ("Unknown Hard Error", GP Fault boxes)
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+    HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+    if (hK32) {
+        typedef BOOL(WINAPI* PFN_SetProcessErrorMode)(DWORD);
+        PFN_SetProcessErrorMode pfn = (PFN_SetProcessErrorMode)GetProcAddress(hK32, "SetProcessErrorMode");
+        if (pfn) pfn(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        typedef HRESULT(WINAPI* PFN_WerSetFlags)(DWORD);
+        PFN_WerSetFlags pfnWer = (PFN_WerSetFlags)GetProcAddress(hK32, "WerSetFlags");
+        if (pfnWer) pfnWer(1 /* WER_FAULT_REPORTING_NO_UI */);
+    }
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (hNtdll) {
+        typedef LONG(NTAPI* PFN_NtSetInformationProcess)(HANDLE, ULONG, PVOID, ULONG);
+        PFN_NtSetInformationProcess pfnNt = (PFN_NtSetInformationProcess)GetProcAddress(hNtdll, "NtSetInformationProcess");
+        if (pfnNt) {
+            ULONG hardErrorMode = 0;
+            pfnNt(GetCurrentProcess(), 12 /* ProcessDefaultHardErrorMode */, &hardErrorMode, sizeof(hardErrorMode));
+        }
+    }
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+    _set_invalid_parameter_handler([](const wchar_t*, const wchar_t*, const wchar_t*, unsigned int, uintptr_t) {});
+    _set_purecall_handler([]() {});
+
+    SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)UnhandledExceptionFilter);
+}
+
+void Initialize() {
+    Install();
 }
 
 } // namespace AeonCrash

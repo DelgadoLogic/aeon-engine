@@ -130,6 +130,9 @@ public:
     // Returns currently loaded model info (by value)
     AeonAIModel GetLoadedModel() const;
 
+    // Returns number of loaded model tensors (0 if unloaded / lightweight mode)
+    uint64_t GetLoadedTensorCount() const;
+
     // ── Inference API ─────────────────────────────────────────────────────
 
     // Single-turn prompt (async streaming)
@@ -163,6 +166,18 @@ public:
 
     // Predictive prefetching candidates
     std::vector<std::string> PredictPrefetchURLs(const std::string& current_url, const std::string& journey_context);
+
+    // Synchronous webpage summarization returning structured JSON
+    std::string SummarizeText(const std::string& page_text, int max_bullets = 5);
+
+    // Intent prompt parser returning target URL and classification
+    std::string ParseIntent(const std::string& intent_prompt);
+
+    // Gemma 4 local model text/vision processing
+    std::string ProcessGemma(const std::string& input_prompt, const std::string& image_base64 = "");
+
+    // MultiOn-grade autonomous workflow motor cortex execution
+    std::string RunMultiOnWorkflow(const std::string& goal, const std::string& auth_json_path = "");
 
     // Cancel current generation
     void CancelGeneration();
