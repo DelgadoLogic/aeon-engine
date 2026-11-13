@@ -38,23 +38,22 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $Root = (Get-Item $PSScriptRoot).Parent.FullName
-Write-Host "`n[build_installer] ═══ Aeon Browser Build Pipeline ═══" -ForegroundColor Cyan
+Write-Host "`n[build_installer] === Aeon Browser Build Pipeline ===" -ForegroundColor Cyan
 Write-Host "[build_installer] Root    : $Root"
 Write-Host "[build_installer] Version : $Version"
 Write-Host "[build_installer] Tier    : $Tier | Channel: $Channel`n"
 
-# ─── 1. Auto-detect version from git tag if not provided ─────────────────────
+# 1. Auto-detect version from git tag if not provided
 if (-not $Version) {
     try {
         $Version = (git -C $Root describe --tags --abbrev=0 2>$null).Trim()
         if (-not $Version) { $Version = "1.0.0" }
-        # Strip leading 'v'
         $Version = $Version -replace '^v',''
     } catch { $Version = "1.0.0" }
 }
 Write-Host "[build_installer] Final version: $Version" -ForegroundColor Yellow
 
-# ─── 2. Locate build tools ────────────────────────────────────────────────────
+# 2. Locate build tools
 function Find-Tool {
     param([string]$Name, [string[]]$ExtraSearch = @())
     $cmd = Get-Command $Name -ErrorAction SilentlyContinue
@@ -68,6 +67,9 @@ function Find-Tool {
 $cmake    = Find-Tool "cmake"
 $cargo    = Find-Tool "cargo"
 $iscc     = Find-Tool "iscc" @(
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     "C:\Program Files\Inno Setup 6\ISCC.exe"
 )
@@ -77,23 +79,23 @@ $signtool = Find-Tool "signtool" @(
 )
 
 if (-not $cmake) { Write-Error "cmake not found in PATH"; exit 1 }
-if (-not $cargo -and -not $SkipRust) { Write-Warning "cargo not found — Rust router won't be built" }
+if (-not $cargo -and -not $SkipRust) { Write-Warning "cargo not found - Rust router won't be built" }
 if (-not $iscc)  { Write-Error "ISCC.exe (Inno Setup 6) not found"; exit 1 }
-if (-not $signtool -and -not $SkipSign) { Write-Warning "signtool not found — binaries won't be signed" }
+if (-not $signtool -and -not $SkipSign) { Write-Warning "signtool not found - binaries won't be signed" }
 
-# ─── 3. Build Rust protocol router ───────────────────────────────────────────
+# 3. Build Rust protocol router
 if ($cargo -and -not $SkipRust -and $Tier -ne "Retro") {
     Write-Host "`n[Step 1/8] Building Rust protocol router..." -ForegroundColor Cyan
     Push-Location "$Root\router"
     & cargo build --release
     if ($LASTEXITCODE -ne 0) { Write-Error "cargo build failed"; exit 1 }
     Pop-Location
-    Write-Host "[Step 1/8] ✓ aeon_router.dll built" -ForegroundColor Green
+    Write-Host "[Step 1/8] OK: aeon_router.dll built" -ForegroundColor Green
 } else {
     Write-Host "`n[Step 1/8] Skipping Rust router build" -ForegroundColor DarkGray
 }
 
-# ─── 4. Build C++ browser core ────────────────────────────────────────────────
+# 4. Build C++ browser core
 Write-Host "`n[Step 2/8] Building C++ core (Tier=$Tier)..." -ForegroundColor Cyan
 
 $buildDir = "$Root\build\$Tier"
@@ -109,27 +111,27 @@ if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed"; exit 1 }
 # Build
 & $cmake --build $buildDir --config Release --parallel
 if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
-Write-Host "[Step 2/8] ✓ Aeon.exe built" -ForegroundColor Green
+Write-Host "[Step 2/8] OK: Aeon.exe built" -ForegroundColor Green
 
-# ─── 5. Bake icon ─────────────────────────────────────────────────────────────
+# 5. Bake icon
 if (-not $SkipIco) {
     Write-Host "`n[Step 3/8] Baking icon..." -ForegroundColor Cyan
     & powershell -ExecutionPolicy Bypass -File "$Root\resources\icons\build_icon.ps1"
-    Write-Host "[Step 3/8] ✓ Aeon.ico baked" -ForegroundColor Green
+    Write-Host "[Step 3/8] OK: Aeon.ico baked" -ForegroundColor Green
 }
 
-# ─── 6. Download filter lists ─────────────────────────────────────────────────
+# 6. Download filter lists
 if (-not $SkipLists) {
     Write-Host "`n[Step 4/8] Refreshing filter lists..." -ForegroundColor Cyan
     $dlScript = "$Root\resources\filters\download_filterlists.ps1"
     if (Test-Path $dlScript) {
         & powershell -ExecutionPolicy Bypass -File $dlScript
     } else {
-        Write-Warning "[Step 4/8] download_filterlists.ps1 not found — using cached lists"
+        Write-Warning "[Step 4/8] download_filterlists.ps1 not found - using cached lists"
     }
 }
 
-# ─── 7. Sign binaries ─────────────────────────────────────────────────────────
+# 7. Sign binaries
 if ($signtool -and -not $SkipSign) {
     Write-Host "`n[Step 5/8] Signing binaries..." -ForegroundColor Cyan
 
@@ -146,16 +148,16 @@ if ($signtool -and -not $SkipSign) {
             /td sha256 /fd sha256 `
             "$bin"
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Signing failed for $bin — continuing (dev build?)"
+            Write-Warning "Signing failed for $bin - continuing (dev build?)"
         } else {
-            Write-Host "  ✓ Signed: $(Split-Path $bin -Leaf)" -ForegroundColor Green
+            Write-Host "  OK: Signed: $(Split-Path $bin -Leaf)" -ForegroundColor Green
         }
     }
 } else {
     Write-Host "`n[Step 5/8] Skipping code signing" -ForegroundColor DarkGray
 }
 
-# ─── 8. Compile Inno Setup installer ─────────────────────────────────────────
+# 8. Compile Inno Setup installer
 Write-Host "`n[Step 6/8] Compiling installer (Inno Setup)..." -ForegroundColor Cyan
 $issFile = "$Root\installer\AeonBrowser.iss"
 $null = New-Item -ItemType Directory -Force -Path "$Root\$OutDir"
@@ -168,9 +170,9 @@ $null = New-Item -ItemType Directory -Force -Path "$Root\$OutDir"
 if ($LASTEXITCODE -ne 0) { Write-Error "ISCC failed"; exit 1 }
 
 $installerExe = "$Root\$OutDir\AeonBrowser-Setup-$Version.exe"
-Write-Host "[Step 6/8] ✓ Installer: $installerExe" -ForegroundColor Green
+Write-Host "[Step 6/8] OK: Installer: $installerExe" -ForegroundColor Green
 
-# ─── 9. Sign installer ────────────────────────────────────────────────────────
+# 9. Sign installer
 if ($signtool -and -not $SkipSign -and (Test-Path $installerExe)) {
     Write-Host "`n[Step 7/8] Signing installer..." -ForegroundColor Cyan
     & $signtool sign `
@@ -178,10 +180,10 @@ if ($signtool -and -not $SkipSign -and (Test-Path $installerExe)) {
         /tr "http://timestamp.digicert.com" `
         /td sha256 /fd sha256 `
         "$installerExe"
-    Write-Host "[Step 7/8] ✓ Installer signed" -ForegroundColor Green
+    Write-Host "[Step 7/8] OK: Installer signed" -ForegroundColor Green
 }
 
-# ─── 10. SHA-256 + manifest.json ─────────────────────────────────────────────
+# 10. SHA-256 + manifest.json
 Write-Host "`n[Step 8/8] Computing SHA-256 and writing manifest..." -ForegroundColor Cyan
 
 $hash = (Get-FileHash $installerExe -Algorithm SHA256).Hash.ToLower()
@@ -194,20 +196,20 @@ $manifest = [ordered]@{
     sha256      = $hash
     size        = $size
     full_url    = "https://update.delgadologic.tech/aeon/releases/$Version/AeonBrowser-Setup-$Version.exe"
-    bspatch_url = ""    # Populated by release pipeline after delta generation
+    bspatch_url = ""
     min_version = "0.9.0"
     released_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
 }
 $manifestPath = "$Root\$OutDir\manifest.json"
 $manifest | ConvertTo-Json -Depth 2 | Set-Content $manifestPath -Encoding UTF8
-Write-Host "[Step 8/8] ✓ manifest.json written" -ForegroundColor Green
+Write-Host "[Step 8/8] OK: manifest.json written" -ForegroundColor Green
 Write-Host "           SHA-256: $hash"
 
-# ─── Summary ─────────────────────────────────────────────────────────────────
-Write-Host "`n[build_installer] ═══════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "[build_installer] ✓ Build complete!" -ForegroundColor Green
+# --- Summary -----------------------------------------------------------------
+Write-Host "`n[build_installer] =========================================" -ForegroundColor Cyan
+Write-Host "[build_installer] OK: Build complete!" -ForegroundColor Green
 Write-Host "  Installer : $installerExe"
 Write-Host "  SHA-256   : $hash"
 Write-Host "  Manifest  : $manifestPath"
 Write-Host "  Version   : $Version | Tier: $Tier | Channel: $Channel"
-Write-Host "[build_installer] ═══════════════════════════════════════`n" -ForegroundColor Cyan
+Write-Host "[build_installer] =========================================`n" -ForegroundColor Cyan

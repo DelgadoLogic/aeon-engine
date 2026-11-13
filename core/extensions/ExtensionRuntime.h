@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <string>
 #include "../probe/HardwareProbe.h"
 
 namespace ExtensionRuntime {
@@ -14,7 +15,9 @@ namespace ExtensionRuntime {
 namespace NativeAdBlock {
     void LoadFilterList(const char* path);
     bool ShouldBlock(const char* url);
+    bool ShouldBlockWithCname(const char* url, std::string& outBlockedDomain);
     void HideElements(HWND hwnd, const char* url);
+    const char* GetCosmeticCSS();    // Returns malloc'd CSS string for element-hide rules (caller must free)
     int  GetBlockedCount();   // Number of domain-block rules loaded
     int  GetTotalRules();     // Total rules across all filter lists
 }

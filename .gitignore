@@ -18,9 +18,14 @@ research/privacy_testing/
 research/self-improving/
 research/ui_logic/
 
-# === Chromium Build Output ===
+# === Chromium, CMake & Local Build Output ===
 out/
 build/
+build_*/
+aeon_ai.dir/
+publish/
+dist/
+dist_*/
 gen/
 *.obj
 *.pdb
@@ -33,16 +38,50 @@ gen/
 *.ipch
 *.VC.db
 *.VC.VC.opendb
+*.dmp
+boot_trace.txt
+err.txt
+out.txt
+test_out_*.txt
+temp*.js
+.agents/
+ORIGINAL_REQUEST.md
+PROJECT.md
+aeon-site/.firebase/
+dev-site/.firebase/
+aeon-site/dist/
+finish-verification.js
+get-token-dev.js
+get-tokens.js
+map-firebase-details.js
+map-firebase-user.js
+map-firebase.js
+test-e2e-loop.mjs
+test-session-sovereignty.js
+test-ui-features.mjs
+test_live_aeon.js
+verify-dev.js
+verify-dev2.js
+verify-domain.js
+verify-domain2.js
+verify-domain3.js
+agent/aeon-mcp/dist/
+agent/aeon-mcp/models/
+installer/Output/
+installer/artifacts/
 
 # === Model / Dict Binaries (released via aeon-models / aeon-dicts) ===
 translate/models/**/*.ctm2
 spell/dicts/*.bdic
+models/*.gguf
+models/*.bin
 
 # === Sovereign Keys — NEVER COMMIT ===
 sovereign/keys/
 sovereign/*.pem
 sovereign/*.key
 sovereign/*.ed25519
+sovereign-keys/
 *.private
 *.secret
 
@@ -104,6 +143,7 @@ retro/*.img
 *.iso
 *.img
 !resources/**
+
 # Temp push scripts
 aeon_push_all.ps1
 push_to_github.ps1
@@ -115,9 +155,6 @@ build_resume*.txt
 # Local research cache (not source code)
 _research/
 research/
-
-# Local dist artifacts (uploaded to GCS, not committed)
-dist_beta/
 
 # === CONFIDENTIAL — NEVER PUSH TO ANY REMOTE ===
 internal_docs/
@@ -140,7 +177,6 @@ sa.json
 *.sa.json
 
 # Build output directories
-dist_pro/
 cloud_build_output/
 
 # Misc
@@ -149,7 +185,62 @@ Gemini_Generated_Image*.jpg
 *.jpg
 # Exception: allow committed installer preview
 !resources/images/installer_preview.jpg
-billing/
 assets/icons/raw/
-
 retro/bearssl_obj/
+
+# Local scratch, stress harnesses, generated screenshots & object artifacts
+*.obj
+*.pdb
+*.ilk
+*.exp
+TEST_INFRA.md
+TEST_READY.md
+walkthrough.md
+compile.bat
+compile.ps1
+compile_bridge_test.bat
+compile_bridge_test.ps1
+compile_run_*.ps1
+do_clean_build.bat
+run_m1_tests.ps1
+run_msvc_cmake.bat
+empirical_stress_results*.json
+test_ai_live.js
+test_auth*.json
+test_crash.cpp
+test_empirical_*
+test_ipc_stress.mjs
+test_m3_m4_engines.cpp
+agent/aeon-mcp/test-*.mjs
+agent/aeon-mcp/test_*.js
+agent/aeon-mcp/test-*.json
+core/tests/*.obj
+core/tests/*.exe
+docs/screenshots/
+installer/assets/*.py
+installer/assets/crops_ref/
+installer/assets/debug_*.png
+installer/assets/sprites/
+installer/test_capture.ps1
+resources/icons/generate_circular_icon.ps1
+resources/preview/
+tests/*.cmd
+tests/*.py
+tests/run_build*.ps1
+tests/run_ipc_test.ps1
+tests/run_test_challenger_*.ps1
+tests/test_adversarial_*
+tests/test_binary_integrity_*
+tests/test_challenger*
+tests/test_cmake_build.ps1
+tests/test_e2e_*.mjs
+tests/test_empirical_*
+tests/test_ipc_*
+tests/test_m1_*
+tests/test_milestone2_*
+tests/test_newtab_dom_stress.mjs
+tests/e2e/adversarial_stress_suite.mjs
+tests/e2e/challenger*.mjs
+tests/e2e/reports/
+tools/capture_all_screenshots.ps1
+tools/test_*.ps1

@@ -21,7 +21,7 @@
 //   [+] Peer scoring — bad actors get isolated, good peers get promoted
 //   [+] Sovereign manifest relay — nodes relay signed updates they can't apply
 //   [+] XP-safe: IOCP transport on Vista+, WSAAsyncSelect on XP
-//   [+] Zero telemetry to any external server — purely P2P, user-controlled
+//   [+] No central tracking server — purely P2P, user-controlled mesh
 // =============================================================================
 
 #pragma once
@@ -65,6 +65,12 @@ enum class AeonHiveTopic : uint32_t {
     CircumventBridge   = 0x0007, // bridge config for censored regions
     PredictHints       = 0x0008, // resource prefetch hints
     PeerScore          = 0x0009, // peer reputation updates
+
+    // ── Sovereign Communications & Marketplace ───────────────────────
+    DirectMessage      = 0x000C, // E2E encrypted 1-to-1 direct messaging
+    GroupMessage       = 0x000D, // Group channel encrypted messaging
+    MailboxSync        = 0x000E, // Offline mailbox peer relay & queue sync
+    MarketListing      = 0x000F, // P2P verified commerce and skill listings
 
     // ── Pillar 1: Sovereign Crypto ────────────────────────────────────
     TrustStoreUpdate   = 0x0100, // Ed25519-signed CA bundle updates (AeonTLS)

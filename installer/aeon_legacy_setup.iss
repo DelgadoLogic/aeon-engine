@@ -16,8 +16,8 @@
 
 #define AppName      "Aeon Browser Legacy Edition"
 #define AppVersion   GetFileVersion("..\build\legacy\aeon\aeon.exe")
-#define AppPublisher "Aeon Browser Project"
-#define AppURL       "https://aeonbrowser.com/legacy"
+#define AppPublisher "Delgado Creative Enterprises LLC d/b/a DelgadoLogic"
+#define AppURL       "https://browseaeon.com/legacy"
 #define AppExeName   "aeon.exe"
 
 [Setup]
@@ -174,7 +174,7 @@ begin
     MsgBox(
       'You are running Windows 10 or 11.' + #13#10 +
       'Please download Aeon Standard Edition instead:' + #13#10 +
-      'https://aeonbrowser.com/download' + #13#10 + #13#10 +
+      'https://browseaeon.com/download' + #13#10 + #13#10 +
       'The Legacy Edition is designed for XP, Vista, 7, and 8.',
       mbInformation, MB_OK);
     Result := False;

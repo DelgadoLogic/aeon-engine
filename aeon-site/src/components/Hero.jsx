@@ -1,5 +1,6 @@
 import React from 'react';
 import TerminalDemo from './TerminalDemo';
+import BrowserMockupDemo from './BrowserMockupDemo';
 
 export default function Hero() {
   return (
@@ -14,7 +15,7 @@ export default function Hero() {
         {/* Status badge */}
         <div className="hero-badge" style={{ animationDelay: '0.2s' }}>
           <span className="pulse"></span>
-          Network online · 0 central servers
+          Developer Preview v0.22 · Beta Waitlist Open
         </div>
 
         {/* Main headline */}
@@ -25,32 +26,35 @@ export default function Hero() {
 
         {/* Tagline */}
         <p className="hero-sub">
-          Aeon finds its own vulnerabilities, patches them, and distributes
-          updates through a peer-to-peer network — with zero telemetry,
-          zero fingerprinting, and zero trust in anyone but you.
+          Aeon combines Brave-grade privacy shields and Obsidian workspace ergonomics with
+          an autonomous local WebMCP AI bridge — zero Google background pings, Camoufox
+          stealth anti-fingerprinting, and Ed25519-signed updates.
         </p>
 
         {/* CTA buttons */}
         <div className="hero-actions">
           <a className="btn-primary" href="#waitlist" id="hero-download-btn">
-            Join the Waitlist
+            Join Early Access
           </a>
-          <a className="btn-secondary" href="#how-it-works">
-            See how it works →
+          <a className="btn-secondary" href="#pro">
+            View Editions →
           </a>
         </div>
 
-        {/* Sub-note with origin badge */}
-        <p className="hero-note">Free · No account required · Open source core</p>
+        {/* Sub-note unified with FACTS.md & Pricing.jsx */}
+        <p className="hero-note">Core Browser $0 Forever · Optional Aeon Pro ($4.99/mo or $39/yr) · 60-Day Refund Guarantee</p>
 
         {/* Feature pills */}
         <div className="hero-pills">
-          {['Local AI', 'P2P Updates', 'Zero Telemetry', 'Ed25519 Signed', '8 OS Tiers'].map((pill, i) => (
+          {['Camoufox Stealth Shield', 'Obsidian Workspaces', 'Local WebMCP AI', 'OmniHub Bridge', 'Zero Google Pings', 'Ed25519 Signed'].map((pill, i) => (
             <span className="hero-pill" key={i} style={{ animationDelay: `${0.6 + i * 0.08}s` }}>
               {pill}
             </span>
           ))}
         </div>
+
+        {/* Live Interactive Browser Mockup */}
+        <BrowserMockupDemo />
 
         {/* Live terminal demo */}
         <TerminalDemo />

@@ -50,7 +50,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://aeonbrowser.com",
+        "https://browseaeon.com",
+        "https://aeonbrowse.com",
         "https://aeon-site.web.app",
         "http://localhost:5173",
         "http://localhost:3000",

@@ -20,6 +20,7 @@
 
 #include "EraChrome.h"
 #include "BrowserChrome.h"
+#include "DwmHelper.h"
 #include "../probe/HardwareProbe.h"
 #include "../engine/AeonBridge.h"
 #include "../agent/AeonAgentPipe.h"
@@ -106,9 +107,23 @@ static LRESULT CALLBACK ModernWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             PostQuitMessage(0);
             return 0;
 
+        case WM_ERASEBKGND:
+            return 1;
+
+        case WM_DPICHANGED: {
+            UINT newDpi = HIWORD(w);
+            const RECT* prc = reinterpret_cast<const RECT*>(l);
+            BrowserChrome::OnDpiChanged(h, static_cast<int>(newDpi));
+            if (prc) {
+                SetWindowPos(h, nullptr, prc->left, prc->top,
+                    prc->right - prc->left, prc->bottom - prc->top,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            return 0;
+        }
+
         case WM_PAINT:
             BrowserChrome::OnPaint(h);
-            // Also let DefWindowProc validate the paint region
             break;
 
         case WM_SIZE: {
@@ -176,13 +191,24 @@ static LRESULT CALLBACK RetroWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             PostQuitMessage(0);
             return 0;
 
+        case WM_ERASEBKGND:
+            return 1;
+
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(h, &ps);
             RECT rc; GetClientRect(h, &rc);
-            PaintRetroChrome(h, hdc, rc);
+            int cw = (rc.right > 0) ? rc.right : 1;
+            int ch = (rc.bottom > 0) ? rc.bottom : 1;
+            HDC memDC = CreateCompatibleDC(hdc);
+            HBITMAP memBmp = CreateCompatibleBitmap(hdc, cw, ch);
+            HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, memBmp);
+            PaintRetroChrome(h, memDC, rc);
+            BitBlt(hdc, 0, 0, cw, ch, memDC, 0, 0, SRCCOPY);
+            SelectObject(memDC, oldBmp);
+            DeleteObject(memBmp);
+            DeleteDC(memDC);
             EndPaint(h, &ps);
-            // Also paint the BrowserChrome tab strip over the retro base
             BrowserChrome::OnPaint(h);
             return 0;
         }
@@ -265,7 +291,7 @@ void EraChrome::CreateBrowserWindow() {
     wc.hIcon         = LoadIcon(m_hInst, MAKEINTRESOURCE(1));
     RegisterClassExW(&wc);
 
-    DWORD style = WS_OVERLAPPEDWINDOW;
+    DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
     // Modern: start maximised; Retro: standard 800×600 (matches retro screens)
     int x = CW_USEDEFAULT, y = CW_USEDEFAULT;
     int w = modern ? CW_USEDEFAULT : 800;
@@ -285,8 +311,7 @@ void EraChrome::CreateBrowserWindow() {
     }
 
     if (modern && IsDwmAvailable()) {
-        ApplyMicaBackdrop(m_hwnd);
-        ApplyRoundedCorners(m_hwnd);
+        AeonDwm::ApplyObsidianMainFrameDwm(m_hwnd);
     }
 
     // ── Wire BrowserChrome to the window ────────────────────────────────

@@ -13,8 +13,8 @@
 
 #define AppName      "Aeon Browser"
 #define AppVersion   GetFileVersion("..\build\win\aeon\aeon.exe")
-#define AppPublisher "Aeon Browser Project"
-#define AppURL       "https://aeonbrowser.com"
+#define AppPublisher "Delgado Creative Enterprises LLC d/b/a DelgadoLogic"
+#define AppURL       "https://browseaeon.com"
 #define AppExeName   "aeon.exe"
 #define AppDataName  "Aeon"
 

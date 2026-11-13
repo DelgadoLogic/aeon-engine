@@ -145,6 +145,8 @@
 #include <functional>
 #include <atomic>
 #include <queue>
+#include <unordered_set>
+#include "../session/nlohmann/json.hpp"
 
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -204,6 +206,18 @@ static const int     k_DefaultTtlSec  = 300;  // 5 minutes
 static const int     k_AirplaneTtlSec = 1800; // 30 minutes (save bandwidth)
 static const size_t  k_MaxCacheSize   = 1024;
 
+// ─── CNAME Cache ─────────────────────────────────────────────────────────────
+struct CnameCacheEntry {
+    std::string canonicalHost;
+    std::vector<std::string> chain;
+    bool isBlocked = false;
+    std::string blockedDomain;
+    std::chrono::steady_clock::time_point expires;
+};
+
+static std::unordered_map<std::string, CnameCacheEntry> g_cnameCache;
+static std::mutex    g_cnameMu;
+
 // ─── State ────────────────────────────────────────────────────────────────────
 static std::mutex    g_mu;           // Protects g_hint, g_corpSuffix, g_allowSystemDns
 static std::mutex    g_statsMu;      // Protects g_stats (separate to avoid I/O under lock)
@@ -228,6 +242,243 @@ static HANDLE                     g_workerThread = nullptr;
 static std::string ToLower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), ::tolower);
     return s;
+}
+
+// ─── CNAME Uncloaking Implementation ─────────────────────────────────────────
+
+std::vector<std::string> ExtractCnameChainFromJson(const std::string& jsonBody, const std::string& initialHost) {
+    std::vector<std::string> chain;
+    if (jsonBody.empty()) return chain;
+
+    std::string startHost = ToLower(initialHost);
+    while (!startHost.empty() && startHost.back() == '.') startHost.pop_back();
+
+    // Map of alias source -> alias target
+    std::unordered_map<std::string, std::string> cnameMap;
+    std::vector<std::pair<std::string, std::string>> cnamePairs;
+
+    try {
+        auto j = nlohmann::json::parse(jsonBody);
+        if (j.contains("Answer") && j["Answer"].is_array()) {
+            for (const auto& item : j["Answer"]) {
+                if (item.is_object() && item.contains("type")) {
+                    int typeVal = 0;
+                    if (item["type"].is_number()) typeVal = item["type"].get<int>();
+                    if (typeVal == 5) { // CNAME
+                        std::string nameStr, dataStr;
+                        if (item.contains("name") && item["name"].is_string()) nameStr = item["name"].get<std::string>();
+                        if (item.contains("data") && item["data"].is_string()) dataStr = item["data"].get<std::string>();
+
+                        nameStr = ToLower(nameStr);
+                        dataStr = ToLower(dataStr);
+                        while (!nameStr.empty() && nameStr.back() == '.') nameStr.pop_back();
+                        while (!dataStr.empty() && dataStr.back() == '.') dataStr.pop_back();
+
+                        if (!nameStr.empty() && !dataStr.empty()) {
+                            cnameMap[nameStr] = dataStr;
+                            cnamePairs.push_back({ nameStr, dataStr });
+                        }
+                    }
+                }
+            }
+        }
+    } catch (...) {
+        // Fallback robust substring parsing for JSON
+        const char* pos = jsonBody.c_str();
+        while (pos && *pos) {
+            const char* type5 = strstr(pos, "\"type\":5");
+            if (!type5) type5 = strstr(pos, "\"type\": 5");
+            if (!type5) break;
+
+            // Search around type5 for name and data fields
+            const char* nameTag = strstr(pos, "\"name\":");
+            const char* dataTag = strstr(pos, "\"data\":");
+
+            if (dataTag) {
+                const char* dQuote1 = strchr(dataTag + 7, '"');
+                if (dQuote1) {
+                    dQuote1++;
+                    const char* dQuote2 = strchr(dQuote1, '"');
+                    if (dQuote2) {
+                        std::string dataStr(dQuote1, dQuote2 - dQuote1);
+                        std::string nameStr = startHost;
+                        if (nameTag && nameTag < dataTag) {
+                            const char* nQuote1 = strchr(nameTag + 7, '"');
+                            if (nQuote1 && nQuote1 < dataTag) {
+                                nQuote1++;
+                                const char* nQuote2 = strchr(nQuote1, '"');
+                                if (nQuote2 && nQuote2 < dataTag) {
+                                    nameStr = std::string(nQuote1, nQuote2 - nQuote1);
+                                }
+                            }
+                        }
+                        nameStr = ToLower(nameStr);
+                        dataStr = ToLower(dataStr);
+                        while (!nameStr.empty() && nameStr.back() == '.') nameStr.pop_back();
+                        while (!dataStr.empty() && dataStr.back() == '.') dataStr.pop_back();
+                        if (!nameStr.empty() && !dataStr.empty()) {
+                            cnameMap[nameStr] = dataStr;
+                            cnamePairs.push_back({ nameStr, dataStr });
+                        }
+                    }
+                }
+            }
+            pos = type5 + 8;
+        }
+    }
+
+    if (cnameMap.empty() && cnamePairs.empty()) return chain;
+
+    // Follow alias chain starting from startHost with loop detection (max depth 10)
+    std::string current = startHost;
+    std::unordered_set<std::string> visited;
+    visited.insert(current);
+
+    const int kMaxDepth = 10;
+    for (int depth = 0; depth < kMaxDepth; depth++) {
+        std::string next;
+        auto it = cnameMap.find(current);
+        if (it != cnameMap.end()) {
+            next = it->second;
+        } else if (depth == 0 && cnamePairs.size() == 1) {
+            next = cnamePairs[0].second;
+        } else {
+            for (const auto& pair : cnamePairs) {
+                if (pair.first == current) {
+                    next = pair.second;
+                    break;
+                }
+            }
+        }
+
+        if (next.empty()) break;
+
+        // Loop detection: if domain was already seen in this chain, abort further unravelling
+        if (visited.count(next)) {
+            break;
+        }
+
+        visited.insert(next);
+        chain.push_back(next);
+        current = next;
+    }
+
+    return chain;
+}
+
+bool GetCachedCname(const std::string& rawHostname, CnameResult& outResult) {
+    std::string host = ToLower(rawHostname);
+    while (!host.empty() && host.back() == '.') host.pop_back();
+
+    std::lock_guard<std::mutex> lk(g_cnameMu);
+    auto it = g_cnameCache.find(host);
+    if (it == g_cnameCache.end()) return false;
+    if (std::chrono::steady_clock::now() > it->second.expires) {
+        g_cnameCache.erase(it);
+        return false;
+    }
+    outResult.initialHost = host;
+    outResult.canonicalHost = it->second.canonicalHost;
+    outResult.chain = it->second.chain;
+    outResult.uncloaked = !it->second.chain.empty();
+    outResult.isBlocked = it->second.isBlocked;
+    outResult.blockedDomain = it->second.blockedDomain;
+    return true;
+}
+
+void SetCachedCname(const std::string& rawHostname, const CnameResult& result, int ttlSec) {
+    std::string host = ToLower(rawHostname);
+    while (!host.empty() && host.back() == '.') host.pop_back();
+
+    std::lock_guard<std::mutex> lk(g_cnameMu);
+    CnameCacheEntry entry;
+    entry.canonicalHost = result.canonicalHost;
+    entry.chain = result.chain;
+    entry.isBlocked = result.isBlocked;
+    entry.blockedDomain = result.blockedDomain;
+    entry.expires = std::chrono::steady_clock::now() + std::chrono::seconds(ttlSec > 0 ? ttlSec : 300);
+    g_cnameCache[host] = std::move(entry);
+}
+
+void FlushCnameCache() {
+    std::lock_guard<std::mutex> lk(g_cnameMu);
+    g_cnameCache.clear();
+}
+
+CnameResult UncloakCname(const std::string& rawHostname, int timeoutMs) {
+    std::string hostname = ToLower(rawHostname);
+    while (!hostname.empty() && hostname.back() == '.') hostname.pop_back();
+
+    CnameResult cached;
+    if (GetCachedCname(hostname, cached)) {
+        return cached;
+    }
+
+    CnameResult result;
+    result.initialHost = hostname;
+    result.canonicalHost = hostname;
+    result.uncloaked = false;
+    result.isBlocked = false;
+
+    // DoH query to resolve CNAME chain
+    int timeout = timeoutMs > 0 ? timeoutMs : 3000;
+    const auto& provider = k_Providers[0]; // Cloudflare primary
+
+    HINTERNET hSess = WinHttpOpen(L"AeonBrowser-DoH/1.0",
+        WINHTTP_ACCESS_TYPE_NO_PROXY,
+        WINHTTP_NO_PROXY_NAME,
+        WINHTTP_NO_PROXY_BYPASS, 0);
+    if (hSess) {
+        DWORD tm = (DWORD)timeout;
+        WinHttpSetOption(hSess, WINHTTP_OPTION_CONNECT_TIMEOUT,  &tm, sizeof(tm));
+        WinHttpSetOption(hSess, WINHTTP_OPTION_SEND_TIMEOUT,     &tm, sizeof(tm));
+        WinHttpSetOption(hSess, WINHTTP_OPTION_RECEIVE_TIMEOUT,  &tm, sizeof(tm));
+
+        HINTERNET hConn = WinHttpConnect(hSess, provider.host, (INTERNET_PORT)provider.port, 0);
+        if (hConn) {
+            wchar_t wname[256] = {};
+            MultiByteToWideChar(CP_UTF8, 0, hostname.c_str(), -1, wname, 255);
+            wchar_t path[512] = {};
+            _snwprintf_s(path, 512, _TRUNCATE, L"%s?name=%s&type=A", provider.path, wname);
+
+            HINTERNET hReq = WinHttpOpenRequest(hConn, L"GET", path,
+                nullptr, WINHTTP_NO_REFERER,
+                WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+            if (hReq) {
+                WinHttpAddRequestHeaders(hReq,
+                    L"Accept: application/dns-json\r\n",
+                    (DWORD)-1L, WINHTTP_ADDREQ_FLAG_ADD);
+
+                if (WinHttpSendRequest(hReq, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+                    WinHttpReceiveResponse(hReq, nullptr)) {
+                    DWORD statusCode = 0, scSz = sizeof(statusCode);
+                    WinHttpQueryHeaders(hReq, WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER,
+                        nullptr, &statusCode, &scSz, nullptr);
+
+                    if (statusCode == 200) {
+                        std::string body;
+                        char buf[4096]; DWORD read;
+                        while (WinHttpReadData(hReq, buf, sizeof(buf)-1, &read) && read > 0)
+                            body.append(buf, read);
+
+                        auto chain = ExtractCnameChainFromJson(body, hostname);
+                        if (!chain.empty()) {
+                            result.chain = chain;
+                            result.canonicalHost = chain.back();
+                            result.uncloaked = true;
+                            { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.cnameUncloaked++; }
+                        }
+                    }
+                }
+                WinHttpCloseHandle(hReq);
+            }
+            WinHttpCloseHandle(hConn);
+        }
+        WinHttpCloseHandle(hSess);
+    }
+
+    SetCachedCname(hostname, result, 300);
+    return result;
 }
 
 // Returns true if the hostname should be resolved via system DNS (split-horizon)
@@ -383,6 +634,18 @@ static ResolveResult DoHQuery(const DoHProvider& provider,
     int dnsStatus = atoi(statusTag + 9);
     if (dnsStatus == 3) { r.status = ResolveStatus::NXDOMAIN; return r; }
     if (dnsStatus != 0) { r.status = ResolveStatus::BLOCKED;  return r; }
+
+    // Extract CNAME alias chain from DoH JSON response
+    auto cnameChain = ExtractCnameChainFromJson(body, hostname);
+    if (!cnameChain.empty()) {
+        CnameResult cRes;
+        cRes.initialHost = hostname;
+        cRes.chain = cnameChain;
+        cRes.canonicalHost = cnameChain.back();
+        cRes.uncloaked = true;
+        SetCachedCname(hostname, cRes, 300);
+        { std::lock_guard<std::mutex> lk(g_statsMu); g_stats.cnameUncloaked++; }
+    }
 
     // DNSSEC
     const char* adTag = strstr(body.c_str(), "\"AD\":true");
@@ -621,8 +884,11 @@ void SetNetworkHint(NetworkEnvHint hint, const char* corporateDnsSuffix) {
 }
 
 void FlushCache() {
-    std::lock_guard<std::mutex> lk(g_cacheMu);
-    g_cache.clear();
+    {
+        std::lock_guard<std::mutex> lk(g_cacheMu);
+        g_cache.clear();
+    }
+    FlushCnameCache();
     fprintf(stdout, "[DnsResolver] Cache flushed\n");
 }
 

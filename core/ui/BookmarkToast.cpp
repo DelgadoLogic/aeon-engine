@@ -18,6 +18,7 @@
 //   - Saves via HistoryEngine::AddBookmark().
 
 #include "BookmarkToast.h"
+#include "DwmHelper.h"
 #include "../history/HistoryEngine.h"
 #include <windowsx.h>
 #include <dwmapi.h>
@@ -82,7 +83,7 @@ static void CreateControls(HWND hWnd) {
     g_nameEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", g_title,
         WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
         PAD, 56, W - PAD*2, 26,
-        hWnd, (HMENU)IDC_NAME_EDIT, g_hInst, nullptr);
+        hWnd, (HMENU)(UINT_PTR)IDC_NAME_EDIT, g_hInst, nullptr);
 
     // Set dark-ish styling on edit via subclass or at minimum set font
     SendMessageW(g_nameEdit, WM_SETFONT, (WPARAM)g_fontMain, TRUE);
@@ -91,12 +92,12 @@ static void CreateControls(HWND hWnd) {
     g_folderCombo = CreateWindowExW(0, L"COMBOBOX", nullptr,
         WS_CHILD|WS_VISIBLE|CBS_DROPDOWNLIST|WS_VSCROLL,
         PAD, 110, W - PAD*2, 200,
-        hWnd, (HMENU)IDC_FOLDER_CB, g_hInst, nullptr);
+        hWnd, (HMENU)(UINT_PTR)IDC_FOLDER_CB, g_hInst, nullptr);
     SendMessageW(g_folderCombo, WM_SETFONT, (WPARAM)g_fontMain, TRUE);
 
     // Populate folders from HistoryEngine
-    HistoryEngine::Bookmark bms_arr[256] = {};
-    int bms_count = HistoryEngine::GetBookmarks(bms_arr, 256);
+    std::vector<HistoryEngine::Bookmark> bms_arr(256);
+    int bms_count = HistoryEngine::GetBookmarks(bms_arr.data(), static_cast<int>(bms_arr.size()));
     std::vector<std::string> seen;
     SendMessageW(g_folderCombo, CB_ADDSTRING, 0, (LPARAM)L"Bookmarks");
     for (int _bi = 0; _bi < bms_count; _bi++) {
@@ -122,14 +123,14 @@ static void CreateControls(HWND hWnd) {
         g_isEdit ? L"Save" : L"Done",
         WS_CHILD|WS_VISIBLE|BS_FLAT|BS_PUSHBUTTON,
         W - PAD - 70, H_FULL - 38, 70, 26,
-        hWnd, (HMENU)IDC_DONE_BTN, g_hInst, nullptr);
+        hWnd, (HMENU)(UINT_PTR)IDC_DONE_BTN, g_hInst, nullptr);
     SendMessageW(g_doneBtn, WM_SETFONT, (WPARAM)g_fontMain, TRUE);
 
     // Remove button
     g_removeBtn = CreateWindowExW(0, L"BUTTON", L"Remove",
         WS_CHILD|WS_VISIBLE|BS_FLAT|BS_PUSHBUTTON,
         PAD, H_FULL - 38, 70, 26,
-        hWnd, (HMENU)IDC_REMOVE_BTN, g_hInst, nullptr);
+        hWnd, (HMENU)(UINT_PTR)IDC_REMOVE_BTN, g_hInst, nullptr);
     SendMessageW(g_removeBtn, WM_SETFONT, (WPARAM)g_fontMain, TRUE);
 }
 
@@ -185,15 +186,20 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_TIMER:
         if (wParam == 1) { Hide(); return 0; } break;
 
+    case WM_ERASEBKGND:
+        return 1;
+
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd,&ps);
         RECT rc; GetClientRect(hWnd,&rc);
+        int w = (std::max)(1L, rc.right);
+        int h = (std::max)(1L, rc.bottom);
         HDC mem = CreateCompatibleDC(hdc);
-        HBITMAP bmp = CreateCompatibleBitmap(hdc,rc.right,rc.bottom);
+        HBITMAP bmp = CreateCompatibleBitmap(hdc,w,h);
         HBITMAP ob  = (HBITMAP)SelectObject(mem,bmp);
         Paint(mem,rc);
-        BitBlt(hdc,0,0,rc.right,rc.bottom,mem,0,0,SRCCOPY);
+        BitBlt(hdc,0,0,w,h,mem,0,0,SRCCOPY);
         SelectObject(mem,ob); DeleteObject(bmp); DeleteDC(mem);
         EndPaint(hWnd,&ps);
         return 0;
@@ -221,8 +227,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         }
         case IDC_REMOVE_BTN: {
             // Find bookmark ID by URL, then delete by ID
-            HistoryEngine::Bookmark bms_arr[256] = {};
-            int cnt = HistoryEngine::GetBookmarks(bms_arr, 256);
+            std::vector<HistoryEngine::Bookmark> bms_arr(256);
+            int cnt = HistoryEngine::GetBookmarks(bms_arr.data(), static_cast<int>(bms_arr.size()));
             for (int i = 0; i < cnt; i++) {
                 if (strcmp(bms_arr[i].url, g_url) == 0) {
                     HistoryEngine::DeleteBookmark(bms_arr[i].id);
@@ -268,6 +274,7 @@ bool RegisterClass(HINSTANCE hInst) {
 void Show(HWND parent, POINT anchor, const char* url, const wchar_t* title,
           bool isEdit, DoneCallback doneCb, RemoveCallback removeCb) {
     if (g_hwnd) Hide();
+    if (!g_hInst) RegisterClass(GetModuleHandle(nullptr));
 
     strncpy_s(g_url,     url,   sizeof(g_url)-1);
     wcsncpy_s(g_title,   title, 511);
@@ -283,17 +290,13 @@ void Show(HWND parent, POINT anchor, const char* url, const wchar_t* title,
     g_hwnd = CreateWindowExW(
         WS_EX_TOPMOST,
         L"AeonBookmarkToast", L"",
-        WS_POPUP | WS_CLIPCHILDREN,
+        WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         x, y, W, H_FULL,
         parent, nullptr, g_hInst, nullptr);
 
     if (!g_hwnd) return;
 
-    // Win11 rounded corners
-    DWORD corner = 2;
-    DwmSetWindowAttribute(g_hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &corner, sizeof(corner));
-    BOOL dark = TRUE;
-    DwmSetWindowAttribute(g_hwnd, 20, &dark, sizeof(dark));
+    AeonDwm::ApplyObsidianTransientPopupDwm(g_hwnd, false);
 
     ShowWindow(g_hwnd, SW_SHOW);
     SetFocus(g_nameEdit); // Auto-focus name field

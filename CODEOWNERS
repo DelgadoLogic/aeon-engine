@@ -5,16 +5,18 @@
 
 # Sovereign key infrastructure — OWNER ONLY, no exceptions
 /sovereign/                @Chronolapse411
+/sovereign-keys/           @Chronolapse411
 
 # Core IAeonComponent interface — breaking this breaks every component
 /core/                     @Chronolapse411
 
-# Build pipeline — GN configs, Chromium patches
+# Build pipeline — CMake configs, patches
 /patches/                  @Chronolapse411
 /build/                    @Chronolapse411
 
-# Hive backbone
+# Hive & Router backbones
 /hive/                     @Chronolapse411
+/router/                   @Chronolapse411
 
-# Everything else — owner still required for now (solo project)
+# Everything else
 *                          @Chronolapse411

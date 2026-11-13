@@ -82,7 +82,33 @@ struct Stats {
     unsigned long long systemFallbacks;  // times we fell back to system DNS
     unsigned long long blocked;          // domains blocked by network
     unsigned long long failed;
+    unsigned long long cnameUncloaked;   // number of CNAME aliases uncloaked
 };
 Stats GetStats();
+
+// ─── CNAME Uncloaking ────────────────────────────────────────────────────────
+struct CnameResult {
+    std::string              initialHost;
+    std::string              canonicalHost; // Terminal uncloaked canonical domain
+    std::vector<std::string> chain;         // Alias chain in resolution order
+    bool                     uncloaked = false; // True if CNAME was uncloaked
+    bool                     isBlocked = false; // True if domain matched blocklist
+    std::string              blockedDomain;     // Domain that triggered the block
+};
+
+// Query or uncloak CNAME chain for a given host
+CnameResult UncloakCname(const std::string& hostname, int timeoutMs = 3000);
+
+// Check if a hostname has a cached CNAME uncloaking result
+bool GetCachedCname(const std::string& hostname, CnameResult& outResult);
+
+// Cache a CNAME result
+void SetCachedCname(const std::string& hostname, const CnameResult& result, int ttlSec = 300);
+
+// Flush the CNAME cache
+void FlushCnameCache();
+
+// Extract CNAME alias chain from DoH JSON response with loop detection (max depth 10)
+std::vector<std::string> ExtractCnameChainFromJson(const std::string& jsonBody, const std::string& initialHost);
 
 } // namespace DnsResolver

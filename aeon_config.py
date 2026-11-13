@@ -6,14 +6,14 @@ import os
 from pathlib import Path
 
 # ── Engine (ungoogled-chromium 146, pre-built) ────────────────────────────────
-CHROME_EXE = r"C:\Users\Manuel A Delgado\AppData\Local\Chromium\Application\chrome.exe"
+CHROME_EXE = os.environ.get("AEON_CHROME_EXE", "")
 
-# Fallback search if path moves (e.g. after update)
-if not Path(CHROME_EXE).exists():
+# Fallback search if env var is unset or path moves (e.g. after update)
+if not CHROME_EXE or not Path(CHROME_EXE).exists():
     _candidates = [
-        Path(os.environ.get("LOCALAPPDATA","")) / "Chromium" / "Application" / "chrome.exe",
-        Path("C:/Program Files/ungoogled-chromium/chrome.exe"),
-        Path("C:/Program Files (x86)/ungoogled-chromium/chrome.exe"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Chromium" / "Application" / "chrome.exe",
+        Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "ungoogled-chromium" / "chrome.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "ungoogled-chromium" / "chrome.exe",
     ]
     for _c in _candidates:
         if _c.exists():

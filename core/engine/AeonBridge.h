@@ -3,6 +3,7 @@
 #pragma once
 #include <windows.h>
 #include <string>
+#include <functional>
 
 // Custom window message for UI-thread operations
 #define WM_AEONBRIDGE  (WM_USER + 0x7AE)
@@ -34,4 +35,17 @@ namespace AeonBridge {
     // Also provides a fallback window.aeonBridge in case WebView2 hasn't injected
     // its IDispatch host object yet.
     std::string BuildInjectionScript();
+
+    // Discover WebMCP tools exposed by active page JS DOM / forms
+    std::string DiscoverWebMCPTools();
+
+    // Remediation primitives for WebView2 / DOM interaction & Stagehand
+    typedef std::function<std::string(int tabId, const char* script)> AeonScriptEvaluatorFn;
+    void RegisterScriptEvaluator(AeonScriptEvaluatorFn fn);
+
+    std::string ExecuteScript(int tabId, const char* script);
+    std::string StagehandObserve(int tabId);
+    std::string StagehandAct(int tabId, const char* action, int ref, const char* text);
+    std::string StagehandExtract(int tabId, const char* instruction, const char* selector = nullptr);
 }
+

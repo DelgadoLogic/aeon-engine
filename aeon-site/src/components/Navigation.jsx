@@ -11,8 +11,8 @@ export default function Navigation() {
         <a href="#features">Features</a>
         <a href="#how-it-works">How it works</a>
         <a href="#comparison">Compare</a>
-        <a href="#pro">Pro</a>
-        <a href="https://github.com/aeonbrowser/aeon" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="#pro">Editions</a>
+        <a href="https://github.com/DelgadoLogic/aeon-engine" target="_blank" rel="noreferrer">GitHub</a>
       </div>
       <a className="nav-cta" href="#waitlist" id="nav-waitlist-btn">Join Waitlist</a>
     </nav>

@@ -67,6 +67,7 @@ $sizeMap = @(
     @{ Size = 64;  Source = $srcLarge  },
     @{ Size = 48;  Source = $srcSmall  },
     @{ Size = 32;  Source = $srcSmall  },
+    @{ Size = 28;  Source = $srcSmall  },
     @{ Size = 16;  Source = $srcSmall  }
 )
 

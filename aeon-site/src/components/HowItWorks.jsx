@@ -4,40 +4,40 @@ export default function HowItWorks() {
   return (
     <section className="how-works" id="how-it-works">
       <div className="section">
-        <div className="reveal" style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
-          <div className="section-label">Process</div>
-          <h2 className="section-title">How Aeon stays<br />ahead of threats</h2>
+        <div className="reveal" style={{ textAlign: 'center', maxWidth: '620px', margin: '0 auto' }}>
+          <div className="section-label">Architecture</div>
+          <h2 className="section-title">How Aeon protects<br />every session</h2>
         </div>
         <div className="flow">
           <div className="flow-step reveal">
             <div className="flow-line"></div>
             <div className="flow-num">1</div>
             <div className="flow-content">
-              <h3>Research agent scans 24/7</h3>
-              <p>Running on distributed compute, it continuously monitors CVE databases, security papers, and GitHub advisories for anything affecting Chromium, V8, or Blink.</p>
+              <h3>Camoufox stealth + Rust shield layer</h3>
+              <p>Every session applies deterministic Canvas LSB noise, WebGL vendor cloaking, AudioContext protection, and Rust-powered tracker filtering before network requests leave the tab.</p>
             </div>
           </div>
           <div className="flow-step reveal">
             <div className="flow-line"></div>
             <div className="flow-num">2</div>
             <div className="flow-content">
-              <h3>AI generates the patch</h3>
-              <p>AeonMind analyzes the vulnerability and writes a targeted C++ patch. For non-critical features, a 48-hour peer vote determines if the change ships.</p>
+              <h3>Local GGUF inference &amp; WebMCP</h3>
+              <p>AeonMind connects to shared quantized Gemma 4 GGUF weights and exposes an authenticated local named-pipe MCP bridge for structured page reasoning without cloud profiling.</p>
             </div>
           </div>
           <div className="flow-step reveal">
             <div className="flow-line"></div>
             <div className="flow-num">3</div>
             <div className="flow-content">
-              <h3>Signed and distributed</h3>
-              <p>The patch is signed with an Ed25519 master key. No unsigned binary can enter the network. Chunks are distributed peer-to-peer — no central server involved.</p>
+              <h3>Canonical Ed25519 + SHA-256 verification</h3>
+              <p>Updates fetched from <code>api.delgadologic.tech/v1/update/aeon/stable</code> are verified against pinned RFC 8032 Ed25519 keys and SHA-256 hashes before staging.</p>
             </div>
           </div>
           <div className="flow-step reveal">
             <div className="flow-num">4</div>
             <div className="flow-content">
-              <h3>Silent install on your machine</h3>
-              <p>The update waits until you step away. It installs, verifies, and restarts components atomically. You come back to a browser that's already been patched.</p>
+              <h3>Direct OmniHub ↔ LogicFlow handoff</h3>
+              <p>Send downloads, clipped pages, or Playwright <code>auth.json</code> sessions straight into LogicFlow HyperStore, Sandbox, or Lazarus workflows over local IPC.</p>
             </div>
           </div>
         </div>
