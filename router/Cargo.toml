@@ -13,15 +13,15 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Tor — Arti (pure-Rust Tor impl, C-ABI bindings in arti-client)
-arti-client   = { version = "0.23", features = ["tokio", "rustls"] }
-tor-rtcompat  = { version = "0.23", features = ["tokio"] }
+arti-client   = { version = "0.48", features = ["tokio", "rustls"] }
+tor-rtcompat  = { version = "0.48", features = ["tokio"] }
 
 # Async runtime
 tokio = { version = "1.37", features = ["full"] }
 
 # TLS
 rustls      = "0.23"
-webpki-roots = "0.26"
+webpki-roots = "1.0"
 
 # SOCKS5 proxy support (wraps Tor / Shadowsocks tunnel)
 tokio-socks = "0.5"
