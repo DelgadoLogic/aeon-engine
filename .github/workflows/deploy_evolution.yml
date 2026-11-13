@@ -1,16 +1,12 @@
 name: Deploy Aeon Evolution Engine
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'aeon/evolution/**'
   workflow_dispatch:
     inputs:
       force_deploy:
-        description: 'Force deploy even without evolution changes'
+        description: 'Force deploy evolution engine to Cloud Run'
         required: false
-        default: 'false'
+        default: 'true'
 
 permissions:
   contents: read
