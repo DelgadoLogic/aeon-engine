@@ -27,7 +27,23 @@
 extern "C" {
 #endif
 
-#define AEON_ENGINE_ABI_VERSION 1  // Bump this when interface changes
+#define AEON_ENGINE_ABI_VERSION 3  // Bump this when interface changes
+
+// Dynamic DOM script execution [REQUIRED in ABI v3]
+typedef int (__cdecl *AeonEngine_ExecuteScript_t)(
+    unsigned int tab_id,
+    const char*  script,
+    char*        out_buf,
+    unsigned int out_buf_len
+);
+
+// ---------------------------------------------------------------------------
+// Storage State / Session Sovereignty [REQUIRED in ABI v2]
+// Export/Import Playwright-compatible auth.json (cookies + LocalStorage)
+// ---------------------------------------------------------------------------
+
+typedef int (__cdecl *AeonEngine_ExportStorageState_t)(const char* json_path);
+typedef int (__cdecl *AeonEngine_ImportStorageState_t)(const char* json_path);
 
 // ---------------------------------------------------------------------------
 // Lifecycle [REQUIRED]
@@ -174,6 +190,9 @@ typedef struct AeonEngineVTable {
     AeonEngine_GetUrl_t        GetUrl;
     AeonEngine_SetCallbacks_t  SetCallbacks;
     AeonEngine_SetViewport_t   SetViewport;
+    AeonEngine_ExportStorageState_t ExportStorageState;
+    AeonEngine_ImportStorageState_t ImportStorageState;
+    AeonEngine_ExecuteScript_t ExecuteScript;
 } AeonEngineVTable;
 
 #ifdef __cplusplus

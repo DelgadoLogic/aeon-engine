@@ -12,9 +12,10 @@
  */
 
 import WebSocket from "ws";
+import { cached } from "./cache.js";
 
 const CDP_HTTP = "http://localhost:9222";
-const WS_TIMEOUT = 5000;
+const WS_TIMEOUT = 30000;
 
 let nextId = 1;
 
@@ -40,6 +41,16 @@ export async function cdpListTargets(): Promise<CDPTarget[]> {
   if (!resp.ok) throw new Error(`CDP /json/list failed: ${resp.status}`);
   return (await resp.json()) as CDPTarget[];
 }
+
+/**
+ * Cached version of cdpListTargets — 5 second TTL.
+ * Prevents redundant HTTP requests when multiple tools query targets in rapid succession.
+ */
+export const cdpListTargetsCached = cached<CDPTarget[]>(
+  "cdp_targets",
+  5,
+  cdpListTargets
+);
 
 /**
  * Fetch browser-level version info from CDP.
@@ -160,3 +171,13 @@ export async function cdpHealthCheck(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Cached version of cdpHealthCheck — 10 second TTL.
+ * Health status doesn't change rapidly; caching prevents redundant network calls.
+ */
+export const cdpHealthCheckCached = cached<boolean>(
+  "cdp_health",
+  10,
+  cdpHealthCheck
+);

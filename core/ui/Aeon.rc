@@ -1,0 +1,9 @@
+// Aeon.rc — Main Browser Resource Script
+// DelgadoLogic | Aeon Browser
+#include <windows.h>
+
+#define IDI_AEON 101
+
+// ID 1 is the primary icon used by Windows Explorer for the .exe file
+1        ICON "../../resources/icons/Aeon.ico"
+IDI_AEON ICON "../../resources/icons/Aeon.ico"

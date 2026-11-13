@@ -1,358 +1,747 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aeon History</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:        #0d0e14;
-    --surface:   #16182a;
-    --card:      #1e2140;
-    --border:    #2e3064;
-    --accent:    #6c63ff;
-    --accent2:   #a78bfa;
-    --text:      #e8e8f0;
-    --text-dim:  #8888aa;
-    --green:     #22c55e;
-    --red:       #ef4444;
-    --radius:    10px;
+    --bg-obsidian: #0b0616;
+    --bg-surface: #0e071c;
+    --bg-card: rgba(18, 20, 36, 0.65);
+    --bg-card-hover: rgba(28, 21, 56, 0.95);
+    --border-card: rgba(168, 85, 247, 0.18);
+    --border-card-hover: rgba(192, 132, 252, 0.55);
+    --border-glow: rgba(168, 85, 247, 0.35);
+    --accent-purple: #9333ea;
+    --accent-light: #c084fc;
+    --accent-glow: rgba(147, 51, 234, 0.45);
+    --neon-cyan: #38bdf8;
+    --neon-cyan-glow: rgba(56, 189, 248, 0.35);
+    --neon-pink: #ec4899;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f97316;
+    --text-white: #f8fafc;
+    --text-soft: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --radius-lg: 18px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background-color: #0b0616;
+    overflow-x: hidden;
+    color: var(--text-white);
+    font-family: var(--font-main);
     min-height: 100vh;
-    padding: 40px 48px 80px;
+    padding: 36px 48px 100px;
+    background-image: 
+      radial-gradient(ellipse 70% 55% at 50% 15%, rgba(112, 38, 206, 0.2) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 50% at 85% 80%, rgba(147, 51, 234, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 15% 90%, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+    background-attachment: fixed;
   }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(192, 132, 252, 0.6); }
 
   .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 32px;
+    margin-bottom: 28px;
   }
 
-  h1 { font-size: 22px; font-weight: 600; }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
 
+  .page-icon-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.45);
+  }
+  .page-icon-badge svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-sub { font-size: 12px; color: var(--text-muted); }
   .top-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     margin-bottom: 24px;
+    flex-wrap: wrap;
   }
 
   .search-box {
     flex: 1;
-    display: flex;
-    align-items: center;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0 14px;
-    gap: 10px;
-    max-width: 540px;
+    min-width: 280px;
+    max-width: 520px;
+    position: relative;
   }
   .search-box input {
-    flex: 1;
-    background: none;
-    border: none;
+    width: 100%;
+    height: 42px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 9999px;
+    padding: 0 16px 0 42px;
+    color: var(--text-white);
+    font-family: var(--font-main);
+    font-size: 13.5px;
     outline: none;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 14px;
-    padding: 11px 0;
+    transition: all 0.2s var(--ease);
+    backdrop-filter: blur(12px);
   }
-  .search-box .icon { color: var(--text-dim); font-size: 14px; }
+  .search-box input:focus {
+    border-color: var(--accent-light);
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.35);
+    background: rgba(28, 21, 56, 0.9);
+  }
+  .search-box svg {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 17px;
+    height: 17px;
+    color: var(--accent-light);
+    pointer-events: none;
+  }
 
-  .filter-pills {
+  .filter-tabs {
     display: flex;
     gap: 8px;
-  }
-  .pill {
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: all .15s;
-  }
-  .pill:hover, .pill.active {
-    background: var(--card);
-    border-color: var(--accent);
-    color: var(--accent2);
+    background: rgba(14, 10, 28, 0.7);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border-card);
   }
 
-  .clear-btn {
-    padding: 8px 16px;
+  .tab-pill {
+    padding: 7px 14px;
     border-radius: 8px;
-    border: 1px solid rgba(239,68,68,.4);
-    background: rgba(239,68,68,.08);
-    color: var(--red);
-    font-family: inherit;
     font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background .15s;
-    margin-left: auto;
-  }
-  .clear-btn:hover { background: rgba(239,68,68,.18); }
-
-  .day-group { margin-bottom: 28px; }
-  .day-label {
-    font-size: 11px;
     font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    border: 1px solid transparent;
+  }
+  .tab-pill:hover {
+    color: var(--text-white);
+    background: rgba(168, 85, 247, 0.12);
+  }
+  .tab-pill.active {
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    color: #fff;
+    border-color: rgba(192, 132, 252, 0.4);
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.35);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 9px;
+    font-family: var(--font-main);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    border: 1px solid transparent;
+  }
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.4);
+  }
+  .btn-secondary {
+    background: var(--bg-card);
+    border-color: var(--border-card);
+    color: var(--text-soft);
+  }
+  .btn-secondary:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-white);
+    border-color: var(--border-card-hover);
+  }
+
+  /* Day group */
+  .day-group { margin-bottom: 28px; }
+  .day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .08em;
-    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    color: var(--neon-cyan);
     margin-bottom: 10px;
-    padding: 0 2px;
+    padding: 0 4px;
   }
 
   .history-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius);
     overflow: hidden;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
   }
 
   .history-row {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+    transition: background 0.15s var(--ease);
     cursor: pointer;
-    transition: background .12s;
   }
   .history-row:last-child { border-bottom: none; }
-  .history-row:hover { background: var(--card); }
+  .history-row:hover { background: rgba(168, 85, 247, 0.06); }
   .history-row:hover .row-actions { opacity: 1; }
+  .history-row.selected { background: rgba(147, 51, 234, 0.15); }
+
+  /* Checkbox */
+  .row-check {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    accent-color: var(--accent-purple);
+    cursor: pointer;
+  }
+
+  .row-time {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    width: 55px;
+    flex-shrink: 0;
+  }
 
   .favicon {
-    width: 16px; height: 16px;
-    border-radius: 3px;
-    background: var(--card);
-    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: rgba(147, 51, 234, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 10px;
-    color: var(--text-dim);
+    color: var(--accent-light);
+    flex-shrink: 0;
   }
 
-  .row-info { flex: 1; min-width: 0; }
+  .row-info {
+    flex: 1;
+    min-width: 0;
+  }
   .row-title {
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 500;
+    color: var(--text-white);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     margin-bottom: 2px;
   }
   .row-url {
-    font-size: 11px;
-    color: var(--text-dim);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .row-url a {
-    color: var(--accent2);
-    text-decoration: none;
-  }
-
-  .row-time {
-    font-size: 11px;
-    color: var(--text-dim);
-    flex-shrink: 0;
-    min-width: 50px;
-    text-align: right;
-  }
 
   .row-actions {
     display: flex;
+    align-items: center;
     gap: 6px;
     opacity: 0;
-    transition: opacity .12s;
+    transition: opacity 0.15s var(--ease);
   }
-  .action-btn {
-    width: 26px; height: 26px;
+  .row-btn {
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text-dim);
-    font-size: 11px;
+    background: rgba(18, 20, 36, 0.8);
+    border: 1px solid var(--border-card);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: color .12s, background .12s;
+    transition: all 0.15s var(--ease);
   }
-  .action-btn:hover { color: var(--red); background: rgba(239,68,68,.12); }
+  .row-btn:hover {
+    color: var(--red);
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.1);
+  }
+  .row-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
 
+  /* Sticky Batch Action Bar */
+  .batch-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: rgba(18, 20, 36, 0.95);
+    border: 1px solid var(--accent-light);
+    border-radius: 16px;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.7), 0 0 25px rgba(147, 51, 234, 0.45);
+    backdrop-filter: blur(20px);
+    z-index: 90;
+    transition: transform 0.3s var(--ease);
+  }
+  .batch-bar.active {
+    transform: translateX(-50%) translateY(0);
+  }
+  .batch-count { font-size: 13px; font-weight: 600; color: #fff; }
+
+  /* Empty state */
   .empty-state {
     text-align: center;
-    padding: 80px 20px;
+    padding: 60px 20px;
     color: var(--text-dim);
   }
-  .empty-state .big { font-size: 48px; margin-bottom: 16px; }
-  .empty-state p { font-size: 14px; }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5; }
 
-  /* Checkbox select */
-  .row-check {
-    width: 16px; height: 16px;
-    accent-color: var(--accent);
-    flex-shrink: 0;
-    opacity: 0;
-    cursor: pointer;
+  /* Modal Dialog */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 4, 16, 0.85);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
   }
-  .history-row:hover .row-check { opacity: 1; }
-  .row-check:checked { opacity: 1; }
+  .modal-backdrop.open { display: flex; }
+  .modal-dialog {
+    background: rgba(18, 20, 36, 0.95);
+    border: 1px solid var(--border-card-hover);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    max-width: 460px;
+    width: 90vw;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.8), 0 0 30px rgba(147, 51, 234, 0.35);
+  }
+  .modal-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .modal-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
+  .modal-option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+  }
+  .modal-option-row:last-child { border-bottom: none; }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  @media (max-width: 900px) {
+    body { padding: 24px 20px 60px; }
+    .header-row { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .search-row { flex-direction: column; align-items: stretch; }
+    .history-entry { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .entry-actions { margin-left: 0; }
+  }
+  @media (max-width: 640px) {
+    body { padding: 16px 12px; }
+    .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .top-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .search-box { min-width: 0; width: 100%; max-width: 100%; }
+    .filter-tabs, .filter-pills { flex-wrap: wrap; max-width: 100%; }
+    .stats-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
-
-<div class="header">
-  <h1>🕐 History</h1>
-</div>
-
-<div class="top-bar">
-  <div class="search-box">
-    <span class="icon">🔍</span>
-    <input type="text" id="search_input" placeholder="Search history…"
-           oninput="searchHistory(this.value)">
-  </div>
-
-  <div class="filter-pills">
-    <span class="pill active" onclick="filterHistory('all', this)">All</span>
-    <span class="pill" onclick="filterHistory('today', this)">Today</span>
-    <span class="pill" onclick="filterHistory('week', this)">This Week</span>
-    <span class="pill" onclick="filterHistory('month', this)">This Month</span>
-  </div>
-
-  <button class="clear-btn" onclick="clearHistory()">🗑 Clear All</button>
-</div>
-
-<div id="history_list">
-  <!-- Populated by loadHistory() -->
-</div>
-
-<script>
-// Demo data — in production: aeon.getHistory() calls native bridge
-const DEMO = [
-  { title: 'DelgadoLogic — Home', url: 'https://delgadologic.tech', time: '2:41 PM', ts: Date.now() - 3*60000 },
-  { title: 'Aeon Browser — GitHub', url: 'https://github.com/DelgadoLogic/AeonBrowser', time: '2:38 PM', ts: Date.now() - 6*60000 },
-  { title: 'DuckDuckGo — aeon browser', url: 'https://duckduckgo.com/?q=aeon+browser', time: '2:37 PM', ts: Date.now() - 7*60000 },
-  { title: 'EasyList — Filter Lists', url: 'https://easylist.to', time: '2:20 PM', ts: Date.now() - 24*60000 },
-  { title: 'Cloudflare Radar — DNS Insights', url: 'https://radar.cloudflare.com', time: '1:55 PM', ts: Date.now() - 49*60000 },
-  { title: 'Wikipedia — Deep Packet Inspection', url: 'https://en.wikipedia.org/wiki/Deep_packet_inspection', time: '1:42 PM', ts: Date.now() - 62*60000 },
-  { title: 'Mozilla — ECH Specification', url: 'https://blog.mozilla.org/security/2021/01/07/encrypted-client-hello-the-future-of-esni/', time: '1:30 PM', ts: Date.now() - 74*60000 },
-  { title: 'WolfSSL — TLS 1.3 Documentation', url: 'https://www.wolfssl.com/docs/tls13', time: 'Yesterday', ts: Date.now() - 26*3600000 },
-  { title: 'Inno Setup — Official Docs', url: 'https://jrsoftware.org/ishelp/', time: 'Yesterday', ts: Date.now() - 27*3600000 },
-  { title: 'Quad9 — Privacy Policy', url: 'https://quad9.net/privacy/policy/', time: 'Yesterday', ts: Date.now() - 30*3600000 },
-];
-
-let allItems = [...DEMO];
-let filtered = [...DEMO];
-
-function groupByDay(items) {
-  const groups = {};
-  const now = new Date();
-  items.forEach(item => {
-    const d = new Date(item.ts);
-    const diff = (now - d) / 86400000;
-    let label;
-    if (diff < 1) label = 'Today';
-    else if (diff < 2) label = 'Yesterday';
-    else label = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
-    if (!groups[label]) groups[label] = [];
-    groups[label].push(item);
-  });
-  return groups;
-}
-
-function favLetter(title) {
-  return title && title.length ? title[0].toUpperCase() : '?';
-}
-
-function renderHistory(items) {
-  const list = document.getElementById('history_list');
-  if (!items.length) {
-    list.innerHTML = `<div class="empty-state"><div class="big">🕐</div><p>No history found.</p></div>`;
-    return;
-  }
-  const groups = groupByDay(items);
-  list.innerHTML = Object.entries(groups).map(([day, rows]) => `
-    <div class="day-group">
-      <div class="day-label">${day}</div>
-      <div class="history-card">
-        ${rows.map((r, i) => `
-          <div class="history-row" onclick="navigate('${r.url}')">
-            <input type="checkbox" class="row-check" onclick="event.stopPropagation()">
-            <div class="favicon">${favLetter(r.title)}</div>
-            <div class="row-info">
-              <div class="row-title">${r.title}</div>
-              <div class="row-url"><a href="${r.url}" onclick="event.stopPropagation();navigate('${r.url}');return false">${r.url}</a></div>
-            </div>
-            <div class="row-time">${r.time}</div>
-            <div class="row-actions">
-              <button class="action-btn" title="Open" onclick="event.stopPropagation();navigate('${r.url}')">↗</button>
-              <button class="action-btn" title="Remove" onclick="event.stopPropagation();removeItem(${i})">✕</button>
-            </div>
-          </div>
-        `).join('')}
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="page-icon-badge" onclick="location.href='aeon://newtab'">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div>
+        <h1>Browsing History</h1>
+        <div class="header-sub">Encrypted SQLite database on disk</div>
       </div>
     </div>
-  `).join('');
-}
+    <button class="btn btn-danger" onclick="openClearModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      Clear Browsing Data...
+    </button>
+  </div>
 
-function searchHistory(q) {
-  q = q.toLowerCase();
-  filtered = q ? allItems.filter(r => r.title.toLowerCase().includes(q) || r.url.toLowerCase().includes(q)) : [...allItems];
-  renderHistory(filtered);
-}
+  <!-- Search & Tabs Bar -->
+  <div class="top-bar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="history-search" name="history_search" aria-label="Search history records" placeholder="Search history records..." oninput="onSearchInput()">
+    </div>
 
-function filterHistory(range, el) {
-  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  const now = Date.now();
-  const bounds = { all: 0, today: 86400000, week: 7*86400000, month: 30*86400000 };
-  filtered = range === 'all' ? [...allItems] : allItems.filter(r => (now - r.ts) < bounds[range]);
-  renderHistory(filtered);
-}
+    <!-- Chronological Grouping Tabs -->
+    <div class="filter-tabs">
+      <div class="tab-pill active" onclick="setTab('all')">All History</div>
+      <div class="tab-pill" onclick="setTab('today')">Today</div>
+      <div class="tab-pill" onclick="setTab('yesterday')">Yesterday</div>
+      <div class="tab-pill" onclick="setTab('last7')">Last 7 Days</div>
+      <div class="tab-pill" onclick="setTab('older')">Older</div>
+    </div>
+  </div>
 
-function clearHistory() {
-  if (!confirm('Clear all browsing history? This cannot be undone.')) return;
-  try { window.aeonBridge?.clearHistory(); } catch(_) {}
-  allItems = []; filtered = [];
-  renderHistory([]);
-}
+  <!-- History Container -->
+  <div id="history-container">
+    <!-- Populated dynamically -->
+  </div>
 
-function removeItem(idx) {
-  const item = filtered[idx];
-  allItems = allItems.filter(r => r !== item);
-  filtered = filtered.filter(r => r !== item);
-  try { window.aeonBridge?.deleteHistoryEntry(item.url, item.ts); } catch(_) {}
-  renderHistory(filtered);
-}
+  <!-- Sticky Batch Action Bar -->
+  <div class="batch-bar" id="batch-bar">
+    <span class="batch-count" id="batch-count">0 items selected</span>
+    <button class="btn btn-danger" onclick="deleteSelected()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      Delete Selected
+    </button>
+    <button class="btn btn-secondary" onclick="clearSelection()">Cancel</button>
+  </div>
 
-function navigate(url) {
-  try { window.aeonBridge?.navigate(url); } catch(_) { window.location.href = url; }
-}
+  <!-- Clear Browsing Data Modal -->
+  <div class="modal-backdrop" id="clear-modal">
+    <div class="modal-dialog">
+      <div class="modal-title">Clear Browsing Data</div>
+      <div class="modal-sub">Choose time range and data types to purge from local storage.</div>
 
-// Load real history from native bridge if available
-try {
-  const real = window.aeonBridge?.getHistory?.();
-  if (real && real.length) { allItems = real; filtered = real; }
-} catch(_) {}
+      <div style="margin-bottom:16px;">
+        <label for="clear-range" style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;">Time Range</label>
+        <select id="clear-range" aria-label="Time Range" style="width:100%;">
+          <option value="1h">Last hour</option>
+          <option value="24h" selected>Last 24 hours</option>
+          <option value="7d">Last 7 days</option>
+          <option value="4w">Last 4 weeks</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
 
-renderHistory(filtered);
-</script>
+      <div class="modal-option-row">
+        <div>
+          <div style="font-size:13.5px; font-weight:600; color:#fff;">Browsing History</div>
+          <div style="font-size:11.5px; color:var(--text-muted);">Clears visit records, URLs, and page titles</div>
+        </div>
+        <input type="checkbox" id="clear-opt-history" aria-label="Clear browsing history" checked class="row-check">
+      </div>
+
+      <div class="modal-option-row">
+        <div>
+          <div style="font-size:13.5px; font-weight:600; color:#fff;">Download History</div>
+          <div style="font-size:11.5px; color:var(--text-muted);">Clears list of downloaded files (keeps files on disk)</div>
+        </div>
+        <input type="checkbox" id="clear-opt-downloads" aria-label="Clear download history" checked class="row-check">
+      </div>
+
+      <div class="modal-option-row">
+        <div>
+          <div style="font-size:13.5px; font-weight:600; color:#fff;">Cookies & Site Data</div>
+          <div style="font-size:11.5px; color:var(--text-muted);">Signs you out of most web sites</div>
+        </div>
+        <input type="checkbox" id="clear-opt-cookies" aria-label="Clear cookies and site data" class="row-check">
+      </div>
+
+      <div class="modal-option-row">
+        <div>
+          <div style="font-size:13.5px; font-weight:600; color:#fff;">Cached Images & Files</div>
+          <div style="font-size:11.5px; color:var(--text-muted);">Frees up local disk cache storage</div>
+        </div>
+        <input type="checkbox" id="clear-opt-cache" aria-label="Clear cached images and files" checked class="row-check">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeClearModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="executeClearBrowsingData()">Clear Data</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let allHistory = [];
+    let currentTab = 'all';
+    let searchQuery = '';
+    const selectedIds = new Set();
+
+    function loadHistory() {
+      allHistory = [];
+      if (window.aeonBridge && typeof window.aeonBridge.getHistory === 'function') {
+        const res = window.aeonBridge.getHistory();
+        if (Array.isArray(res)) {
+          allHistory = res;
+        } else if (typeof res === 'string') {
+          try { allHistory = JSON.parse(res); } catch(e) { allHistory = []; }
+        }
+      } else {
+        try {
+          const cached = localStorage.getItem('aeon_history_cache');
+          allHistory = cached ? JSON.parse(cached) : [];
+        } catch (e) {
+          allHistory = [];
+        }
+      }
+      allHistory.forEach((item, idx) => {
+        if (item.id === undefined || item.id === null) item.id = idx + 1;
+      });
+      renderHistory();
+    }
+
+    function saveHistoryCache() {
+      try {
+        localStorage.setItem('aeon_history_cache', JSON.stringify(allHistory));
+      } catch (e) {}
+    }
+
+    function setTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
+      const activeEl = Array.from(document.querySelectorAll('.tab-pill')).find(el => el.textContent.toLowerCase().includes(tab) || (tab==='all' && el.textContent.includes('All')));
+      if (activeEl) activeEl.classList.add('active');
+      renderHistory();
+    }
+
+    function onSearchInput() {
+      searchQuery = (document.getElementById('history-search')?.value || '').toLowerCase().trim();
+      renderHistory();
+    }
+
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function getDayKey(ts) {
+      const now = new Date();
+      const d = new Date(ts);
+      const diffDays = Math.floor((now.setHours(0,0,0,0) - new Date(ts).setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return 'Last 7 Days';
+      return 'Older';
+    }
+
+    function filterByTabAndSearch(item) {
+      if (searchQuery) {
+        const matches = (item.title || '').toLowerCase().includes(searchQuery) || (item.url || '').toLowerCase().includes(searchQuery);
+        if (!matches) return false;
+      }
+      if (currentTab === 'all') return true;
+      const group = getDayKey(item.last_visit_time || Date.now());
+      if (currentTab === 'today') return group === 'Today';
+      if (currentTab === 'yesterday') return group === 'Yesterday';
+      if (currentTab === 'last7') return group === 'Today' || group === 'Yesterday' || group === 'Last 7 Days';
+      if (currentTab === 'older') return group === 'Older';
+      return true;
+    }
+    function renderHistory() {
+      const container = document.getElementById('history-container');
+      if (!container) return;
+
+      const filtered = allHistory.filter(filterByTabAndSearch);
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div style="font-size:15px; font-weight:600; color:#fff; margin-bottom:4px;">No History Records Found</div>
+            <div style="font-size:12px;">No visits match your current search and filter criteria.</div>
+          </div>
+        `;
+        updateBatchBar();
+        return;
+      }
+
+      // Group by Day
+      const groups = {};
+      filtered.forEach(item => {
+        const key = getDayKey(item.last_visit_time || Date.now());
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+      });
+
+      let html = '';
+      const order = ['Today', 'Yesterday', 'Last 7 Days', 'Older'];
+      order.forEach(groupName => {
+        if (!groups[groupName] || groups[groupName].length === 0) return;
+        html += `
+          <div class="day-group">
+            <div class="day-header">
+              <span>${groupName}</span>
+              <span>${groups[groupName].length} visits</span>
+            </div>
+            <div class="history-card">
+        `;
+        groups[groupName].forEach(item => {
+          const isChecked = selectedIds.has(item.id);
+          const timeStr = formatTime(item.last_visit_time || Date.now());
+          html += `
+            <div class="history-row ${isChecked ? 'selected' : ''}" data-id="${item.id}" data-url="${escapeHtml(item.url)}" onclick="navigateToUrl(this.dataset.url)">
+              <input type="checkbox" class="row-check" id="hist-check-${item.id}" name="hist_check_${item.id}" aria-label="Select history item" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelect(${item.id})">
+              <div class="row-time">${timeStr}</div>
+              <div class="favicon">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+              </div>
+              <div class="row-info">
+                <div class="row-title">${escapeHtml(item.title || item.url)}</div>
+                <div class="row-url">${escapeHtml(item.url)}</div>
+              </div>
+              <div class="row-actions" onclick="event.stopPropagation()">
+                <button class="row-btn" title="Delete from history" onclick="deleteSingle(${item.id})">
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div></div>`;
+      });
+
+      container.innerHTML = html;
+      updateBatchBar();
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function navigateToUrl(url) {
+      if (url) window.location.href = url;
+    }
+
+    function toggleSelect(id) {
+      if (selectedIds.has(id)) selectedIds.delete(id);
+      else selectedIds.add(id);
+      renderHistory();
+    }
+
+    function clearSelection() {
+      selectedIds.clear();
+      renderHistory();
+    }
+
+    function updateBatchBar() {
+      const bar = document.getElementById('batch-bar');
+      const countEl = document.getElementById('batch-count');
+      if (selectedIds.size > 0) {
+        if (countEl) countEl.textContent = `${selectedIds.size} item${selectedIds.size > 1 ? 's' : ''} selected`;
+        if (bar) bar.classList.add('active');
+      } else {
+        if (bar) bar.classList.remove('active');
+      }
+    }
+
+    function deleteSingle(id) {
+      const item = allHistory.find(x => x.id === id);
+      const url = item ? item.url : '';
+      const ts = item ? (item.last_visit_time || 0) : 0;
+      allHistory = allHistory.filter(x => x.id !== id);
+      selectedIds.delete(id);
+      saveHistoryCache();
+      renderHistory();
+
+      if (window.aeonBridge && typeof window.aeonBridge.deleteHistoryEntry === 'function') {
+        window.aeonBridge.deleteHistoryEntry(url, ts);
+      }
+    }
+
+    function deleteSelected() {
+      const itemsToDelete = allHistory.filter(x => selectedIds.has(x.id)).map(x => x.url);
+      allHistory = allHistory.filter(x => !selectedIds.has(x.id));
+      selectedIds.clear();
+      saveHistoryCache();
+      renderHistory();
+
+      if (window.aeonBridge && typeof window.aeonBridge.deleteHistoryEntries === 'function') {
+        window.aeonBridge.deleteHistoryEntries(itemsToDelete);
+      }
+    }
+
+    function openClearModal() {
+      const m = document.getElementById('clear-modal');
+      if (m) m.classList.add('open');
+    }
+
+    function closeClearModal() {
+      const m = document.getElementById('clear-modal');
+      if (m) m.classList.remove('open');
+    }
+
+    function executeClearBrowsingData() {
+      const opts = {
+        range: document.getElementById('clear-range')?.value || '24h',
+        history: document.getElementById('clear-opt-history')?.checked || false,
+        downloads: document.getElementById('clear-opt-downloads')?.checked || false,
+        cookies: document.getElementById('clear-opt-cookies')?.checked || false,
+        cache: document.getElementById('clear-opt-cache')?.checked || false
+      };
+
+      if (opts.history) {
+        allHistory = [];
+        selectedIds.clear();
+        saveHistoryCache();
+        renderHistory();
+      }
+
+      if (window.aeonBridge && typeof window.aeonBridge.clearBrowsingData === 'function') {
+        window.aeonBridge.clearBrowsingData(opts);
+      }
+
+      closeClearModal();
+    }
+
+    window.addEventListener('DOMContentLoaded', loadHistory);
+    loadHistory();
+  </script>
 </body>
 </html>

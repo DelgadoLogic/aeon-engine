@@ -37,14 +37,22 @@ public:
     // Called when a new Page/Tab is instantiated by AeonWorkspace
     void OnNewDocumentCreated(int tab_id);
 
-private:
+    // Full anti-fingerprinting stealth JS payload generator
     std::string BuildStealthPayload() const;
+    std::string GetFullStealthBootstrapScript() const { return BuildStealthPayload(); }
+
+private:
     void InjectCdpScript(int tab_id, const std::string& script_content);
 
-    // Evasion components mapped to conceptual logic
+    // Camoufox noise & evasion components
     std::string EvadeWebDriver() const;
     std::string EvadeChromeCdc() const;
     std::string RandomizeWebGL() const;
+    std::string InjectCanvasNoise() const;
+    std::string InjectAudioNoise() const;
+    std::string InjectFontProtection() const;
+    std::string InjectWebRTCProtection() const;
+    std::string EvadeNavigatorProperties() const;
     std::string EvadeNavigatorPlugins() const;
 
     bool m_initialized = false;

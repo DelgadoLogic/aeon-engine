@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon Sovereign Shields — Privacy &amp; Defense Controls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-obsidian: #0b0616;
+    --bg-surface: #0e071c;
+    --bg-card: rgba(18, 20, 36, 0.72);
+    --bg-card-hover: rgba(28, 21, 56, 0.94);
+    --border-card: rgba(168, 85, 247, 0.18);
+    --border-card-hover: rgba(192, 132, 252, 0.55);
+    --accent-purple: #9333ea;
+    --accent-light: #c084fc;
+    --accent-glow: rgba(147, 51, 234, 0.45);
+    --neon-cyan: #38bdf8;
+    --neon-cyan-glow: rgba(56, 189, 248, 0.35);
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text-white: #f8fafc;
+    --text-soft: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --font-main: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius-sm: 8px;
+    --radius: 14px;
+    --radius-full: 9999px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body {
+    font-family: var(--font-main);
+    background-color: #0b0616;
+    color: var(--text-white);
+    min-height: 100vh;
+    display: flex;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse 75% 50% at 50% -15%, rgba(147, 51, 234, 0.18), transparent 70%),
+      radial-gradient(circle at 88% 82%, rgba(56, 189, 248, 0.1), transparent 60%);
+    background-attachment: fixed;
+  }
+  :focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 2px; }
+  nav {
+    width: 240px;
+    background: linear-gradient(180deg, rgba(14, 7, 28, 0.96) 0%, rgba(10, 5, 20, 0.98) 100%);
+    border-right: 1px solid var(--border-card);
+    padding: 24px 14px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(20px);
+    z-index: 10;
+  }
+  .nav-logo { display: flex; align-items: center; gap: 12px; padding: 0 8px 20px; border-bottom: 1px solid var(--border-card); margin-bottom: 16px; cursor: pointer; }
+  .nav-logo .badge { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #fff; box-shadow: 0 0 16px var(--accent-glow); flex-shrink: 0; }
+  .nav-logo .logo-text { display: flex; flex-direction: column; min-width: 0; }
+  .nav-logo .brand { font-weight: 700; font-size: 15px; color: var(--text-white); }
+  .nav-logo .sub { font-size: 11px; color: var(--neon-cyan); font-family: var(--font-mono); }
+  .nav-links { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
+  nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; border: 1px solid transparent; transition: all 0.2s var(--ease); cursor: pointer; }
+  nav a:hover { background: var(--bg-card); color: var(--text-white); border-color: var(--border-card); transform: translateX(3px); }
+  nav a.active { background: rgba(147, 51, 234, 0.2); color: var(--accent-light); border-color: var(--border-card-hover); box-shadow: 0 0 14px rgba(147, 51, 234, 0.22); }
+  main { flex: 1; min-width: 0; padding: 36px 44px 80px; max-width: 1120px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .page-header h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; background: linear-gradient(135deg, #ffffff 35%, var(--accent-light) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
+  .subtitle { color: var(--text-muted); font-size: 13.5px; }
+  .hero-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 24px 26px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent-purple), var(--neon-cyan), var(--green)); }
+  .hero-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .shield-orb { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(56, 189, 248, 0.2)); border: 1px solid var(--border-card-hover); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--neon-cyan); box-shadow: 0 0 22px var(--neon-cyan-glow); }
+  .hero-left h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .hero-left p { font-size: 13px; color: var(--text-soft); line-height: 1.5; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 26px; }
+  .stat-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius); padding: 18px; backdrop-filter: blur(16px); transition: all 0.2s var(--ease); }
+  .stat-card:hover { background: var(--bg-card-hover); border-color: var(--border-card-hover); transform: translateY(-2px); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+  .stat-val { font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--text-white); }
+  .stat-val.cyan { color: var(--neon-cyan); }
+  .stat-val.purple { color: var(--accent-light); }
+  .stat-val.green { color: var(--green); }
+  .panel { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius); margin-bottom: 24px; backdrop-filter: blur(18px); overflow: hidden; }
+  .panel-header { padding: 16px 22px; background: rgba(14, 7, 28, 0.65); border-bottom: 1px solid var(--border-card); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .panel-header h3 { font-size: 15px; font-weight: 700; color: var(--text-white); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+  .pill.green { background: rgba(34, 197, 94, 0.14); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.35); }
+  .pill.cyan { background: rgba(56, 189, 248, 0.14); color: var(--neon-cyan); border: 1px solid rgba(56, 189, 248, 0.35); }
+  .layer-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 22px; border-bottom: 1px solid rgba(168, 85, 247, 0.1); transition: background 0.18s var(--ease); }
+  .layer-row:last-child { border-bottom: none; }
+  .layer-row:hover { background: rgba(147, 51, 234, 0.06); }
+  .layer-info { flex: 1; min-width: 0; }
+  .layer-title { font-size: 14px; font-weight: 600; color: var(--text-white); margin-bottom: 3px; }
+  .layer-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; }
+  select, input[type="text"] {
+    background: rgba(10, 5, 20, 0.85);
+    color: var(--text-white);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-family: var(--font-main);
+    font-size: 13px;
+    min-width: 0;
+    transition: border-color 0.2s var(--ease);
+  }
+  select:hover, input[type="text"]:hover { border-color: var(--border-card-hover); }
+  .toggle { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; cursor: pointer; background: rgba(100, 116, 139, 0.35); border: 1px solid var(--border-card); border-radius: var(--radius-full); transition: 0.2s var(--ease); }
+  .slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s var(--ease); }
+  .toggle input:checked + .slider { background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan)); border-color: var(--neon-cyan); box-shadow: 0 0 12px var(--accent-glow); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); }
+  .allow-form { display: flex; gap: 10px; padding: 16px 22px; border-bottom: 1px solid rgba(168, 85, 247, 0.12); flex-wrap: wrap; }
+  .allow-form input { flex: 1; min-width: 180px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; font-family: var(--font-main); cursor: pointer; border: 1px solid var(--border-card); background: rgba(24, 26, 50, 0.85); color: var(--text-white); transition: all 0.2s var(--ease); }
+  .btn:hover { background: var(--bg-card-hover); border-color: var(--border-card-hover); transform: translateY(-1px); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent-purple), #7c3aed); border-color: rgba(192, 132, 252, 0.45); box-shadow: 0 0 18px var(--accent-glow); }
+  .btn-danger { color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.12); padding: 6px 12px; font-size: 12px; }
+  .allow-list { padding: 8px 22px 16px; }
+  .allow-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(168, 85, 247, 0.08); }
+  .allow-item:last-child { border-bottom: none; }
+  .allow-domain { font-family: var(--font-mono); font-size: 13px; color: var(--text-white); word-break: break-all; }
+  .allow-note { font-size: 12px; color: var(--text-muted); }
+  .legal-card { background: rgba(18, 20, 36, 0.55); border: 1px solid var(--border-card); border-radius: var(--radius); padding: 18px 22px; font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
+  .legal-card strong { color: var(--text-soft); }
+  .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: var(--radius-sm); background: rgba(18, 20, 36, 0.96); border: 1px solid var(--neon-cyan); color: var(--text-white); font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); opacity: 0; transform: translateY(12px); pointer-events: none; transition: all 0.2s var(--ease); z-index: 99; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  @media (max-width: 900px) {
+    nav { width: 72px; padding: 18px 8px; }
+    .nav-logo .logo-text, nav a span { display: none; }
+    .nav-logo { justify-content: center; }
+    main { padding: 24px 20px 60px; }
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    body { flex-direction: column; }
+    nav { width: 100%; height: auto; position: relative; flex-direction: row; align-items: center; padding: 10px 12px; gap: 10px; border-right: none; border-bottom: 1px solid var(--border-card); overflow-x: auto; }
+    .nav-logo { padding: 0; margin: 0; border: none; }
+    .nav-links { flex-direction: row; overflow-x: auto; }
+    nav a { padding: 8px 10px; }
+    main { padding: 18px 16px 60px; }
+    .hero-card, .layer-row { flex-direction: column; align-items: flex-start; }
+    .stats-grid { grid-template-columns: minmax(0, 1fr); }
+    select, input[type="text"], .btn { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+  <nav aria-label="Aeon internal navigation">
+    <div class="nav-logo" onclick="navigateTo('aeon://newtab')" role="button" tabindex="0">
+      <div class="badge">A</div>
+      <div class="logo-text">
+        <span class="brand">Aeon Browser</span>
+        <span class="sub">v0.22.0 • Shields</span>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a onclick="navigateTo('aeon://newtab')"><span>New Tab</span></a>
+      <a class="active" onclick="navigateTo('aeon://shields')"><span>Sovereign Shields</span></a>
+      <a onclick="navigateTo('aeon://extensions')"><span>Extensions &amp; MCP</span></a>
+      <a onclick="navigateTo('aeon://passwords')"><span>Password Vault</span></a>
+      <a onclick="navigateTo('aeon://downloads')"><span>Downloads</span></a>
+      <a onclick="navigateTo('aeon://history')"><span>History</span></a>
+      <a onclick="navigateTo('aeon://bookmarks')"><span>Bookmarks</span></a>
+      <a onclick="navigateTo('aeon://intelligence')"><span>Intelligence</span></a>
+      <a onclick="navigateTo('aeon://diagnostics')"><span>Diagnostics</span></a>
+      <a onclick="navigateTo('aeon://settings')"><span>Settings</span></a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="page-header">
+      <div>
+        <h1>Sovereign Shields</h1>
+        <p class="subtitle">Native C++ Content Blocker, CNAME Uncloaking, Fingerprinting Guard &amp; Post-Quantum Transport</p>
+      </div>
+      <button type="button" class="btn btn-primary" onclick="resetDefaults()">Restore Strict Defaults</button>
+    </header>
+
+    <section class="hero-card" aria-label="Global Shield Protection">
+      <div class="hero-left">
+        <div class="shield-orb" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <div>
+          <h2 id="shield-status-heading">Shields Active — Aggressive Sovereign Defense</h2>
+          <p>Enforcing EasyList + uBlock filters, X25519Kyber768 TLS 1.3, ECH masking, and DoH query encryption across all tabs.</p>
+        </div>
+      </div>
+      <label class="toggle" aria-label="Master Sovereign Shield toggle">
+        <input type="checkbox" id="shield_master_toggle" name="shield_master_toggle" checked onchange="toggleMaster(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </section>
+
+    <section class="stats-grid" aria-label="Shield Telemetry Counters">
+      <div class="stat-card">
+        <div class="stat-label">Trackers &amp; Ads Blocked</div>
+        <div class="stat-val cyan" id="stat-blocked">24,850</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">CNAME Cloaks Unmasked</div>
+        <div class="stat-val purple" id="stat-cname">1,428</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Kyber-768 Handshakes</div>
+        <div class="stat-val green" id="stat-pq">98.4%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Bandwidth Saved</div>
+        <div class="stat-val" id="stat-bw">348.5 MB</div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Interactive Defense Layers">
+      <div class="panel-header">
+        <h3>Defense Layers</h3>
+        <span class="pill green">Native C++ + Rust Router</span>
+      </div>
+
+      <div class="layer-row">
+        <div class="layer-info">
+          <div class="layer-title">Ad &amp; Tracker Blocking Level</div>
+          <div class="layer-desc">uBlock Origin + EasyList + Peter Lowe filter rules evaluated before socket connection.</div>
+        </div>
+        <select id="shield_adblock_level" name="shield_adblock_level" aria-label="Ad and Tracker Blocking Level" onchange="persistSetting('adblock_level', this.value)">
+          <option value="aggressive" selected>Aggressive Blocking</option>
+          <option value="standard">Standard Balanced</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+
+      <div class="layer-row">
+        <div class="layer-info">
+          <div class="layer-title">Canvas, WebGL &amp; Audio Fingerprint Noise</div>
+          <div class="layer-desc">Per-origin deterministic micro-entropy injected by Camoufox C++ Sentinel to defeat cross-site tracking.</div>
+        </div>
+        <label class="toggle" aria-label="Fingerprint Guard toggle">
+          <input type="checkbox" id="shield_fp_guard" name="shield_fp_guard" checked onchange="persistSetting('fingerprint_guard', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="layer-row">
+        <div class="layer-info">
+          <div class="layer-title">Encrypted DNS-over-HTTPS (DoH) + CNAME Uncloaking</div>
+          <div class="layer-desc">Prevents ISP DNS logging and resolves first-party tracking CNAME aliases against blocklists.</div>
+        </div>
+        <select id="shield_doh_provider" name="shield_doh_provider" aria-label="DoH Provider" onchange="persistSetting('doh_provider', this.value)">
+          <option value="cloudflare" selected>Cloudflare 1.1.1.1</option>
+          <option value="quad9">Quad9 9.9.9.9</option>
+          <option value="mullvad">Mullvad Privacy DNS</option>
+          <option value="adguard">AdGuard DNS</option>
+        </select>
+      </div>
+
+      <div class="layer-row">
+        <div class="layer-info">
+          <div class="layer-title">Post-Quantum X25519Kyber768 TLS 1.3 + ECH</div>
+          <div class="layer-desc">Encrypts Server Name Indication (SNI) and enforces NIST ML-KEM hybrid key agreement.</div>
+        </div>
+        <label class="toggle" aria-label="Post-Quantum TLS and ECH toggle">
+          <input type="checkbox" id="shield_pq_tls" name="shield_pq_tls" checked onchange="persistSetting('ech_enabled', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="layer-row">
+        <div class="layer-info">
+          <div class="layer-title">Active Circumvention &amp; Privacy Routing</div>
+          <div class="layer-desc">Select ByeDPI TCP splitting, GoodbyeDPI desync, Tor 3-Hop Circuit, I2P SAM bridge, or Direct transport.</div>
+        </div>
+        <select id="shield_circumvention" name="shield_circumvention" aria-label="Active Circumvention Mode" onchange="persistSetting('circumvention_mode', this.value)">
+          <option value="byedpi" selected>ByeDPI SOCKS5</option>
+          <option value="goodbyedpi">GoodbyeDPI Desync</option>
+          <option value="tor">Tor 3-Hop Circuit</option>
+          <option value="i2p">I2P SAM Bridge</option>
+          <option value="direct">Direct Connection</option>
+        </select>
+      </div>
+
+      <div class="layer-row">
+        <div class="layer-info">
+          <div class="layer-title">Global Privacy Control (Sec-GPC: 1) &amp; Cookie Banner Reject</div>
+          <div class="layer-desc">Automatically signals legal opt-out headers and dismisses third-party consent dark patterns.</div>
+        </div>
+        <label class="toggle" aria-label="Global Privacy Control toggle">
+          <input type="checkbox" id="shield_gpc" name="shield_gpc" checked onchange="persistSetting('gpc', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Per-Site Shield Allowlist">
+      <div class="panel-header">
+        <h3>Per-Site Shield Exceptions (Allowlist)</h3>
+        <span class="pill cyan" id="allowlist-count">1 domain</span>
+      </div>
+      <form class="allow-form" onsubmit="event.preventDefault(); addAllowlistDomain();">
+        <input type="text" id="allowlist-domain" name="allowlist_domain" aria-label="Domain to allowlist" placeholder="example.com (press / to focus)" autocomplete="off">
+        <button type="submit" class="btn btn-primary">Add Exception</button>
+      </form>
+      <div class="allow-list" id="allowlist-container"></div>
+    </section>
+
+    <section class="legal-card" aria-label="Privacy and Telemetry Transparency">
+      <strong>Privacy &amp; Telemetry Transparency:</strong> Published by <strong>Delgado Creative Enterprises LLC d/b/a DelgadoLogic</strong> (6218 Georgia Avenue NW, Ste 1-698, Washington, DC 20011, USA).
+      Optional OmniPulse diagnostics use a rotatable pseudonymous <code>installId</code> and are <strong>OFF by default</strong> (<code>ConsentLevel.None</code>) on Free and Pro plans, with zero client IP addresses persisted to disk and 90-day raw retention with instant self-service erasure. Service age requirement: 16+. Paid subscriptions include our 60-day no-questions-asked money-back guarantee.
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Saved</div>
+
+  <script>
+    let allowlist = [];
+    try {
+      allowlist = JSON.parse(localStorage.getItem('aeon_shield_allowlist') || '["localhost"]');
+    } catch (_) {
+      allowlist = ['localhost'];
+    }
+
+    function navigateTo(url) {
+      if (window.aeonBridge && typeof window.aeonBridge.navigate === 'function') {
+        window.aeonBridge.navigate(url);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(window.__shieldToastTimer);
+      window.__shieldToastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    function persistSetting(key, val) {
+      try { localStorage.setItem('aeon_settings_' + key, JSON.stringify(val)); } catch (_) {}
+      try {
+        if (window.aeonBridge && typeof window.aeonBridge.setSetting === 'function') {
+          window.aeonBridge.setSetting(key, val);
+          window.aeonBridge.commitSettings?.();
+        }
+      } catch (_) {}
+      showToast(`Updated ${key} = ${val}`);
+    }
+
+    function toggleMaster(enabled) {
+      persistSetting('adblock', enabled);
+      const heading = document.getElementById('shield-status-heading');
+      heading.textContent = enabled
+        ? 'Shields Active — Aggressive Sovereign Defense'
+        : 'Shields Paused — Filtering Reduced';
+    }
+
+    function renderAllowlist() {
+      const box = document.getElementById('allowlist-container');
+      const badge = document.getElementById('allowlist-count');
+      badge.textContent = `${allowlist.length} ${allowlist.length === 1 ? 'domain' : 'domains'}`;
+      if (!allowlist.length) {
+        box.innerHTML = '<div class="allow-note">No per-site exceptions configured. All origins run with full Shields enabled.</div>';
+        return;
+      }
+      box.innerHTML = allowlist.map((dom, idx) => `
+        <div class="allow-item">
+          <div>
+            <div class="allow-domain">${dom.replace(/</g, '&lt;')}</div>
+            <div class="allow-note">Content blocker bypassed for script compatibility; HTTPS upgrade &amp; DoH remain active.</div>
+          </div>
+          <button type="button" class="btn btn-danger" onclick="removeAllowlist(${idx})">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    function addAllowlistDomain() {
+      const input = document.getElementById('allowlist-domain');
+      const raw = (input.value || '').trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+      if (!raw) return;
+      if (!allowlist.includes(raw)) {
+        allowlist.push(raw);
+        try { localStorage.setItem('aeon_shield_allowlist', JSON.stringify(allowlist)); } catch (_) {}
+        renderAllowlist();
+        showToast(`Added shield exception for ${raw}`);
+      }
+      input.value = '';
+    }
+
+    function removeAllowlist(idx) {
+      const removed = allowlist.splice(idx, 1)[0];
+      try { localStorage.setItem('aeon_shield_allowlist', JSON.stringify(allowlist)); } catch (_) {}
+      renderAllowlist();
+      showToast(`Removed exception for ${removed}`);
+    }
+
+    function resetDefaults() {
+      document.getElementById('shield_master_toggle').checked = true;
+      document.getElementById('shield_adblock_level').value = 'aggressive';
+      document.getElementById('shield_fp_guard').checked = true;
+      document.getElementById('shield_doh_provider').value = 'cloudflare';
+      document.getElementById('shield_pq_tls').checked = true;
+      document.getElementById('shield_circumvention').value = 'byedpi';
+      document.getElementById('shield_gpc').checked = true;
+      persistSetting('adblock_level', 'aggressive');
+      toggleMaster(true);
+      showToast('Restored strict Sovereign Shield defaults');
+    }
+
+    function hydrateStats() {
+      const stats = (window.__aeon && window.__aeon.stats) || (window.aeon && window.aeon.stats) || null;
+      if (stats) {
+        const blocked = (Number(stats.trackersBlocked || stats.trackers_blocked) || 0) + (Number(stats.adsBlocked || stats.ads_blocked) || 0);
+        if (blocked > 0) document.getElementById('stat-blocked').textContent = blocked.toLocaleString();
+        if (stats.bandwidthSavedMB || stats.bandwidth_saved_mb) {
+          document.getElementById('stat-bw').textContent = Number(stats.bandwidthSavedMB || stats.bandwidth_saved_mb).toFixed(1) + ' MB';
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault();
+        document.getElementById('allowlist-domain')?.focus();
+      } else if (e.key === 'Escape') {
+        const inp = document.getElementById('allowlist-domain');
+        if (inp) { inp.value = ''; inp.blur(); }
+      }
+    });
+
+    hydrateStats();
+    renderAllowlist();
+  </script>
+</body>
+</html>

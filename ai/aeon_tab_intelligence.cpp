@@ -7,6 +7,7 @@
 // =============================================================================
 
 #include "aeon_tab_intelligence.h"
+#include "../engines/aeon_ai.h"
 
 #include <algorithm>
 #include <cstring>
@@ -137,6 +138,17 @@ public:
 
     const char* ClassifyByKeywords(const char* url, const char* title,
                                     float* confidence) {
+        // First attempt classification via AeonAI engine (gemma4:e2b / gemma4:12b)
+        std::string ai_topic = AeonAIInstance().ClassifyTopicLLM(url ? url : "", title ? title : "");
+        if (!ai_topic.empty()) {
+            for (uint32_t i = 0; i < AEON_TOPIC_COUNT; ++i) {
+                if (ai_topic == AEON_TAB_TOPICS[i]) {
+                    if (confidence) *confidence = 0.95f;
+                    return AEON_TAB_TOPICS[i];
+                }
+            }
+        }
+
         // Convert to lowercase for matching
         std::string combined;
         if (url) combined += url;
@@ -520,25 +532,37 @@ void AeonTabIntelligence::OnTabNavigated(uint64_t tab_id,
     auto it = m_impl->tabs.find(tab_id);
     if (it == m_impl->tabs.end()) return;
 
-    strncpy(it->second.url, new_url, sizeof(it->second.url) - 1);
-    strncpy(it->second.title, new_title, sizeof(it->second.title) - 1);
+    if (new_url) {
+        strncpy(it->second.url, new_url, sizeof(it->second.url) - 1);
+        it->second.url[sizeof(it->second.url) - 1] = '\0';
+    }
+    if (new_title) {
+        strncpy(it->second.title, new_title, sizeof(it->second.title) - 1);
+        it->second.title[sizeof(it->second.title) - 1] = '\0';
+    }
 
     // Reclassify
     float confidence = 0;
-    const char* topic = m_impl->ClassifyByKeywords(new_url, new_title, &confidence);
-    strncpy(it->second.primary_topic, topic, sizeof(it->second.primary_topic) - 1);
+    const char* topic = m_impl->ClassifyByKeywords(it->second.url, it->second.title, &confidence);
+    if (topic) {
+        strncpy(it->second.primary_topic, topic, sizeof(it->second.primary_topic) - 1);
+        it->second.primary_topic[sizeof(it->second.primary_topic) - 1] = '\0';
+    }
     it->second.topic_confidence = confidence;
 
     // Extract domain
-    std::string url_str(new_url);
-    size_t proto_end = url_str.find("://");
-    if (proto_end != std::string::npos) {
-        size_t dom_start = proto_end + 3;
-        size_t dom_end = url_str.find('/', dom_start);
-        if (dom_end == std::string::npos) dom_end = url_str.size();
-        std::string domain = url_str.substr(dom_start, dom_end - dom_start);
-        strncpy(it->second.domain, domain.c_str(),
-                sizeof(it->second.domain) - 1);
+    if (new_url && new_url[0]) {
+        std::string url_str(new_url);
+        size_t proto_end = url_str.find("://");
+        if (proto_end != std::string::npos) {
+            size_t dom_start = proto_end + 3;
+            size_t dom_end = url_str.find('/', dom_start);
+            if (dom_end == std::string::npos) dom_end = url_str.size();
+            std::string domain = url_str.substr(dom_start, dom_end - dom_start);
+            strncpy(it->second.domain, domain.c_str(),
+                    sizeof(it->second.domain) - 1);
+            it->second.domain[sizeof(it->second.domain) - 1] = '\0';
+        }
     }
 }
 

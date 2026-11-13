@@ -62,6 +62,10 @@ namespace NetworkSentinel {
     void StartMonitor();
     void StopMonitor();
 
+    // Direct circumvention launchers
+    bool LaunchByeDPI(const char* socksAddr = "127.0.0.1:1080", const char* extraFlags = nullptr);
+    bool LaunchGoodbyeDPI(DpiMode mode);
+
     // Accessors for current state
     const NetworkEnvironment& GetEnvironment();
     const SentinelState&      GetState();

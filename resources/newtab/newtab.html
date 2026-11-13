@@ -1,586 +1,944 @@
 <!DOCTYPE html>
-<!--
-  Aeon Browser — aeon://newtab
-  DelgadoLogic | UI Team
-  
-  This is the New Tab page served when the user opens aeon://newtab.
-  It is a self-contained HTML file — no external CDN, no network requests.
-  All assets are inline (CSS font via @import from bundled font file,
-  icons are inline SVG).
-  
-  The C++ core serves this file from the embedded resources of Aeon.exe.
-  On legacy tiers (XP/Vista) the CSS animations are disabled via
-  a class injected by EraChrome.cpp: <body class="legacy-mode">
-  
-  PRIVACY: Speed Dial thumbnails are cached locally in %APPDATA%\Aeon\thumbnails\.
-  No URLs are sent to any server from this page.
--->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Tab — Aeon Browser</title>
+  <title>New Tab - Aeon Browser</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* =========================================================
-       DESIGN SYSTEM — Aeon Dark Theme
-    ========================================================= */
     :root {
-      --bg-primary:    #0d0e14;
-      --bg-card:       #16182a;
-      --bg-card-hover: #1e2140;
-      --accent:        #6c63ff;
-      --accent-2:      #a78bfa;
-      --accent-glow:   rgba(108, 99, 255, 0.35);
-      --text-primary:  #e8e8f0;
-      --text-dim:      #8888aa;
-      --text-faint:    #44445a;
-      --border:        rgba(108,99,255,0.18);
-      --radius:        14px;
-      --radius-sm:     8px;
-      --transition:    0.22s cubic-bezier(0.4, 0, 0.2, 1);
-      --font:          'Segoe UI', system-ui, -apple-system, sans-serif;
+      --bg-obsidian: #0b0616;
+      --bg-surface: #0e071c;
+      --bg-card: rgba(18, 20, 36, 0.65);
+      --bg-card-hover: rgba(30, 24, 58, 0.82);
+      --border-card: rgba(168, 85, 247, 0.18);
+      --border-card-hover: rgba(192, 132, 252, 0.55);
+      --border-glow: rgba(168, 85, 247, 0.45);
+      --accent-purple: #9333ea;
+      --accent-light: #c084fc;
+      --accent-glow: rgba(168, 85, 247, 0.45);
+      --neon-cyan: #38bdf8;
+      --neon-cyan-glow: rgba(56, 189, 248, 0.35);
+      --neon-pink: #ec4899;
+      --green: #22c55e;
+      --text-white: #f8fafc;
+      --text-soft: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --radius-lg: 18px;
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html, body {
-      width: 100%; height: 100%;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      font-family: var(--font);
-      overflow-x: hidden;
+    body {
+      background-color: #080511;
+      color: var(--text-white);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      display: flex;
+      overflow: hidden;
+      user-select: none;
+      background-image: 
+        radial-gradient(ellipse 70% 55% at 50% 35%, rgba(112, 38, 206, 0.25) 0%, transparent 75%),
+        radial-gradient(ellipse 45% 45% at 85% 75%, rgba(147, 51, 234, 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 65% at 15% 85%, rgba(56, 189, 248, 0.12) 0%, transparent 70%);
+      background-attachment: fixed;
     }
 
-    /* Animated aurora background */
-    body::before {
-      content: '';
+    .star-layer {
       position: fixed;
       inset: 0;
-      background:
-        radial-gradient(ellipse 90% 70% at 15% 8%,  rgba(108,99,255,0.22) 0%, transparent 65%),
-        radial-gradient(ellipse 70% 90% at 85% 88%, rgba(167,139,250,0.16) 0%, transparent 65%),
-        radial-gradient(ellipse 50% 50% at 50% 45%, rgba(76,29,149,0.12)  0%, transparent 60%),
-        radial-gradient(ellipse 30% 30% at 30% 80%, rgba(108,99,255,0.08) 0%, transparent 55%);
-      animation: aurora 18s ease-in-out infinite alternate;
       pointer-events: none;
-      z-index: 0;
-    }
-    @keyframes aurora {
-      0%   { transform: scale(1)   rotate(0deg);  opacity: 0.8; }
-      50%  { transform: scale(1.1) rotate(1deg);  opacity: 1;   }
-      100% { transform: scale(1)   rotate(-1deg); opacity: 0.8; }
+      background-image: 
+        radial-gradient(1px 1px at 8% 18%, rgba(255, 255, 255, 0.6) 50%, transparent),
+        radial-gradient(1.5px 1.5px at 22% 42%, rgba(192, 132, 252, 0.7) 50%, transparent),
+        radial-gradient(1px 1px at 38% 68%, rgba(255, 255, 255, 0.5) 50%, transparent),
+        radial-gradient(2px 2px at 58% 22%, rgba(220, 200, 255, 0.8) 50%, transparent),
+        radial-gradient(1px 1px at 74% 62%, rgba(56, 189, 248, 0.6) 50%, transparent),
+        radial-gradient(1.5px 1.5px at 86% 32%, rgba(192, 132, 252, 0.7) 50%, transparent),
+        radial-gradient(1px 1px at 92% 78%, rgba(255, 255, 255, 0.4) 50%, transparent);
+      opacity: 0.75;
     }
 
-    /* Disable animations on legacy tier */
-    body.legacy-mode::before { animation: none; }
-    body.legacy-mode * { transition: none !important; animation: none !important; }
+    .sidebar {
+      width: 200px;
+      min-width: 200px;
+      height: 100vh;
+      background: linear-gradient(180deg, rgba(14, 7, 28, 0.72) 0%, rgba(10, 5, 20, 0.82) 100%);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border-right: 1px solid rgba(168, 85, 247, 0.15);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 14px 20px;
+      backdrop-filter: blur(20px);
+      z-index: 10;
+      flex-shrink: 0;
+    }
 
-    /* =========================================================
-       LAYOUT
-    ========================================================= */
-    .page {
-      position: relative;
-      z-index: 1;
+    .sidebar-brand {
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
-      padding: 0 24px;
+      text-align: center;
+      margin-bottom: 20px;
+      cursor: pointer;
     }
 
-    /* =========================================================
-       HEADER / BRAND
-    ========================================================= */
-    .brand {
-      margin-top: 48px;
+    .brand-glow-container {
+      width: 52px;
+      height: 52px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      opacity: 0.9;
-      animation: fadeUp 0.6s ease;
+      justify-content: center;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.35), rgba(56, 189, 248, 0.25));
+      border: 1px solid rgba(192, 132, 252, 0.3);
+      box-shadow: 0 0 20px rgba(147, 51, 234, 0.35);
+      margin-bottom: 8px;
+      transition: all 0.3s var(--ease);
     }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0);    }
+    .brand-glow-container:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 28px rgba(192, 132, 252, 0.6);
+      border-color: var(--accent-light);
     }
 
     .brand-icon {
-      width: 36px; height: 36px;
-      filter: drop-shadow(0 0 10px var(--accent-glow));
+      width: 32px;
+      height: 32px;
+      filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.8));
     }
 
-    .brand-name {
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      text-transform: uppercase;
-    }
-
-    /* =========================================================
-       SEARCH BAR
-    ========================================================= */
-    .search-wrap {
-      margin-top: 44px;
-      width: 100%;
-      max-width: 680px;
-      animation: fadeUp 0.7s 0.1s ease both;
-    }
-
-    .search-container {
-      position: relative;
-      display: flex;
-      align-items: center;
-      background: var(--bg-card);
-      border: 1.5px solid var(--border);
-      border-radius: 48px;
-      padding: 0 20px;
-      height: 58px;
-      box-shadow:
-        0 0 0 0 var(--accent-glow),
-        0 4px 32px rgba(0,0,0,0.4);
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-    .search-container:focus-within {
-      border-color: var(--accent);
-      box-shadow:
-        0 0 0 4px var(--accent-glow),
-        0 4px 32px rgba(0,0,0,0.4);
-    }
-
-    .search-icon {
-      flex-shrink: 0;
-      width: 20px; height: 20px;
-      fill: var(--text-dim);
-      transition: fill var(--transition);
-    }
-    .search-container:focus-within .search-icon { fill: var(--accent-2); }
-
-    #search-input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text-primary);
-      font-family: var(--font);
-      font-size: 17px;
-      padding: 0 14px;
-      caret-color: var(--accent-2);
-    }
-    #search-input::placeholder { color: var(--text-faint); }
-
-    .search-engines {
-      display: flex;
-      gap: 6px;
-    }
-
-    .engine-btn {
-      background: none;
-      border: 1px solid transparent;
-      border-radius: 20px;
-      padding: 4px 10px;
-      font-size: 12px;
-      color: var(--text-dim);
-      cursor: pointer;
-      transition: all var(--transition);
-      white-space: nowrap;
-    }
-    .engine-btn:hover,
-    .engine-btn.active {
-      border-color: var(--accent);
-      color: var(--accent-2);
-      background: rgba(108,99,255,0.1);
-    }
-
-    /* =========================================================
-       SPEED DIAL
-    ========================================================= */
-    .section-label {
-      margin-top: 52px;
-      font-size: 11px;
+    .sidebar-title {
+      font-size: 13px;
+      font-weight: 800;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--text-faint);
-      align-self: flex-start;
-      max-width: 900px;
-      width: 100%;
-      animation: fadeUp 0.7s 0.2s ease both;
+      background: linear-gradient(135deg, #ffffff, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
-    .speed-dial {
-      margin-top: 16px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 12px;
-      max-width: 900px;
-      width: 100%;
-      animation: fadeUp 0.7s 0.25s ease both;
+    .sidebar-subtitle {
+      font-size: 10px;
+      color: var(--neon-cyan);
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    .tor-status-card {
+      background: rgba(18, 20, 36, 0.75);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 20px;
+      font-size: 11px;
+      line-height: 1.5;
+      backdrop-filter: blur(12px);
     }
 
-    .dial-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 12px 16px;
+    .tor-conn-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      color: var(--green);
+      font-size: 10.5px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulseGreen 2s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.85); }
+    }
+
+    .tor-stat-row {
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+
+    .circuit-route {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(168, 85, 247, 0.15);
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--accent-light);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      color: var(--text-soft);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s var(--ease);
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(192, 132, 252, 0.3);
+      color: var(--text-white);
+      transform: translateX(3px);
+      box-shadow: 0 0 14px rgba(147, 51, 234, 0.25);
+    }
+
+    .nav-item.active {
+      background: rgba(147, 51, 234, 0.25);
+      border-color: rgba(192, 132, 252, 0.45);
+      color: var(--text-white);
+      box-shadow: 0 0 16px rgba(147, 51, 234, 0.3);
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .badge-pill {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--neon-cyan);
+      margin-left: auto;
+    }
+
+    .main-viewport {
+      flex: 1;
+      height: 100vh;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      justify-content: flex-start;
+      padding: 32px 28px 48px;
+      position: relative;
+    }
+
+    .dashboard-center {
+      max-width: 820px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+    }
+
+    .privacy-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 28px;
+    }
+
+    .stat-badge-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-align: left;
+      transition: all 0.25s var(--ease);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+    .stat-badge-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-card-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(11, 6, 22, 0.8), 0 0 20px rgba(147, 51, 234, 0.25);
+    }
+
+    .stat-icon-wrap {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(147, 51, 234, 0.15);
+      border: 1px solid rgba(192, 132, 252, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--accent-light);
+    }
+    .stat-icon-wrap.cyan {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: var(--neon-cyan);
+    }
+    .stat-icon-wrap.green {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.35);
+      color: var(--green);
+    }
+
+    .stat-icon-wrap svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .stat-data-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-num {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-white);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .clock-display {
+      font-size: 84px;
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      color: #f1ecfc;
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(192, 132, 252, 0.45);
+      margin-bottom: 6px;
+      font-feature-settings: "tnum";
+    }
+
+    .date-weather {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--accent-light);
+      margin-bottom: 30px;
+    }
+
+    .date-weather .separator {
+      opacity: 0.35;
+    }
+
+    .search-wrapper {
+      width: 100%;
+      max-width: 600px;
+      position: relative;
+      margin-bottom: 36px;
+    }
+
+    .search-input-box {
+      width: 100%;
+      height: 52px;
+      background: rgba(18, 20, 36, 0.65);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 9999px;
+      padding: 0 54px 0 50px;
+      font-size: 15px;
+      font-family: var(--font-main);
+      color: var(--text-white);
+      outline: none;
+      box-shadow: 
+        0 4px 24px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(147, 51, 234, 0.25),
+        inset 0 0 12px rgba(147, 51, 234, 0.15);
+      transition: all 0.25s var(--ease);
+      backdrop-filter: blur(16px);
+    }
+
+    .search-input-box::placeholder {
+      color: #a78bfa;
+      opacity: 0.65;
+    }
+
+    .search-input-box:focus {
+      border-color: var(--accent-light);
+      box-shadow: 
+        0 0 32px rgba(192, 132, 252, 0.6),
+        0 0 16px rgba(56, 189, 248, 0.35),
+        inset 0 0 16px rgba(147, 51, 234, 0.3);
+      background: rgba(26, 20, 52, 0.95);
+    }
+
+    .search-icon-left {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: var(--accent-light);
+      pointer-events: none;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .search-submit-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(192, 132, 252, 0.5);
+      background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s var(--ease);
+      box-shadow: 0 0 12px rgba(192, 132, 252, 0.4);
+      color: #ffffff;
+    }
+
+    .search-submit-btn:hover {
+      transform: translateY(-50%) scale(1.08);
+      box-shadow: 0 0 20px rgba(192, 132, 252, 0.8);
+      background: linear-gradient(135deg, #a855f7, var(--accent-purple));
+    }
+
+    .search-submit-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.5;
+    }
+
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 150px);
+      gap: 16px;
+      justify-content: center;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    .shortcut-card {
+      height: 106px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       text-decoration: none;
-      color: var(--text-primary);
-      transition:
-        background var(--transition),
-        border-color var(--transition),
-        transform var(--transition),
-        box-shadow var(--transition);
+      color: var(--text-white);
+      transition: all 0.25s var(--ease);
+      backdrop-filter: blur(16px);
+      cursor: pointer;
       position: relative;
       overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
-    .dial-card::before {
+
+    .shortcut-card::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg, var(--accent-glow), transparent 70%);
+      background: radial-gradient(circle at 50% 30%, rgba(168, 85, 247, 0.25) 0%, transparent 70%);
       opacity: 0;
-      transition: opacity var(--transition);
+      transition: opacity 0.25s var(--ease);
     }
-    .dial-card:hover {
+
+    .shortcut-card:hover {
       background: var(--bg-card-hover);
-      border-color: var(--accent);
+      border-color: var(--border-card-hover);
       transform: translateY(-4px);
-      box-shadow: 0 8px 32px rgba(108,99,255,0.2);
-    }
-    .dial-card:hover::before { opacity: 1; }
-
-    .dial-favicon {
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      background: rgba(255,255,255,0.06);
-      position: relative; z-index: 1;
+      box-shadow: 0 12px 28px rgba(11, 6, 22, 0.8), 0 0 22px rgba(168, 85, 247, 0.35);
     }
 
-    .dial-label {
+    .shortcut-card:hover::before {
+      opacity: 1;
+    }
+
+    .shortcut-icon-box {
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .shortcut-title {
       font-size: 12px;
-      color: var(--text-dim);
-      text-align: center;
-      position: relative; z-index: 1;
+      font-weight: 600;
+      color: #e2d9f3;
+      position: relative;
+      z-index: 1;
+      letter-spacing: 0.01em;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100%;
+      max-width: 120px;
     }
 
-    /* Add new dial button */
-    .dial-add {
-      background: transparent;
-      border: 1.5px dashed var(--text-faint);
-      border-radius: var(--radius);
-      padding: 20px 12px 16px;
+    .quick-prompt-banner {
+      margin-top: 24px;
       display: flex;
-      flex-direction: column;
       align-items: center;
       gap: 10px;
-      cursor: pointer;
-      color: var(--text-faint);
-      transition: all var(--transition);
-    }
-    .dial-add:hover {
-      border-color: var(--accent);
-      color: var(--accent-2);
-      background: rgba(108,99,255,0.06);
-    }
-
-    /* =========================================================
-       PRIVACY BAR (bottom)
-    ========================================================= */
-    .privacy-bar {
-      margin-top: auto;
-      padding: 20px 0 16px;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      opacity: 0.6;
+      background: rgba(18, 20, 36, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 30px;
+      padding: 8px 18px;
       font-size: 12px;
-      color: var(--text-dim);
-      animation: fadeUp 0.8s 0.4s ease both;
+      color: var(--text-soft);
+      cursor: pointer;
+      transition: all 0.2s var(--ease);
     }
-
-    .privacy-item {
+    .quick-prompt-banner:hover {
+      background: rgba(30, 24, 58, 0.9);
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+      color: var(--text-white);
+      transform: translateY(-1px);
+    }
+    .sparkle-icon {
+      color: var(--neon-cyan);
       display: flex;
-      align-items: center;
-      gap: 6px;
     }
-
-    .privacy-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 6px rgba(34,197,94,0.7);
-      flex-shrink: 0;
+    @media (max-width: 900px) {
+      .sidebar { width: 76px; padding: 20px 10px; }
+      .sidebar-brand-text, .nav-item span, .badge-pill, .tor-status-card span { display: none; }
+      .sidebar-brand { justify-content: center; padding: 0 0 16px; }
+      .nav-item { justify-content: center; padding: 12px; }
+      .main-viewport { padding: 32px 20px; }
+      .shortcuts-grid { grid-template-columns: repeat(2, 1fr); }
+      .privacy-stats-grid { grid-template-columns: 1fr; }
     }
-    .privacy-dot.off { background: var(--text-faint); box-shadow: none; }
-
-    /* =========================================================
-       TIME / DATE
-    ========================================================= */
-    .clock {
-      margin-top: 48px;
-      text-align: center;
-      animation: fadeUp 0.6s 0.05s ease both;
-    }
-
-    #clock-time {
-      font-size: clamp(72px, 10vw, 110px);
-      font-weight: 200;
-      letter-spacing: -4px;
-      color: var(--text-primary);
-      line-height: 1;
-      text-shadow:
-        0 0 60px rgba(108,99,255,0.25),
-        0 0 120px rgba(108,99,255,0.10);
-    }
-
-    #clock-date {
-      font-size: 14px;
-      color: var(--text-dim);
-      margin-top: 6px;
-      letter-spacing: 0.04em;
-    }
-
-    /* =========================================================
-       RESPONSIVE
-    ========================================================= */
-    @media (max-width: 600px) {
-      #clock-time { font-size: 48px; }
-      .speed-dial { grid-template-columns: repeat(3, 1fr); }
-      .brand { margin-top: 28px; }
+    @media (max-width: 640px) {
+      body { flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+      .sidebar { width: 100%; min-width: 0; height: auto; position: relative; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 12px 14px; gap: 8px; }
+      .sidebar-nav { flex-direction: row; flex: 1 1 100%; min-width: 0; gap: 4px; overflow-x: auto; }
+      .tor-status-card { display: none; }
+      .main-viewport { padding: 20px 14px; min-width: 0; width: 100%; }
+      .dashboard-center { width: 100%; min-width: 0; max-width: 100%; }
+      .clock-display { font-size: 48px; }
+      .date-weather { flex-wrap: wrap; justify-content: center; text-align: center; }
+      .quick-prompt-banner { max-width: 100%; white-space: normal; text-align: center; }
+      .shortcuts-grid { grid-template-columns: minmax(0, 1fr); max-width: 100%; }
+      .search-box, .search-wrapper { max-width: 100%; }
     }
   </style>
 </head>
 <body>
-<div class="page">
+  <div class="star-layer"></div>
 
-  <!-- Brand header -->
-  <div class="brand">
-    <!-- Inline SVG: Aeon hourglass/infinity icon (placeholder until Aeon.ico is final) -->
-    <svg class="brand-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="a" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stop-color="#6c63ff"/>
-          <stop offset="100%" stop-color="#a78bfa"/>
-        </linearGradient>
-        <filter id="glow">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <!-- Infinity / figure-8 shape -->
-      <path filter="url(#glow)"
-        d="M8 18 C8 13, 14 9, 18 14 C22 9, 28 13, 28 18 C28 23, 22 27, 18 22 C14 27, 8 23, 8 18 Z"
-        fill="none" stroke="url(#a)" stroke-width="2.2"/>
-      <!-- Center glow dot -->
-      <circle cx="18" cy="18" r="2" fill="url(#a)" opacity="0.9"/>
-    </svg>
-    <span class="brand-name">Aeon</span>
-  </div>
+  <aside class="sidebar">
+    <div class="sidebar-brand" onclick="navigate('aeon://newtab')">
+      <div class="brand-glow-container">
+        <svg class="brand-icon" viewBox="0 0 48 48" fill="none">
+          <defs>
+            <linearGradient id="sideShieldBorder" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#ec4899"/>
+              <stop offset="35%" stop-color="#c084fc"/>
+              <stop offset="70%" stop-color="#818cf8"/>
+              <stop offset="100%" stop-color="#38bdf8"/>
+            </linearGradient>
+            <linearGradient id="sideShieldFill" x1="12" y1="6" x2="36" y2="42" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="rgba(236, 72, 153, 0.3)"/>
+              <stop offset="45%" stop-color="rgba(192, 132, 252, 0.25)"/>
+              <stop offset="100%" stop-color="rgba(56, 189, 248, 0.2)"/>
+            </linearGradient>
+            <linearGradient id="sideRibbonGrad" x1="14" y1="12" x2="34" y2="38" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="25%" stop-color="#e9d5ff"/>
+              <stop offset="65%" stop-color="#c084fc"/>
+              <stop offset="100%" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 4C24 4 11 8 9 9C7 10 7 13 7 19C7 31 16 39.5 24 44C32 39.5 41 31 41 19C41 13 41 10 39 9C37 8 24 4 24 4Z" 
+                fill="url(#sideShieldFill)" 
+                stroke="url(#sideShieldBorder)" 
+                stroke-width="2.2" 
+                stroke-linejoin="round"/>
+          <path d="M16 35L24 13L32 35" 
+                stroke="url(#sideRibbonGrad)" 
+                stroke-width="2.4" 
+                stroke-linecap="round" 
+                stroke-linejoin="round"/>
+          <path d="M14 27C17.5 24.5 22 25 24 28C26 31 29.5 31.5 34 26" 
+                stroke="url(#sideRibbonGrad)" 
+                stroke-width="2" 
+                stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="sidebar-title">Aeon</div>
+      <div class="sidebar-subtitle">Obsidian Pro</div>
+    </div>
 
-  <!-- Clock -->
-  <div class="clock">
-    <div id="clock-time">--:--</div>
-    <div id="clock-date">Loading...</div>
-  </div>
-
-  <!-- Search -->
-  <div class="search-wrap">
-    <div class="search-container">
-      <!-- Search icon -->
-      <svg class="search-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-          stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-          fill="none"/>
-      </svg>
-      <input id="search-input" type="text"
-        placeholder="Search or enter address"
-        autocomplete="off" spellcheck="false">
-      <div class="search-engines">
-        <button class="engine-btn active" data-engine="bing"    title="Bing">Bing</button>
-        <button class="engine-btn"        data-engine="ddg"     title="DuckDuckGo">DDG</button>
-        <button class="engine-btn"        data-engine="google"  title="Google">Google</button>
-        <button class="engine-btn"        data-engine="onion"   title="Onion/Tor" style="font-size:11px;">🧅 Tor</button>
+    <div class="tor-status-card">
+      <div class="tor-conn-row">
+        <span>Sentinel Engine:</span>
+        <div class="status-badge">
+          <div class="status-dot"></div>
+          <span>Active</span>
+        </div>
+      </div>
+      <div class="tor-stat-row">
+        <span>Circumvention:</span>
+        <span style="color:#c084fc; font-weight:600;">ByeDPI v2</span>
+      </div>
+      <div class="tor-stat-row">
+        <span>Camoufox Noise:</span>
+        <span style="color:#38bdf8; font-weight:600;">Injected</span>
+      </div>
+      <div class="circuit-route">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Quantum Kyber-768</span>
       </div>
     </div>
-  </div>
 
-  <!-- Speed Dial -->
-  <div class="section-label">Quick Access</div>
-  <div class="speed-dial" id="speed-dial">
-    <!-- Default dials — will be loaded from history/bookmarks via aeon:// protocol -->
-    <a class="dial-card" href="https://www.bing.com" data-aeon-dial>
-      <div class="dial-favicon">🔍</div>
-      <div class="dial-label">Bing</div>
-    </a>
-    <a class="dial-card" href="https://github.com" data-aeon-dial>
-      <div class="dial-favicon">🐙</div>
-      <div class="dial-label">GitHub</div>
-    </a>
-    <a class="dial-card" href="https://www.youtube.com" data-aeon-dial>
-      <div class="dial-favicon">▶️</div>
-      <div class="dial-label">YouTube</div>
-    </a>
-    <a class="dial-card" href="https://browseaeon.com" data-aeon-dial>
-      <div class="dial-favicon">⚡</div>
-      <div class="dial-label">DelgadoLogic</div>
-    </a>
-    <a class="dial-card" href="https://wikipedia.org" data-aeon-dial>
-      <div class="dial-favicon">📖</div>
-      <div class="dial-label">Wikipedia</div>
-    </a>
-    <a class="dial-card" href="http://3g2upl4pq6kufc4m.onion" data-aeon-dial>
-      <div class="dial-favicon">🧅</div>
-      <div class="dial-label">DDG Onion</div>
-    </a>
-    <button class="dial-add" id="dial-add-btn" onclick="aeon.addDial()">
-      <div class="dial-favicon" style="font-size:22px;background:none;">+</div>
-      <div class="dial-label">Add shortcut</div>
-    </button>
-  </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="navigate('aeon://newtab')">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>New Tab</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://intelligence')">
+        <svg viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+        <span>Intelligence</span>
+        <span class="badge-pill">AI</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://history')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>History</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://bookmarks')">
+        <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <span>Bookmarks</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://passwords')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Passwords</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://downloads')">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Downloads</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://settings')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://shields')" tabindex="0">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Shields</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://extensions')" tabindex="0">
+        <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span>Extensions</span>
+      </div>
+      <div class="nav-item" onclick="navigate('aeon://diagnostics')" tabindex="0">
+        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>Diagnostics</span>
+      </div>
+    </nav>
+  </aside>
+  <main class="main-viewport">
+    <div class="dashboard-center">
+      
+      <div class="privacy-stats-grid">
+        <div class="stat-badge-card">
+          <div class="stat-icon-wrap">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="stat-data-col">
+            <span class="stat-num" id="stat-trackers">24,850</span>
+            <span class="stat-label">Trackers & Ads Blocked</span>
+          </div>
+        </div>
 
-  <!-- Privacy status bar -->
-  <div class="privacy-bar">
-    <div class="privacy-item" id="adblock-status">
-      <span class="privacy-dot" id="dot-adblock"></span>
-      <span id="label-adblock">AdBlock ON</span>
+        <div class="stat-badge-card">
+          <div class="stat-icon-wrap cyan">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <div class="stat-data-col">
+            <span class="stat-num" id="stat-bandwidth">348.5 MB</span>
+            <span class="stat-label">Bandwidth Saved</span>
+          </div>
+        </div>
+
+        <div class="stat-badge-card">
+          <div class="stat-icon-wrap green">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-data-col">
+            <span class="stat-num" id="stat-time">21.4 min</span>
+            <span class="stat-label">Time Saved</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="clock-display" id="clock">12:00</div>
+      
+      <div class="date-weather">
+        <span id="current-date">Tuesday, September 1</span>
+        <span class="separator">|</span>
+        <span>⚡ Obsidian Fast & Sovereign</span>
+      </div>
+
+      <div class="search-wrapper">
+        <svg class="search-icon-left" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="search-input" name="q" aria-label="Search the web or type a URL" class="search-input-box" placeholder="Search the web or type a URL..." autocomplete="off" spellcheck="false">
+        <button class="search-submit-btn" id="search-btn" title="Search">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+      <div class="shortcuts-grid" id="shortcuts-container">
+        <div class="shortcut-card" onclick="navigate('https://github.com')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="#ffffff">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">GitHub</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('https://delgadologic.tech')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 48 48" width="32" height="32" fill="none" style="filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.75));">
+              <path d="M24 4C24 4 11 8 9 9C7 10 7 13 7 19C7 31 16 39.5 24 44C32 39.5 41 31 41 19C41 13 41 10 39 9C37 8 24 4 24 4Z" fill="rgba(147,51,234,0.3)" stroke="#c084fc" stroke-width="2.5"/>
+              <path d="M16 35L24 13L32 35" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M14 27C17.5 24.5 22 25 24 28C26 31 29.5 31.5 34 26" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">Aeon Dev</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('aeon://intelligence')">
+          <div class="shortcut-icon-box">
+            <div style="width:32px; height:32px; border-radius:10px; background:linear-gradient(135deg, #9333ea, #38bdf8); display:flex; align-items:center; justify-content:center; box-shadow:0 0 12px rgba(56, 189, 248, 0.5);">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
+          </div>
+          <span class="shortcut-title">Intelligence</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('https://youtube.com')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 32 24" width="30" height="22">
+              <rect width="32" height="24" rx="6" fill="#ef4444"/>
+              <polygon points="13,7 22,12 13,17" fill="#ffffff"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">YouTube</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('https://mail.google.com')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="#e2d9f3">
+              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">Gmail</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('https://reddit.com')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="#f97316">
+              <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.197-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">Reddit</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('https://x.com')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="#ffffff">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">X (Twitter)</span>
+        </div>
+
+        <div class="shortcut-card" onclick="navigate('https://figma.com')">
+          <div class="shortcut-icon-box">
+            <svg viewBox="0 0 24 24" width="26" height="26">
+              <path fill="#F24E1E" d="M12 12a3 3 0 1 1 3-3 3 3 0 0 1-3 3z"/>
+              <path fill="#FF7262" d="M6 3a3 3 0 0 1 3-3h3v6H9a3 3 0 0 1-3-3z"/>
+              <path fill="#A259FF" d="M12 0h3a3 3 0 0 1 0 6h-3V0z"/>
+              <path fill="#1ABCFE" d="M6 9a3 3 0 0 1 3-3h3v6H9a3 3 0 0 1-3-3z"/>
+              <path fill="#0ACF83" d="M6 15a3 3 0 0 1 3-3h3v3a3 3 0 0 1-3 3 3 3 0 0 1-3-3z"/>
+            </svg>
+          </div>
+          <span class="shortcut-title">Figma</span>
+        </div>
+      </div>
+
+      <div class="quick-prompt-banner" onclick="navigate('aeon://intelligence')">
+        <span class="sparkle-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </span>
+        <span>Ask Aeon Intelligence anything or run an autonomous research agent</span>
+      </div>
+
     </div>
-    <div class="privacy-item" id="tor-status">
-      <span class="privacy-dot off" id="dot-tor"></span>
-      <span id="label-tor">Tor OFF</span>
-    </div>
-    <div class="privacy-item" id="https-status">
-      <span class="privacy-dot" id="dot-https"></span>
-      <span id="label-https">HTTPS upgrade</span>
-    </div>
-    <div class="privacy-item" id="fp-status">
-      <span class="privacy-dot" id="dot-fp"></span>
-      <span id="label-fp">FP Guard ON</span>
-    </div>
-    <div class="privacy-item" id="fw-status" style="display:none">
-      <span class="privacy-dot" id="dot-fw" style="background:#a78bfa;box-shadow:0 0 6px rgba(167,139,250,0.7)"></span>
-      <span id="label-fw">Firewall Mode</span>
-    </div>
-    <div class="privacy-item" id="sentinel-status" style="display:none">
-      <span class="privacy-dot" id="dot-sentinel" style="background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,0.7)"></span>
-      <span id="label-sentinel">Auto Bypass</span>
-    </div>
-  </div>
+  </main>
+  <script>
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const clockEl = document.getElementById('clock');
+      if (clockEl) {
+        clockEl.textContent = `${hours}:${minutes}`;
+      }
 
-</div><!-- /.page -->
-
-<script>
-// =========================================================
-// CLOCK
-// =========================================================
-function updateClock() {
-  var now  = new Date();
-  var h    = now.getHours().toString().padStart(2, '0');
-  var m    = now.getMinutes().toString().padStart(2, '0');
-  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var mons = ['January','February','March','April','May','June',
-              'July','August','September','October','November','December'];
-  document.getElementById('clock-time').textContent = h + ':' + m;
-  document.getElementById('clock-date').textContent =
-    days[now.getDay()] + ', ' + mons[now.getMonth()] +
-    ' ' + now.getDate() + ', ' + now.getFullYear();
-}
-updateClock();
-setInterval(updateClock, 10000);
-
-// =========================================================
-// SEARCH
-// =========================================================
-var ENGINES = {
-  bing:   'https://www.bing.com/search?q=',
-  ddg:    'https://duckduckgo.com/?q=',
-  google: 'https://www.google.com/search?q=',
-  onion:  'https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/html/?q='
-};
-var activeEngine = 'bing';
-
-document.querySelectorAll('.engine-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.engine-btn').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    activeEngine = btn.dataset.engine;
-    document.getElementById('search-input').focus();
-  });
-});
-
-document.getElementById('search-input').addEventListener('keydown', function(e) {
-  if (e.key !== 'Enter') return;
-  var val = this.value.trim();
-  if (!val) return;
-
-  // Direct URL if it looks like one
-  if (/^https?:\/\//i.test(val) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/|$)/.test(val)) {
-    var url = (/^https?:\/\//i.test(val)) ? val : 'https://' + val;
-    try { window.aeonBridge?.navigate(url); } catch(_) { location.href = url; }
-  } else {
-    var searchUrl = ENGINES[activeEngine] + encodeURIComponent(val);
-    try { window.aeonBridge?.navigate(searchUrl); } catch(_) { location.href = searchUrl; }
-  }
-});
-
-// =========================================================
-// PRIVACY STATUS — read from C++ bridge (injected by PulseBridge)
-// aeon.settings is injected by EraChrome as a JSON object:
-// { adblock: true, tor: false, https_upgrade: true, fp_guard: true }
-// =========================================================
-function updatePrivacy() {
-  // Use __aeon (injected by AeonBridge::BuildInjectionScript) or legacy window.aeon
-  var s = (window.__aeon && window.__aeon.settings) ? window.__aeon.settings
-        : (window.aeon  && window.aeon.settings)    ? window.aeon.settings
-        : { adblock: true, tor_enabled: false, https_upgrade: true, fingerprint_guard: true };
-
-  // Network info
-  var net = (window.__aeon && window.__aeon.network) ? window.__aeon.network : {};
-
-  function setDot(id, labelId, active, onText, offText) {
-    var dot = document.getElementById(id);
-    var lbl = document.getElementById(labelId);
-    if (active) {
-      dot.className = 'privacy-dot';
-      lbl.textContent = onText;
-    } else {
-      dot.className = 'privacy-dot off';
-      lbl.textContent = offText;
+      const options = { weekday: 'long', month: 'short', day: 'numeric' };
+      const dateEl = document.getElementById('current-date');
+      if (dateEl) {
+        dateEl.textContent = now.toLocaleDateString('en-US', options);
+      }
     }
-  }
+    updateClock();
+    setInterval(updateClock, 1000);
 
-  setDot('dot-adblock', 'label-adblock', s.adblock,           'AdBlock ON',   'AdBlock OFF');
-  setDot('dot-tor',     'label-tor',     s.tor_enabled,       'Tor ON',       'Tor OFF');
-  setDot('dot-https',   'label-https',   s.https_upgrade,     'HTTPS upgrade','HTTP only');
-  setDot('dot-fp',      'label-fp',      s.fingerprint_guard, 'FP Guard ON',  'FP Guard OFF');
+    function updateStats() {
+      if (window.aeon && window.aeon.stats) {
+        const s = window.aeon.stats;
+        if (s.trackersBlocked !== undefined || s.adsBlocked !== undefined) {
+          const totalTrackers = (Number(s.trackersBlocked) || 0) + (Number(s.adsBlocked) || 0);
+          const el = document.getElementById('stat-trackers');
+          if (el) el.textContent = totalTrackers.toLocaleString();
+        }
+        if (s.bandwidthSavedMB !== undefined) {
+          const el = document.getElementById('stat-bandwidth');
+          if (el) el.textContent = Number(s.bandwidthSavedMB || 0).toFixed(1) + ' MB';
+        }
+        if (s.timeSavedMs !== undefined) {
+          const minutes = (Number(s.timeSavedMs || 0) / 60000).toFixed(1);
+          const el = document.getElementById('stat-time');
+          if (el) el.textContent = minutes + ' min';
+        }
+      }
+    }
+    updateStats();
 
-  // Firewall / bypass indicator
-  if (s.bypass_enabled || net.bypass_active) {
-    document.getElementById('fw-status').style.display = 'flex';
-    document.getElementById('label-fw').textContent = '🛡 DPI Bypass';
-  }
-  // Corporate/firewall network type
-  if (net.type && net.type !== 'Open' && net.type !== 'ISP_Throttle') {
-    document.getElementById('sentinel-status').style.display = 'flex';
-    document.getElementById('label-sentinel').textContent = '🔍 ' + net.type;
-  }
-}
-updatePrivacy();
+    function navigate(url) {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({ type: 'navigate', url: url });
+      } else if (window.aeon && typeof window.aeon.navigate === 'function') {
+        window.aeon.navigate(url);
+      } else if (window.aeonBridge && typeof window.aeonBridge.navigate === 'function') {
+        window.aeonBridge.navigate(url);
+      } else {
+        window.location.href = url;
+      }
+    }
 
-// =========================================================
-// LEGACY MODE — applied by EraChrome.cpp before page load
-// document.body.classList.add('legacy-mode')
-// =========================================================
-console.log('[Aeon] New Tab loaded. Bridge: ' + (window.aeon ? 'connected' : 'standalone'));
-</script>
+    const searchInput = document.getElementById('search-input');
+    const searchBtn = document.getElementById('search-btn');
+
+    function performSearch() {
+      const q = searchInput ? searchInput.value.trim() : '';
+      if (!q) return;
+      if (q.startsWith('http://') || q.startsWith('https://') || (q.includes('.') && !q.includes(' '))) {
+        const url = q.startsWith('http') ? q : 'https://' + q;
+        navigate(url);
+      } else if (q.startsWith('aeon://')) {
+        navigate(q);
+      } else {
+        let engineUrl = 'https://duckduckgo.com/?q=';
+        if (window.aeon && window.aeon.settings && window.aeon.settings.search_engine) {
+          const engine = window.aeon.settings.search_engine.toLowerCase();
+          if (engine.includes('google')) engineUrl = 'https://www.google.com/search?q=';
+          else if (engine.includes('bing')) engineUrl = 'https://www.bing.com/search?q=';
+          else if (engine.includes('brave')) engineUrl = 'https://search.brave.com/search?q=';
+          else if (engine.includes('kagi')) engineUrl = 'https://kagi.com/search?q=';
+        }
+        navigate(engineUrl + encodeURIComponent(q));
+      }
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performSearch();
+      });
+    }
+    if (searchBtn) {
+      searchBtn.addEventListener('click', performSearch);
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== searchInput && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        searchInput?.focus();
+      } else if (e.key === 'Enter' && document.activeElement?.hasAttribute('tabindex')) {
+        document.activeElement.click();
+      }
+    });
+  </script>
 </body>
 </html>

@@ -4,11 +4,11 @@ AeonDNS — Sovereign DNS-over-HTTPS Resolver
 RFC 8484 compliant DoH resolver. Zero logging. Zero tracking.
 Gives anyone in the world clean, uncensored DNS resolution.
 
-Deployed on Cloud Run. Accessible at dns.aeonbrowser.com.
+Deployed on Cloud Run. Accessible at dns.browseaeon.com.
 Works with ANY browser or OS that supports DoH — not just Aeon.
 
 For a person in China: configure your browser's DoH to
-  https://dns.aeonbrowser.com/dns-query
+  https://dns.browseaeon.com/dns-query
 and DNS poisoning stops working. Google resolves. YouTube resolves.
 Wikipedia resolves. The first wall falls.
 

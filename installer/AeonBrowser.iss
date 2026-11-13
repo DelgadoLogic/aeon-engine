@@ -1,15 +1,8 @@
-; AeonBrowser — Inno Setup Installer Script
+﻿; AeonBrowser - Inno Setup Installer Script
 ; DelgadoLogic | Build Team
 ;
 ; Builds: AeonBrowser-Setup-{version}.exe
-; Requires: Inno Setup 6.2+ (https://jrsoftware.org/isinfo.php)
-;
-; Usage:
-;   iscc AeonBrowser.iss
-;   iscc /DVersion=1.2.3 AeonBrowser.iss
-;
-; Output: installer\Output\AeonBrowser-Setup-{version}.exe
-; Signed: via signtool.exe in post-build step (see build_installer.ps1)
+; Matches: installer_preview.jpg modern dark UI
 
 #define AppName "Aeon Browser"
 #define AppPublisher "DelgadoLogic"
@@ -40,133 +33,189 @@ SetupIconFile=..\resources\icons\Aeon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 InternalCompressLevel=ultra64
-WizardStyle=modern
-WizardResizable=no
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+MinVersion=6.1
+DisableWelcomePage=yes
+DisableDirPage=yes
+DisableProgramGroupPage=yes
+DisableReadyPage=yes
+DisableFinishedPage=yes
 
-; Minimum OS: Windows XP SP3 (5.1.2600)
-; Full-featured: Vista+ (6.0+), Win10+ (10.0)
-MinVersion=5.1.2600
-
-; Code-signing (applied externally via build_installer.ps1 → signtool.exe)
-; SignTool=STDef sign /a /n "DelgadoLogic" /tr http://timestamp.digicert.com /td sha256 /fd sha256 $f
-
-; Uninstaller settings
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
 CreateUninstallRegKey=yes
 UpdateUninstallLogAppName=yes
 
-; Registry: write version so AutoUpdater can read it
 [Registry]
-Root: HKLM; Subkey: "SOFTWARE\DelgadoLogic\Aeon"; ValueType: string; ValueName: "Version"; ValueData: "{#Version}"; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "SOFTWARE\DelgadoLogic\Aeon"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletevalue
-Root: HKLM; Subkey: "SOFTWARE\DelgadoLogic\Aeon"; ValueType: dword; ValueName: "TelemetryEnabled"; ValueData: "1"; Flags: uninsdeletevalue createvalueifdoesntexist
-; Default browser registration (user-scope)
-Root: HKCU; Subkey: "SOFTWARE\Clients\StartMenuInternet\Aeon"; ValueType: string; ValueData: "Aeon Browser"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "SOFTWARE\Clients\StartMenuInternet\Aeon\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" ""%1"""; Flags: uninsdeletekey
-
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
-Name: "french";  MessagesFile: "compiler:Languages\French.isl"
-
-[Tasks]
-Name: "desktopicon";    Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "quicklaunchicon";Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1
-Name: "defaultbrowser"; Description: "Make Aeon my default browser"; GroupDescription: "Browser settings:"; Flags: unchecked
+Root: HKA; Subkey: "SOFTWARE\DelgadoLogic\Aeon"; ValueType: string; ValueName: "Version"; ValueData: "{#Version}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "SOFTWARE\DelgadoLogic\Aeon"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "SOFTWARE\DelgadoLogic\Aeon"; ValueType: dword; ValueName: "TelemetryEnabled"; ValueData: "0"; Flags: uninsdeletevalue createvalueifdoesntexist
+Root: HKA; Subkey: "SOFTWARE\Clients\StartMenuInternet\Aeon"; ValueType: string; ValueData: "Aeon Browser"; Flags: uninsdeletekey
+Root: HKA; Subkey: "SOFTWARE\Clients\StartMenuInternet\Aeon\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" ""%1"""; Flags: uninsdeletekey
 
 [Files]
-; Main executable
-Source: "..\build\Release\Aeon.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Installer background artwork
+Source: "..\resources\images\installer_bg.bmp"; Flags: dontcopy
 
-; Rust protocol router DLL
-Source: "..\router\target\release\aeon_router.dll"; DestDir: "{app}"; Flags: ignoreversion
+; Release binaries and libraries from publish\Pro
+Source: "..\publish\Pro\Aeon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\Pro\aeon_blink.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\Pro\aeon_gecko_stealth.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\Pro\aeon_ai.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\Pro\aeon_router.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
-; Retro tier engine (HTML4 GDI renderer)
-Source: "..\retro\aeon_html4.dll"; DestDir: "{app}"; DestName: "aeon_html4.dll"; Flags: ignoreversion; Check: not IsWin64
-Source: "..\retro\aeon_html4_x64.dll"; DestDir: "{app}"; DestName: "aeon_html4.dll"; Flags: ignoreversion; Check: IsWin64
+; Pages, newtab, and resources
+Source: "..\publish\Pro\newtab\*"; DestDir: "{app}\newtab"; Flags: ignoreversion recursesubdirs
+Source: "..\publish\Pro\pages\*"; DestDir: "{app}\pages"; Flags: ignoreversion recursesubdirs
+Source: "..\publish\Pro\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
+Source: "..\publish\Pro\Network\*"; DestDir: "{app}\Network"; Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
 
-; Resources
-Source: "..\resources\newtab\*"; DestDir: "{app}\resources\newtab"; Flags: ignoreversion recursesubdirs
-Source: "..\resources\downloads\*"; DestDir: "{app}\resources\downloads"; Flags: ignoreversion recursesubdirs
-Source: "..\resources\history\*"; DestDir: "{app}\resources\history"; Flags: ignoreversion recursesubdirs
-Source: "..\resources\passwords\*"; DestDir: "{app}\resources\passwords"; Flags: ignoreversion recursesubdirs
-Source: "..\resources\settings\*"; DestDir: "{app}\resources\settings"; Flags: ignoreversion recursesubdirs
-
-; Filter lists (bundled EasyList + EasyPrivacy snapshots)
-Source: "..\resources\filters\easylist.txt"; DestDir: "{app}\resources\filters"; Flags: ignoreversion
-Source: "..\resources\filters\easyprivacy.txt"; DestDir: "{app}\resources\filters"; Flags: ignoreversion
-Source: "..\resources\filters\aeon_extra.txt"; DestDir: "{app}\resources\filters"; Flags: ignoreversion
+; Filter lists
+Source: "..\resources\filters\aeon_extra.txt"; DestDir: "{app}\resources\filters"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\resources\filters\*.txt"; DestDir: "{app}\resources\filters"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Icons
 Source: "..\resources\icons\Aeon.ico"; DestDir: "{app}\resources\icons"; Flags: ignoreversion
 
-; Crash handler
-Source: "..\build\Release\AeonCrash.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: FileExists('..\build\Release\AeonCrash.exe')
-
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\resources\icons\Aeon.ico"
-Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\resources\icons\Aeon.ico"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: quicklaunchicon
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\resources\icons\Aeon.ico"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\resources\icons\Aeon.ico"
 
 [Run]
-; Launch after install
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
-; Register as default browser if task selected
-Filename: "{app}\{#AppExeName}"; Parameters: "--set-default-browser"; Flags: nowait runhidden; Tasks: defaultbrowser
-
-[UninstallRun]
-Filename: "{app}\{#AppExeName}"; Parameters: "--unregister"; Flags: runhidden; RunOnceId: "Unregister"
-
 [UninstallDelete]
-; Clean up user data only if asked (GDPR-friendly)
-; We do NOT delete %APPDATA%\Aeon automatically — too destructive.
-; User can do it manually via Settings → Clear All Data.
+Type: filesandordirs; Name: "{app}\newtab"
+Type: filesandordirs; Name: "{app}\pages"
 Type: filesandordirs; Name: "{app}\resources"
-Type: filesandordirs; Name: "{app}\blocklists"
+Type: filesandordirs; Name: "{app}\Network"
 
 [Code]
-// ─── Mutex check: prevent running installer while browser is open ───────────
-function InitializeSetup(): Boolean;
 var
-  hMutex: THandle;
+  BgImage: TBitmapImage;
+  CloseBtn: TLabel;
+  PercentLabel: TLabel;
+  StatusLabel: TLabel;
+  SubtitleLabel: TLabel;
+  CustomProgressBar: TNewProgressBar;
+
+procedure CloseBtnClick(Sender: TObject);
 begin
-  hMutex := CreateMutex(False, '{#AppMutex}');
-  if (hMutex <> 0) and (GetLastError() = 183 {ERROR_ALREADY_EXISTS}) then begin
-    MsgBox(
-      'Aeon Browser is currently running.' + #13#10 +
-      'Please close it before running the installer.',
-      mbError, MB_OK);
-    Result := False;
-    exit;
-  end;
-  Result := True;
+  WizardForm.Close;
 end;
 
-// ─── Detect OS tier for UI messaging ──────────────────────────────────────
-function GetWindowsVersionLabel(): String;
+procedure CurStepChanged(CurStep: TSetupStep);
 var
-  V: TWindowsVersion;
+  ResultCode: Integer;
 begin
-  GetWindowsVersionEx(V);
-  if V.Major >= 10 then Result := 'Windows 10/11 — Full Pro Tier'
-  else if V.Major = 6 then begin
-    if V.Minor >= 2 then Result := 'Windows 8/8.1 — Extended Tier'
-    else if V.Minor = 1 then Result := 'Windows 7 — Extended Tier'
-    else Result := 'Windows Vista — Extended Tier';
-  end else if V.Major = 5 then begin
-    if V.Minor >= 1 then Result := 'Windows XP — XPHi Tier'
-    else Result := 'Windows 2000 — Retro Tier';
-  end else Result := 'Legacy Windows — Retro Tier';
+  if CurStep = ssPostInstall then
+  begin
+    Exec(ExpandConstant('{app}\{#AppExeName}'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+  end;
+end;
+
+procedure CurInstallProgressChanged(CurProgress, MaxProgress: Integer);
+var
+  pct: Integer;
+begin
+  if MaxProgress > 0 then
+  begin
+    pct := (CurProgress * 100) div MaxProgress;
+    if pct > 100 then pct := 100;
+    if Assigned(PercentLabel) then
+      PercentLabel.Caption := IntToStr(pct) + '%';
+    if Assigned(CustomProgressBar) then
+      CustomProgressBar.Position := pct;
+  end;
 end;
 
 procedure InitializeWizard();
+var
+  bgPath: String;
 begin
-  WizardForm.WelcomeLabel2.Caption :=
-    'Detected OS: ' + GetWindowsVersionLabel() + #13#10 + #13#10 +
-    WizardForm.WelcomeLabel2.Caption;
+  WizardForm.BorderStyle := bsNone;
+  WizardForm.ClientWidth := 640;
+  WizardForm.ClientHeight := 360;
+  WizardForm.Position := poScreenCenter;
+  WizardForm.Color := $120710;
+
+  WizardForm.OuterNotebook.Visible := False;
+  WizardForm.Bevel.Visible := False;
+  WizardForm.BackButton.Visible := False;
+  WizardForm.NextButton.Visible := False;
+  WizardForm.CancelButton.Visible := False;
+
+  ExtractTemporaryFile('installer_bg.bmp');
+  bgPath := ExpandConstant('{tmp}\installer_bg.bmp');
+
+  BgImage := TBitmapImage.Create(WizardForm);
+  BgImage.Parent := WizardForm;
+  BgImage.Left := 0;
+  BgImage.Top := 0;
+  BgImage.Width := 640;
+  BgImage.Height := 360;
+  BgImage.Stretch := True;
+  BgImage.Bitmap.LoadFromFile(bgPath);
+
+  CloseBtn := TLabel.Create(WizardForm);
+  CloseBtn.Parent := WizardForm;
+  CloseBtn.Left := 612;
+  CloseBtn.Top := 10;
+  CloseBtn.Caption := 'X';
+  CloseBtn.Font.Name := 'Segoe UI';
+  CloseBtn.Font.Size := 11;
+  CloseBtn.Font.Color := $A384C0;
+  CloseBtn.Cursor := crHand;
+  CloseBtn.OnClick := @CloseBtnClick;
+
+  CustomProgressBar := TNewProgressBar.Create(WizardForm);
+  CustomProgressBar.Parent := WizardForm;
+  CustomProgressBar.Left := 120;
+  CustomProgressBar.Top := 240;
+  CustomProgressBar.Width := 400;
+  CustomProgressBar.Height := 4;
+  CustomProgressBar.Min := 0;
+  CustomProgressBar.Max := 100;
+  CustomProgressBar.Position := 10;
+
+  PercentLabel := TLabel.Create(WizardForm);
+  PercentLabel.Parent := WizardForm;
+  PercentLabel.Left := 305;
+  PercentLabel.Top := 222;
+  PercentLabel.Caption := '0%';
+  PercentLabel.Font.Name := 'Segoe UI';
+  PercentLabel.Font.Size := 9;
+  PercentLabel.Font.Color := $9470B8;
+  PercentLabel.Transparent := True;
+
+  StatusLabel := TLabel.Create(WizardForm);
+  StatusLabel.Parent := WizardForm;
+  StatusLabel.Left := 0;
+  StatusLabel.Top := 258;
+  StatusLabel.Width := 640;
+  StatusLabel.Alignment := taCenter;
+  StatusLabel.Caption := 'Installing Aeon Browser...';
+  StatusLabel.Font.Name := 'Segoe UI';
+  StatusLabel.Font.Size := 14;
+  StatusLabel.Font.Style := [fsBold];
+  StatusLabel.Font.Color := $FFFFFF;
+  StatusLabel.Transparent := True;
+
+  SubtitleLabel := TLabel.Create(WizardForm);
+  SubtitleLabel.Parent := WizardForm;
+  SubtitleLabel.Left := 0;
+  SubtitleLabel.Top := 290;
+  SubtitleLabel.Width := 640;
+  SubtitleLabel.Alignment := taCenter;
+  SubtitleLabel.Caption := 'Hardening your digital perimeter.';
+  SubtitleLabel.Font.Name := 'Segoe UI';
+  SubtitleLabel.Font.Size := 10;
+  SubtitleLabel.Font.Color := $A88ABA;
+  SubtitleLabel.Transparent := True;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
 end;

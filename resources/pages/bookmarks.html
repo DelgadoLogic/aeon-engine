@@ -1,403 +1,840 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aeon Bookmarks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
   :root {
-    --bg: #0d0e14; --surface: #16182a; --card: #1e2140;
-    --border: #2e3064; --accent: #6c63ff; --accent2: #a78bfa;
-    --text: #e8e8f0; --text-dim: #8888aa; --green: #22c55e;
-    --red: #ef4444; --radius: 10px;
+    --bg-obsidian: #0b0616;
+    --bg-surface: #0e071c;
+    --bg-card: rgba(18, 20, 36, 0.65);
+    --bg-card-hover: rgba(28, 21, 56, 0.95);
+    --border-card: rgba(168, 85, 247, 0.18);
+    --border-card-hover: rgba(192, 132, 252, 0.55);
+    --border-glow: rgba(168, 85, 247, 0.35);
+    --accent-purple: #9333ea;
+    --accent-light: #c084fc;
+    --accent-glow: rgba(147, 51, 234, 0.45);
+    --neon-cyan: #38bdf8;
+    --neon-cyan-glow: rgba(56, 189, 248, 0.35);
+    --neon-pink: #ec4899;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f97316;
+    --text-white: #f8fafc;
+    --text-soft: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --radius-lg: 18px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 40px 48px 80px; }
 
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
-  h1 { font-size: 22px; font-weight: 600; }
-
-  .top-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; }
-  .search-box {
-    flex: 1; max-width: 480px;
-    display: flex; align-items: center; gap: 10px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 0 14px;
+  body {
+    background-color: #0b0616;
+    overflow-x: hidden;
+    color: var(--text-white);
+    font-family: var(--font-main);
+    min-height: 100vh;
+    padding: 36px 48px 80px;
+    background-image: 
+      radial-gradient(ellipse 70% 55% at 50% 15%, rgba(112, 38, 206, 0.2) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 50% at 85% 80%, rgba(147, 51, 234, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 15% 90%, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+    background-attachment: fixed;
   }
-  .search-box input {
-    flex: 1; background: none; border: none; outline: none;
-    color: var(--text); font-family: inherit; font-size: 14px; padding: 11px 0;
-  }
-  .icon { color: var(--text-dim); font-size: 14px; }
 
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(192, 132, 252, 0.6); }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .page-icon-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.45);
+    cursor: pointer;
+  }
+  .page-icon-badge svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-sub { font-size: 12px; color: var(--text-muted); }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
   .btn {
-    padding: 8px 16px; border-radius: 8px; font-family: inherit;
-    font-size: 12px; font-weight: 500; cursor: pointer;
-    border: 1px solid var(--border); transition: all .12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 9px;
+    font-family: var(--font-main);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    border: 1px solid transparent;
   }
-  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn-primary:hover { opacity: .88; }
-  .btn-ghost { background: var(--surface); color: var(--text-dim); }
-  .btn-ghost:hover { background: var(--card); color: var(--text); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    color: #fff;
+    border-color: rgba(192, 132, 252, 0.4);
+    box-shadow: 0 0 14px rgba(147, 51, 234, 0.35);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 20px rgba(192, 132, 252, 0.6);
+  }
+  .btn-ghost {
+    background: var(--bg-card);
+    border-color: var(--border-card);
+    color: var(--text-soft);
+  }
+  .btn-ghost:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-white);
+    border-color: var(--border-card-hover);
+  }
 
-  /* View toggle */
-  .view-toggle { display: flex; gap: 4px; }
-  .view-btn {
-    width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text-dim); cursor: pointer; font-size: 14px;
-    display: flex; align-items: center; justify-content: center; transition: all .12s;
+  .top-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
   }
-  .view-btn.active { background: var(--card); color: var(--accent2); border-color: var(--accent); }
 
-  /* Folder sidebar */
-  .layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
-
-  .folder-list {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 8px; height: fit-content;
-    position: sticky; top: 20px;
-  }
-  .folder-header {
-    font-size: 11px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--text-dim); padding: 4px 8px 10px;
-  }
-  .folder-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 10px; border-radius: 7px; cursor: pointer;
-    font-size: 13px; color: var(--text-dim); transition: all .12s;
+  .search-box {
+    flex: 1;
+    max-width: 480px;
     position: relative;
   }
-  .folder-item:hover { background: var(--card); color: var(--text); }
-  .folder-item.active { background: var(--card); color: var(--accent2); }
+  .search-box input {
+    width: 100%;
+    height: 42px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 9999px;
+    padding: 0 16px 0 42px;
+    color: var(--text-white);
+    font-family: var(--font-main);
+    font-size: 13.5px;
+    outline: none;
+    transition: all 0.2s var(--ease);
+    backdrop-filter: blur(12px);
+  }
+  .search-box input:focus {
+    border-color: var(--accent-light);
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.35);
+    background: rgba(28, 21, 56, 0.9);
+  }
+  .search-box svg {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 17px;
+    height: 17px;
+    color: var(--accent-light);
+    pointer-events: none;
+  }
+
+  .view-switcher {
+    display: flex;
+    gap: 4px;
+    background: rgba(14, 10, 28, 0.7);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border-card);
+    margin-left: auto;
+  }
+  .view-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+  }
+  .view-btn.active, .view-btn:hover {
+    background: rgba(147, 51, 234, 0.25);
+    color: var(--text-white);
+  }
+  .view-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+  /* Two-column layout */
+  .layout-grid {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* Folder sidebar */
+  .folder-sidebar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 14px 10px;
+    backdrop-filter: blur(16px);
+    position: sticky;
+    top: 20px;
+  }
+
+  .folder-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--neon-cyan);
+    padding: 6px 10px 10px;
+  }
+
+  .folder-node {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .folder-node:hover {
+    background: rgba(168, 85, 247, 0.12);
+    color: var(--text-white);
+    border-color: rgba(192, 132, 252, 0.25);
+  }
+  .folder-node.active {
+    background: rgba(147, 51, 234, 0.25);
+    color: var(--text-white);
+    border-color: rgba(192, 132, 252, 0.45);
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.25);
+  }
+  .folder-node svg { width: 16px; height: 16px; color: var(--accent-light); flex-shrink: 0; }
   .folder-count {
-    margin-left: auto; background: var(--card); border-radius: 20px;
-    padding: 1px 7px; font-size: 10px; color: var(--text-dim); border: 1px solid var(--border);
+    margin-left: auto;
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    background: rgba(14, 10, 28, 0.6);
+    padding: 1px 7px;
+    border-radius: 10px;
+    border: 1px solid rgba(168, 85, 247, 0.15);
   }
-  .folder-item.active .folder-count { border-color: var(--accent); color: var(--accent2); }
 
-  .new-folder-btn {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-    border-radius: 7px; font-size: 12px; color: var(--text-dim);
-    cursor: pointer; width: 100%; background: none; border: none; font-family: inherit;
-    transition: background .12s;
+  /* Grid View */
+  .bookmarks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
   }
-  .new-folder-btn:hover { background: var(--card); color: var(--accent2); }
 
-  /* Grid view */
-  .bm-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
-  }
   .bm-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px; cursor: pointer;
-    transition: all .15s; position: relative; group: true;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 16px;
+    backdrop-filter: blur(16px);
+    transition: all 0.25s var(--ease);
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
-  .bm-card:hover { background: var(--card); border-color: var(--accent); transform: translateY(-1px); }
-  .bm-card:hover .bm-card-actions { opacity: 1; }
-  .bm-favicon { font-size: 24px; margin-bottom: 10px; }
-  .bm-card-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
-  .bm-card-url { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bm-card-actions {
-    position: absolute; top: 8px; right: 8px;
-    display: flex; gap: 4px; opacity: 0; transition: opacity .12s;
+  .bm-card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-card-hover);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(11, 6, 22, 0.8), 0 0 18px rgba(168, 85, 247, 0.25);
   }
-  .bm-act {
-    width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border);
-    background: var(--card); color: var(--text-dim); font-size: 10px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; transition: color .12s;
-  }
-  .bm-act:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
+  .bm-card:hover .card-actions { opacity: 1; }
 
-  /* List view */
-  .bm-list-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; margin-bottom: 0;
+  .bm-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(147, 51, 234, 0.18);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    color: var(--accent-light);
+  }
+  .bm-title { font-size: 13.5px; font-weight: 600; color: #fff; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bm-url { font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s var(--ease);
+  }
+
+  /* List View */
+  .bookmarks-list {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    backdrop-filter: blur(16px);
   }
   .bm-row {
-    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+    transition: background 0.15s var(--ease);
+    cursor: pointer;
   }
   .bm-row:last-child { border-bottom: none; }
-  .bm-row:hover { background: var(--card); }
-  .bm-row:hover .bm-row-actions { opacity: 1; }
-  .bm-row-icon { font-size: 18px; flex-shrink: 0; }
-  .bm-row-info { flex: 1; min-width: 0; }
-  .bm-row-title { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
-  .bm-row-url { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bm-row-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .12s; }
-  .bm-row-act {
-    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--card); color: var(--text-dim); font-size: 10px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; transition: color .12s;
-  }
-  .bm-row-act:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
+  .bm-row:hover { background: rgba(168, 85, 247, 0.06); }
+  .bm-row:hover .card-actions { opacity: 1; }
 
-  /* Add modal */
-  .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,9,.7); backdrop-filter: blur(6px);
-    display: none; align-items: center; justify-content: center; z-index: 99;
+  /* Action button */
+  .act-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(18, 20, 36, 0.85);
+    border: 1px solid var(--border-card);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
   }
-  .modal-overlay.open { display: flex; }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; padding: 28px; width: 420px; max-width: 90vw;
+  .act-btn:hover { color: #fff; border-color: var(--accent-light); background: rgba(147, 51, 234, 0.3); }
+  .act-btn.del:hover { color: var(--red); border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); }
+  .act-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 4, 16, 0.85);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
   }
-  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .modal-backdrop.open { display: flex; }
+  .modal-dialog {
+    background: rgba(18, 20, 36, 0.95);
+    border: 1px solid var(--border-card-hover);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    max-width: 440px;
+    width: 90vw;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.8), 0 0 30px rgba(147, 51, 234, 0.35);
+  }
+  .modal-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 16px; }
   .form-group { margin-bottom: 14px; }
-  .form-group label { font-size: 12px; font-weight: 500; color: var(--text-dim); display: block; margin-bottom: 6px; }
-  .form-input {
-    width: 100%; background: var(--card); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); font-family: inherit;
-    font-size: 13px; padding: 9px 12px; outline: none; transition: border-color .12s;
+  .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+  .form-group input, .form-group select {
+    width: 100%;
+    height: 38px;
+    background: rgba(14, 10, 28, 0.85);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    color: var(--text-white);
+    font-family: var(--font-main);
+    font-size: 13px;
+    padding: 0 12px;
+    outline: none;
   }
-  .form-input:focus { border-color: var(--accent); }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
-
-  .empty-state { text-align: center; padding: 80px 20px; color: var(--text-dim); }
-  .empty-state .big { font-size: 56px; margin-bottom: 20px; }
-  .empty-state p { font-size: 14px; }
+  .form-group input:focus, .form-group select:focus {
+    border-color: var(--accent-light);
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.35);
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  @media (max-width: 900px) {
+    .layout-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .folder-sidebar { position: static; width: 100%; }
+    .bookmarks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    body { padding: 16px 12px; }
+    .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .header-actions { flex-wrap: wrap; width: 100%; }
+    .top-bar { flex-wrap: wrap; align-items: stretch; gap: 10px; }
+    .search-box { min-width: 0; width: 100%; max-width: 100%; flex: 1 1 100%; }
+    .bookmarks-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
-
-<div class="header">
-  <h1>★ Bookmarks</h1>
-</div>
-
-<div class="top-bar">
-  <div class="search-box">
-    <span class="icon">🔍</span>
-    <input type="text" id="bm_search" placeholder="Search bookmarks…" oninput="search(this.value)">
-  </div>
-  <div class="view-toggle">
-    <button class="view-btn active" id="grid_btn" onclick="setView('grid')" title="Grid view">⊞</button>
-    <button class="view-btn" id="list_btn" onclick="setView('list')" title="List view">☰</button>
-  </div>
-  <button class="btn btn-primary" onclick="openAddModal()">+ Add Bookmark</button>
-</div>
-
-<div class="layout">
-  <!-- Folder Sidebar -->
-  <div class="folder-list">
-    <div class="folder-header">Folders</div>
-    <div class="folder-item active" onclick="selectFolder('all', this)">
-      <span>📚</span> All Bookmarks <span class="folder-count" id="fc_all">0</span>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="page-icon-badge" onclick="location.href='aeon://newtab'">
+        <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div>
+        <h1>Bookmark Manager</h1>
+        <div class="header-sub">Hierarchical tree navigation & Netscape HTML/JSON sync</div>
+      </div>
     </div>
-    <div id="folder_nav">
-      <!-- Dynamic folders -->
-    </div>
-    <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 4px;">
-    <button class="new-folder-btn" onclick="newFolder()">+ New Folder</button>
-  </div>
-
-  <!-- Bookmark Content -->
-  <div id="bm_content"></div>
-</div>
-
-<!-- Add/Edit Modal -->
-<div class="modal-overlay" id="modal">
-  <div class="modal">
-    <h2 id="modal_title">Add Bookmark</h2>
-    <div class="form-group">
-      <label>Title</label>
-      <input class="form-input" id="f_title" placeholder="Bookmark title">
-    </div>
-    <div class="form-group">
-      <label>URL</label>
-      <input class="form-input" id="f_url" placeholder="https://example.com">
-    </div>
-    <div class="form-group">
-      <label>Folder</label>
-      <select class="form-input" id="f_folder">
-        <option value="">Bookmarks Bar</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveBookmark()">Save</button>
+    <div class="header-actions">
+      <button class="btn btn-ghost" onclick="triggerImport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Import
+      </button>
+      <button class="btn btn-ghost" onclick="triggerExport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Export
+      </button>
+      <button class="btn btn-ghost" onclick="openFolderModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        New Folder
+      </button>
+      <button class="btn btn-primary" onclick="openBookmarkModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Bookmark
+      </button>
     </div>
   </div>
-</div>
 
-<script>
-// Demo bookmark data — in production: aeonBridge.getBookmarks()
-let bookmarks = [
-  { id: 1, title: 'DelgadoLogic', url: 'https://delgadologic.tech', icon: '🌐', folder: 'Bookmarks Bar' },
-  { id: 2, title: 'Aeon Browser Repo', url: 'https://github.com/DelgadoLogic/AeonBrowser', icon: '🐙', folder: 'Bookmarks Bar' },
-  { id: 3, title: 'DuckDuckGo', url: 'https://duckduckgo.com', icon: '🔍', folder: 'Bookmarks Bar' },
-  { id: 4, title: 'Cloudflare Radar', url: 'https://radar.cloudflare.com', icon: '📡', folder: 'Research' },
-  { id: 5, title: 'EasyList', url: 'https://easylist.to', icon: '🛡', folder: 'Research' },
-  { id: 6, title: 'WolfSSL Docs', url: 'https://wolfssl.com/docs', icon: '🔒', folder: 'Research' },
-  { id: 7, title: 'Inno Setup Docs', url: 'https://jrsoftware.org/ishelp/', icon: '📦', folder: 'Dev Tools' },
-  { id: 8, title: 'CMake Reference', url: 'https://cmake.org/cmake/help/latest/', icon: '⚙', folder: 'Dev Tools' },
-  { id: 9, title: 'MSDN Win32 API', url: 'https://docs.microsoft.com/en-us/windows/win32/', icon: '🪟', folder: 'Dev Tools' },
-  { id: 10, title: 'Rust Book', url: 'https://doc.rust-lang.org/book/', icon: '🦀', folder: 'Dev Tools' },
-];
-
-let currentFolder = 'all';
-let currentView = 'grid';
-let searchQ = '';
-let editingId = null;
-
-function folders() {
-  const f = [...new Set(bookmarks.map(b => b.folder))];
-  return f;
-}
-
-function visibleBookmarks() {
-  let bms = bookmarks;
-  if (currentFolder !== 'all') bms = bms.filter(b => b.folder === currentFolder);
-  if (searchQ) bms = bms.filter(b =>
-    b.title.toLowerCase().includes(searchQ) || b.url.toLowerCase().includes(searchQ));
-  return bms;
-}
-
-function renderFolderNav() {
-  const nav = document.getElementById('folder_nav');
-  nav.innerHTML = folders().map(f => `
-    <div class="folder-item${currentFolder === f ? ' active' : ''}" onclick="selectFolder('${f}', this)">
-      <span>📁</span> ${f}
-      <span class="folder-count">${bookmarks.filter(b => b.folder === f).length}</span>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="bm-search" name="bm_search" aria-label="Search bookmarks" placeholder="Search bookmarks..." oninput="onSearch()">
     </div>
-  `).join('');
-  document.getElementById('fc_all').textContent = bookmarks.length;
-}
 
-function renderContent() {
-  const bms = visibleBookmarks();
-  const cont = document.getElementById('bm_content');
+    <div class="view-switcher">
+      <button class="view-btn active" id="btn-grid" title="Grid View" onclick="setView('grid')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </button>
+      <button class="view-btn" id="btn-list" title="List View" onclick="setView('list')">
+        <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
 
-  if (!bms.length) {
-    cont.innerHTML = `<div class="empty-state"><div class="big">★</div><p>No bookmarks yet.<br>Click <b>+ Add Bookmark</b> to save your first site.</p></div>`;
-    return;
-  }
+  <!-- Layout -->
+  <div class="layout-grid">
+    <!-- Folder Sidebar -->
+    <aside class="folder-sidebar">
+      <div class="folder-title">Folders</div>
+      <div id="folder-tree">
+        <!-- Rendered dynamically -->
+      </div>
+    </aside>
 
-  if (currentView === 'grid') {
-    cont.innerHTML = `<div class="bm-grid">${bms.map(b => `
-      <div class="bm-card" onclick="navigate('${b.url}')">
-        <div class="bm-card-actions">
-          <button class="bm-act" title="Edit" onclick="event.stopPropagation();editBookmark(${b.id})">✎</button>
-          <button class="bm-act" title="Delete" onclick="event.stopPropagation();deleteBookmark(${b.id})">✕</button>
+    <!-- Main Bookmark Content -->
+    <main id="bookmark-content">
+      <!-- Rendered dynamically as Grid or List -->
+    </main>
+  </div>
+
+  <!-- Hidden File Input for Import -->
+  <input type="file" id="import-file" aria-label="Import bookmarks file" style="display:none" accept=".html,.json" onchange="handleFileImport(event)">
+
+  <!-- Add/Edit Bookmark Modal -->
+  <div class="modal-backdrop" id="bm-modal">
+    <div class="modal-dialog">
+      <div class="modal-title" id="bm-modal-title">Add Bookmark</div>
+      <div class="form-group">
+        <label for="bm-input-title">Title</label>
+        <input type="text" id="bm-input-title" aria-label="Bookmark Title" placeholder="Website title">
+      </div>
+      <div class="form-group">
+        <label for="bm-input-url">URL</label>
+        <input type="text" id="bm-input-url" aria-label="Bookmark URL" placeholder="https://example.com">
+      </div>
+      <div class="form-group">
+        <label for="bm-input-folder">Folder</label>
+        <select id="bm-input-folder" aria-label="Bookmark Folder">
+          <option value="Bookmarks Bar">Bookmarks Bar</option>
+          <option value="Other Bookmarks">Other Bookmarks</option>
+          <option value="Mobile Bookmarks">Mobile Bookmarks</option>
+          <option value="Development">Development</option>
+          <option value="Research & Papers">Research & Papers</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeBookmarkModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveBookmarkModal()">Save Bookmark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Folder Modal -->
+  <div class="modal-backdrop" id="folder-modal">
+    <div class="modal-dialog">
+      <div class="modal-title">New Folder</div>
+      <div class="form-group">
+        <label for="folder-input-name">Folder Name</label>
+        <input type="text" id="folder-input-name" aria-label="Folder Name" placeholder="e.g., Cryptography & Security">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeFolderModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveNewFolder()">Create Folder</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let bookmarks = [];
+    let customFolders = ['Bookmarks Bar', 'Other Bookmarks', 'Mobile Bookmarks', 'Development', 'Research & Papers'];
+    let selectedFolder = 'All Bookmarks';
+    let viewMode = 'grid';
+    let searchQuery = '';
+    let editingId = null;
+
+    function loadBookmarks() {
+      bookmarks = [];
+      if (window.aeonBridge && typeof window.aeonBridge.getBookmarks === 'function') {
+        const res = window.aeonBridge.getBookmarks();
+        if (Array.isArray(res)) bookmarks = res;
+        else if (typeof res === 'string') {
+          try { bookmarks = JSON.parse(res); } catch(e) { bookmarks = []; }
+        }
+      } else {
+        try {
+          const cached = localStorage.getItem('aeon_bookmarks_cache');
+          bookmarks = cached ? JSON.parse(cached) : [];
+        } catch(e) {
+          bookmarks = [];
+        }
+      }
+      extractFolders();
+      renderFolderTree();
+      renderBookmarks();
+    }
+
+    function saveCache() {
+      try {
+        localStorage.setItem('aeon_bookmarks_cache', JSON.stringify(bookmarks));
+      } catch(e) {}
+    }
+
+    function extractFolders() {
+      bookmarks.forEach(b => {
+        if (b.folder && !customFolders.includes(b.folder)) {
+          customFolders.push(b.folder);
+        }
+      });
+      updateFolderSelectOptions();
+    }
+
+    function updateFolderSelectOptions() {
+      const sel = document.getElementById('bm-input-folder');
+      if (!sel) return;
+      sel.innerHTML = customFolders.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+    }
+
+    function renderFolderTree() {
+      const tree = document.getElementById('folder-tree');
+      if (!tree) return;
+
+      const totalCount = bookmarks.length;
+      let html = `
+        <div class="folder-node ${selectedFolder === 'All Bookmarks' ? 'active' : ''}" onclick="selectFolder('All Bookmarks')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span>All Bookmarks</span>
+          <span class="folder-count">${totalCount}</span>
         </div>
-        <div class="bm-favicon">${b.icon}</div>
-        <div class="bm-card-title">${b.title}</div>
-        <div class="bm-card-url">${b.url.replace(/^https?:\/\//,'')}</div>
-      </div>`).join('')}</div>`;
-  } else {
-    cont.innerHTML = `<div class="bm-list-card">${bms.map(b => `
-      <div class="bm-row" onclick="navigate('${b.url}')">
-        <div class="bm-row-icon">${b.icon}</div>
-        <div class="bm-row-info">
-          <div class="bm-row-title">${b.title}</div>
-          <div class="bm-row-url">${b.url}</div>
-        </div>
-        <div class="bm-row-actions">
-          <button class="bm-row-act" title="Edit" onclick="event.stopPropagation();editBookmark(${b.id})">✎</button>
-          <button class="bm-row-act" title="Delete" onclick="event.stopPropagation();deleteBookmark(${b.id})">✕</button>
-        </div>
-      </div>`).join('')}</div>`;
-  }
-}
+      `;
 
-function render() { renderFolderNav(); renderContent(); }
+      customFolders.forEach(folder => {
+        const count = bookmarks.filter(b => b.folder === folder).length;
+        html += `
+          <div class="folder-node ${selectedFolder === folder ? 'active' : ''}" data-folder="${escapeHtml(folder)}" onclick="selectFolder(this.dataset.folder)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(folder)}</span>
+            <span class="folder-count">${count}</span>
+          </div>
+        `;
+      });
 
-function selectFolder(f, el) {
-  currentFolder = f;
-  document.querySelectorAll('.folder-item').forEach(x => x.classList.remove('active'));
-  el.classList.add('active');
-  render();
-}
+      tree.innerHTML = html;
+    }
 
-function setView(v) {
-  currentView = v;
-  document.getElementById('grid_btn').classList.toggle('active', v === 'grid');
-  document.getElementById('list_btn').classList.toggle('active', v === 'list');
-  renderContent();
-}
+    function selectFolder(f) {
+      selectedFolder = f;
+      renderFolderTree();
+      renderBookmarks();
+    }
 
-function search(q) { searchQ = q.toLowerCase(); renderContent(); }
+    function setView(v) {
+      viewMode = v;
+      document.getElementById('btn-grid')?.classList.toggle('active', v === 'grid');
+      document.getElementById('btn-list')?.classList.toggle('active', v === 'list');
+      renderBookmarks();
+    }
 
-function navigate(url) {
-  try { window.aeonBridge?.navigate(url); } catch(_) { window.open(url, '_blank'); }
-}
+    function onSearch() {
+      searchQuery = (document.getElementById('bm-search')?.value || '').toLowerCase().trim();
+      renderBookmarks();
+    }
 
-function openAddModal(title='', url='', folder='') {
-  editingId = null;
-  document.getElementById('modal_title').textContent = 'Add Bookmark';
-  document.getElementById('f_title').value = title;
-  document.getElementById('f_url').value = url;
-  document.getElementById('f_folder').innerHTML =
-    ['Bookmarks Bar', ...folders()].map(f => `<option${f === folder ? ' selected' : ''}>${f}</option>`).join('');
-  document.getElementById('modal').classList.add('open');
-}
+    function openBookmark(id) {
+      const b = bookmarks.find(x => x.id === id);
+      if (b && b.url) window.location.href = b.url;
+    }
 
-function editBookmark(id) {
-  const b = bookmarks.find(x => x.id === id);
-  if (!b) return;
-  editingId = id;
-  document.getElementById('modal_title').textContent = 'Edit Bookmark';
-  document.getElementById('f_title').value = b.title;
-  document.getElementById('f_url').value = b.url;
-  document.getElementById('f_folder').innerHTML =
-    [...new Set(['Bookmarks Bar', ...folders()])].map(f => `<option${f === b.folder ? ' selected' : ''}>${f}</option>`).join('');
-  document.getElementById('modal').classList.add('open');
-}
+    function renderBookmarks() {
+      const content = document.getElementById('bookmark-content');
+      if (!content) return;
 
-function closeModal() { document.getElementById('modal').classList.remove('open'); }
+      const filtered = bookmarks.filter(b => {
+        if (selectedFolder !== 'All Bookmarks' && b.folder !== selectedFolder) return false;
+        if (searchQuery) {
+          const t = (b.title || '').toLowerCase();
+          const u = (b.url || '').toLowerCase();
+          return t.includes(searchQuery) || u.includes(searchQuery);
+        }
+        return true;
+      });
 
-function saveBookmark() {
-  const title  = document.getElementById('f_title').value.trim();
-  const url    = document.getElementById('f_url').value.trim();
-  const folder = document.getElementById('f_folder').value;
-  if (!title || !url) return;
+      if (filtered.length === 0) {
+        content.innerHTML = `
+          <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px; opacity:0.5;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            <div style="font-size:15px; font-weight:600; color:#fff; margin-bottom:4px;">No Bookmarks Found</div>
+            <div style="font-size:12px;">No items match your folder or search query.</div>
+          </div>
+        `;
+        return;
+      }
 
-  if (editingId) {
-    const b = bookmarks.find(x => x.id === editingId);
-    if (b) { b.title = title; b.url = url; b.folder = folder; }
-    try { window.aeonBridge?.updateBookmark(editingId, title, url, folder); } catch(_) {}
-  } else {
-    const newBm = { id: Date.now(), title, url, icon: '🌐', folder };
-    bookmarks.unshift(newBm);
-    try { window.aeonBridge?.addBookmark(title, url, folder); } catch(_) {}
-  }
-  closeModal();
-  render();
-}
+      if (viewMode === 'grid') {
+        let html = '<div class="bookmarks-grid">';
+        filtered.forEach(b => {
+          html += `
+            <div class="bm-card" onclick="openBookmark(${b.id})">
+              <div class="card-actions" onclick="event.stopPropagation()">
+                <button class="act-btn" title="Edit" onclick="editBookmark(${b.id})">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="act-btn del" title="Delete" onclick="deleteBookmark(${b.id})">
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+              <div class="bm-icon-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
+              <div class="bm-title" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</div>
+              <div class="bm-url" title="${escapeHtml(b.url)}">${escapeHtml(b.url)}</div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        content.innerHTML = html;
+      } else {
+        let html = '<div class="bookmarks-list">';
+        filtered.forEach(b => {
+          html += `
+            <div class="bm-row" onclick="openBookmark(${b.id})">
+              <div class="bm-icon-box" style="width:28px; height:28px; border-radius:6px; margin:0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div class="bm-title">${escapeHtml(b.title)}</div>
+                <div class="bm-url">${escapeHtml(b.url)}</div>
+              </div>
+              <div class="folder-count" style="margin-right:12px;">${escapeHtml(b.folder || 'Bookmarks Bar')}</div>
+              <div class="card-actions" style="position:static; opacity:1;" onclick="event.stopPropagation()">
+                <button class="act-btn" title="Edit" onclick="editBookmark(${b.id})">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="act-btn del" title="Delete" onclick="deleteBookmark(${b.id})">
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        content.innerHTML = html;
+      }
+    }
 
-function deleteBookmark(id) {
-  bookmarks = bookmarks.filter(b => b.id !== id);
-  try { window.aeonBridge?.deleteBookmark(id); } catch(_) {}
-  render();
-}
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 
-function newFolder() {
-  const name = prompt('Folder name:');
-  if (name && name.trim()) {
-    try { window.aeonBridge?.createFolder(name.trim()); } catch(_) {}
-    renderFolderNav();
-  }
-}
+    function openBookmarkModal() {
+      editingId = null;
+      document.getElementById('bm-modal-title').textContent = 'Add Bookmark';
+      document.getElementById('bm-input-title').value = '';
+      document.getElementById('bm-input-url').value = '';
+      document.getElementById('bm-input-folder').value = selectedFolder !== 'All Bookmarks' ? selectedFolder : 'Bookmarks Bar';
+      document.getElementById('bm-modal').classList.add('open');
+    }
 
-// Load real data from native bridge
-try {
-  let data = window.aeonBridge?.getBookmarks?.();
-  // Bridge may return JSON string — parse it
-  if (typeof data === 'string') {
-    try { data = JSON.parse(data); } catch(_) {}
-  }
-  if (data && Array.isArray(data) && data.length) {
-    bookmarks = data.map((b, i) => ({
-      id: (b.id !== undefined) ? b.id : i,
-      title: b.title || b.url || '',
-      url: b.url || '',
-      icon: b.icon || '🌐',
-      folder: b.folder || 'Bookmarks Bar'
-    }));
-  }
-} catch(_) {}
+    function editBookmark(id) {
+      const b = bookmarks.find(x => x.id === id);
+      if (!b) return;
+      editingId = id;
+      document.getElementById('bm-modal-title').textContent = 'Edit Bookmark';
+      document.getElementById('bm-input-title').value = b.title || '';
+      document.getElementById('bm-input-url').value = b.url || '';
+      document.getElementById('bm-input-folder').value = b.folder || 'Bookmarks Bar';
+      document.getElementById('bm-modal').classList.add('open');
+    }
 
-render();
-</script>
+    function closeBookmarkModal() {
+      document.getElementById('bm-modal').classList.remove('open');
+      editingId = null;
+    }
+
+    function saveBookmarkModal() {
+      const title = document.getElementById('bm-input-title')?.value.trim() || 'Untitled Bookmark';
+      let url = document.getElementById('bm-input-url')?.value.trim() || 'https://';
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('aeon://')) {
+        url = 'https://' + url;
+      }
+      const folder = document.getElementById('bm-input-folder')?.value || 'Bookmarks Bar';
+
+      if (editingId) {
+        const idx = bookmarks.findIndex(x => x.id === editingId);
+        if (idx !== -1) {
+          bookmarks[idx].title = title;
+          bookmarks[idx].url = url;
+          bookmarks[idx].folder = folder;
+        }
+        if (window.aeonBridge && typeof window.aeonBridge.updateBookmark === 'function') {
+          window.aeonBridge.updateBookmark(editingId, url, title, folder);
+        }
+      } else {
+        const newId = Date.now();
+        bookmarks.unshift({ id: newId, title, url, folder, added_time: Date.now() });
+        if (window.aeonBridge && typeof window.aeonBridge.addBookmark === 'function') {
+          window.aeonBridge.addBookmark(url, title, folder);
+        }
+      }
+
+      saveCache();
+      renderFolderTree();
+      renderBookmarks();
+      closeBookmarkModal();
+    }
+
+    function deleteBookmark(id) {
+      bookmarks = bookmarks.filter(x => x.id !== id);
+      if (window.aeonBridge && typeof window.aeonBridge.deleteBookmark === 'function') {
+        window.aeonBridge.deleteBookmark(id);
+      }
+      saveCache();
+      renderFolderTree();
+      renderBookmarks();
+    }
+
+    function openFolderModal() {
+      document.getElementById('folder-input-name').value = '';
+      document.getElementById('folder-modal').classList.add('open');
+    }
+    function closeFolderModal() {
+      document.getElementById('folder-modal').classList.remove('open');
+    }
+    function saveNewFolder() {
+      const name = document.getElementById('folder-input-name')?.value.trim();
+      if (name && !customFolders.includes(name)) {
+        customFolders.push(name);
+        updateFolderSelectOptions();
+        renderFolderTree();
+      }
+      closeFolderModal();
+    }
+
+    function triggerExport() {
+      if (window.aeonBridge && typeof window.aeonBridge.exportBookmarks === 'function') {
+        window.aeonBridge.exportBookmarks('html');
+      } else {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bookmarks, null, 2));
+        const a = document.createElement('a');
+        a.setAttribute('href', dataStr);
+        a.setAttribute('download', 'aeon_bookmarks.json');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    }
+
+    function triggerImport() {
+      document.getElementById('import-file').click();
+    }
+
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const content = evt.target.result;
+        try {
+          const imported = JSON.parse(content);
+          if (Array.isArray(imported)) {
+            bookmarks = imported.concat(bookmarks);
+            saveCache();
+            extractFolders();
+            renderFolderTree();
+            renderBookmarks();
+          }
+        } catch(err) {
+          // HTML format import fallback
+          if (window.aeonBridge && typeof window.aeonBridge.importBookmarks === 'function') {
+            window.aeonBridge.importBookmarks('html', content);
+          }
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    window.addEventListener('DOMContentLoaded', loadBookmarks);
+    loadBookmarks();
+  </script>
 </body>
 </html>

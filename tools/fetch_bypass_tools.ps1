@@ -160,17 +160,17 @@ Get-VerifiedFile `
     "$lanternBase/lantern-installer.exe" `
     "$netDir\lantern.exe"
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Summary
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 Write-Host ""
 Write-Host "=== Network Tools Summary ==="
 $tools = @(
     @{ Name="goodbyedpi.exe";      Desc="DPI bypass (GFW, Russia, ISP)"   },
     @{ Name="winws.exe";           Desc="Zapret (Russia TSPU)"              },
-    @{ Name="obfs4proxy.exe";      Desc="Tor PT — obfs4"                   },
-    @{ Name="meek-client.exe";     Desc="Tor PT — meek (CDN)"              },
-    @{ Name="snowflake-client.exe";Desc="Tor PT — WebRTC"                  },
+    @{ Name="obfs4proxy.exe";      Desc="Tor PT - obfs4"                   },
+    @{ Name="meek-client.exe";     Desc="Tor PT - meek (CDN)"              },
+    @{ Name="snowflake-client.exe";Desc="Tor PT - WebRTC"                  },
     @{ Name="ss-local.exe";        Desc="Shadowsocks SOCKS5 proxy"         },
     @{ Name="v2ray-plugin.exe";    Desc="V2Ray WebSocket obfuscation"       },
     @{ Name="psiphon3.exe";        Desc="Psiphon tunnel (last resort)"      },
@@ -178,10 +178,10 @@ $tools = @(
 )
 foreach ($t in $tools) {
     $path = Join-Path $netDir $t.Name
-    $status = if (Test-Path $path) { "✓" } else { "✗ MISSING" }
-    Write-Host "  $status  $($t.Name.PadRight(26)) — $($t.Desc)"
+    $status = if (Test-Path $path) { "OK" } else { "MISSING" }
+    Write-Host "  [$status]  $($t.Name.PadRight(26)) - $($t.Desc)"
 }
 Write-Host ""
 Write-Host "Note: These tools are launched as child processes."
-Write-Host "      All are open-source. Aeon's code is GPL-safe."
+Write-Host "      All are open-source. The Aeon codebase is GPL-safe."
 Write-Host ""

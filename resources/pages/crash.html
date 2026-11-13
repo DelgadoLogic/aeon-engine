@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aeon — Session Restored</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Inter', system-ui, sans-serif;
-    background: #0d0e14;
-    color: #e8e8f0;
+    background: #0b0616;
+    color: #f8fafc;
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 40px 20px;
+    overflow-x: hidden;
   }
 
   .card {
@@ -96,7 +99,12 @@
   }
   .btn-ghost:hover { color: #e8e8f0; }
 
-  .footer-note { font-size: 11px; color: #44445a; margin-top: 20px; }
+  .footer-note { font-size: 11px; color: #94a3b8; margin-top: 20px; }
+  @media (max-width: 640px) {
+    .card { padding: 24px 18px; }
+    .btn-row { flex-direction: column; }
+    .btn { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -121,7 +129,7 @@
 
   <p class="footer-note">
     Session auto-saved every 30 seconds. Report a crash:
-    <a href="https://browseaeon.com/support" style="color:#6c63ff">browseaeon.com/support</a>
+    <a href="https://delgadologic.tech/contact" style="color:#38bdf8">delgadologic.tech/contact</a>
   </p>
 </div>
 
@@ -131,7 +139,7 @@ let tabs = [];
 try {
   tabs = window.aeonBridge?.getCrashedTabs?.() || [
     { id: 1, title: 'DelgadoLogic', url: 'https://delgadologic.tech', icon: '🌐' },
-    { id: 2, title: 'Aeon Browser — GitHub', url: 'https://github.com/DelgadoLogic/AeonBrowser', icon: '🐙' },
+    { id: 2, title: 'Aeon Browser — GitHub', url: 'https://github.com/DelgadoLogic/aeon-engine', icon: '🐙' },
     { id: 3, title: 'DuckDuckGo Search', url: 'https://duckduckgo.com', icon: '🔍' },
   ];
 } catch(_) {}
@@ -139,7 +147,7 @@ try {
 function render() {
   document.getElementById('tab_list').innerHTML = tabs.map(t => `
     <div class="tab-row">
-      <input type="checkbox" class="tab-check" id="chk_${t.id}" checked>
+      <input type="checkbox" class="tab-check" id="chk_${t.id}" name="chk_${t.id}" aria-label="Restore tab ${t.id}" checked>
       <div class="tab-favicon">${t.icon || '🌐'}</div>
       <div class="tab-info">
         <div class="tab-title">${t.title}</div>

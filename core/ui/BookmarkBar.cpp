@@ -56,8 +56,8 @@ static RECT g_overflowRc = {};
 
 // ─── Load from HistoryEngine ──────────────────────────────────────────────────
 static void Reload(HDC measDC) {
-    HistoryEngine::Bookmark bms_arr[512] = {};
-    int bms_count = HistoryEngine::GetBookmarks(bms_arr, 512);
+    std::vector<HistoryEngine::Bookmark> bms_arr(512);
+    int bms_count = HistoryEngine::GetBookmarks(bms_arr.data(), static_cast<int>(bms_arr.size()));
     g_items.clear();
 
     // Layout: measure text widths, place items left-to-right
@@ -203,16 +203,21 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         }
         return 0;
 
+    case WM_ERASEBKGND:
+        return 1;
+
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
         RECT rc; GetClientRect(hWnd, &rc);
+        int w = (rc.right > 0) ? rc.right : 1;
+        int h = (rc.bottom > 0) ? rc.bottom : 1;
         HDC mem = CreateCompatibleDC(hdc);
-        HBITMAP bmp = CreateCompatibleBitmap(hdc, rc.right, rc.bottom);
+        HBITMAP bmp = CreateCompatibleBitmap(hdc, w, h);
         HBITMAP oldbmp = (HBITMAP)SelectObject(mem, bmp);
         SelectObject(mem, g_font);
         Paint(mem, rc);
-        BitBlt(hdc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
+        BitBlt(hdc, 0, 0, w, h, mem, 0, 0, SRCCOPY);
         SelectObject(mem, oldbmp); DeleteObject(bmp); DeleteDC(mem);
         EndPaint(hWnd, &ps);
         return 0;
@@ -232,9 +237,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_LBUTTONUP: {
         int mx = GET_X_LPARAM(lParam), my = GET_Y_LPARAM(lParam);
 
-        // Overflow button → navigate to aeon://history#bookmarks
+        // Overflow button → navigate to aeon://bookmarks
         if (PtInRect(&g_overflowRc, {mx,my})) {
-            if (g_navCb) g_navCb(L"aeon://history#bookmarks");
+            if (g_navCb) g_navCb(L"aeon://bookmarks");
             return 0;
         }
 
@@ -242,9 +247,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             if (!PtInRect(&g_items[i].rc, {mx,my})) continue;
             auto& item = g_items[i];
             if (item.isFolder) {
-                // TODO: Show folder dropdown popup
-                // For now navigate to aeon://history#bookmarks?folder=...
-                if (g_navCb) g_navCb((L"aeon://history#bookmarks?folder=" + item.label).c_str());
+                if (g_navCb) g_navCb((L"aeon://bookmarks?folder=" + item.label).c_str());
             } else {
                 if (g_navCb) g_navCb(item.url.c_str());
             }
@@ -293,7 +296,7 @@ bool RegisterClass(HINSTANCE hInst) {
 HWND Create(HWND parent, int x, int y, int width, NavigateCallback cb) {
     g_navCb = cb;
     g_hwnd = CreateWindowExW(0, L"AeonBookmarkBar", L"",
-        WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+        WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         x, y, width, BAR_H,
         parent, (HMENU)IDC_BOOKMARK_BAR, g_hInst, nullptr);
     return g_hwnd;

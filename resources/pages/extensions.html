@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aeon Extensions, WebMCP &amp; OmniHub Bridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-obsidian: #0b0616;
+    --bg-surface: #0e071c;
+    --bg-card: rgba(18, 20, 36, 0.72);
+    --bg-card-hover: rgba(28, 21, 56, 0.94);
+    --border-card: rgba(168, 85, 247, 0.18);
+    --border-card-hover: rgba(192, 132, 252, 0.55);
+    --accent-purple: #9333ea;
+    --accent-light: #c084fc;
+    --accent-glow: rgba(147, 51, 234, 0.45);
+    --neon-cyan: #38bdf8;
+    --green: #22c55e;
+    --text-white: #f8fafc;
+    --text-soft: #cbd5e1;
+    --text-muted: #94a3b8;
+    --font-main: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius-sm: 8px;
+    --radius: 14px;
+    --radius-full: 9999px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body {
+    font-family: var(--font-main);
+    background-color: #0b0616;
+    color: var(--text-white);
+    min-height: 100vh;
+    display: flex;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse 75% 50% at 50% -15%, rgba(147, 51, 234, 0.18), transparent 70%),
+      radial-gradient(circle at 88% 82%, rgba(56, 189, 248, 0.1), transparent 60%);
+    background-attachment: fixed;
+  }
+  :focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 2px; }
+  nav {
+    width: 240px;
+    background: linear-gradient(180deg, rgba(14, 7, 28, 0.96) 0%, rgba(10, 5, 20, 0.98) 100%);
+    border-right: 1px solid var(--border-card);
+    padding: 24px 14px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(20px);
+    z-index: 10;
+  }
+  .nav-logo { display: flex; align-items: center; gap: 12px; padding: 0 8px 20px; border-bottom: 1px solid var(--border-card); margin-bottom: 16px; cursor: pointer; }
+  .nav-logo .badge { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #fff; box-shadow: 0 0 16px var(--accent-glow); flex-shrink: 0; }
+  .nav-logo .logo-text { display: flex; flex-direction: column; min-width: 0; }
+  .nav-logo .brand { font-weight: 700; font-size: 15px; color: var(--text-white); }
+  .nav-logo .sub { font-size: 11px; color: var(--neon-cyan); font-family: var(--font-mono); }
+  .nav-links { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
+  nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; border: 1px solid transparent; transition: all 0.2s var(--ease); cursor: pointer; }
+  nav a:hover { background: var(--bg-card); color: var(--text-white); border-color: var(--border-card); transform: translateX(3px); }
+  nav a.active { background: rgba(147, 51, 234, 0.2); color: var(--accent-light); border-color: var(--border-card-hover); box-shadow: 0 0 14px rgba(147, 51, 234, 0.22); }
+  main { flex: 1; min-width: 0; padding: 36px 44px 80px; max-width: 1120px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .page-header h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; background: linear-gradient(135deg, #ffffff 35%, var(--accent-light) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
+  .subtitle { color: var(--text-muted); font-size: 13.5px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+  .search-input { flex: 1; min-width: 220px; background: var(--bg-card); color: var(--text-white); border: 1px solid var(--border-card); border-radius: var(--radius-sm); padding: 10px 14px; font-family: var(--font-main); font-size: 13.5px; transition: border-color 0.2s var(--ease); }
+  .search-input:focus { border-color: var(--neon-cyan); outline: none; }
+  .toolbar-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; font-family: var(--font-main); cursor: pointer; border: 1px solid var(--border-card); background: var(--bg-card); color: var(--text-white); transition: all 0.2s var(--ease); }
+  .btn:hover { background: var(--bg-card-hover); border-color: var(--border-card-hover); transform: translateY(-1px); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent-purple), #7c3aed); border-color: rgba(192, 132, 252, 0.45); box-shadow: 0 0 18px var(--accent-glow); }
+  .filter-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .pill-btn { padding: 6px 14px; border-radius: var(--radius-full); font-size: 12px; font-weight: 600; border: 1px solid var(--border-card); background: var(--bg-card); color: var(--text-muted); cursor: pointer; transition: all 0.18s var(--ease); }
+  .pill-btn.active, .pill-btn:hover { color: var(--text-white); border-color: var(--border-card-hover); background: rgba(147, 51, 234, 0.22); }
+  .cards-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .ext-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius); padding: 20px; backdrop-filter: blur(18px); display: flex; flex-direction: column; justify-content: space-between; gap: 14px; transition: all 0.2s var(--ease); }
+  .ext-card:hover { background: var(--bg-card-hover); border-color: var(--border-card-hover); transform: translateY(-2px); }
+  .ext-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ext-name { font-size: 15.5px; font-weight: 700; color: var(--text-white); margin-bottom: 4px; }
+  .ext-meta { font-family: var(--font-mono); font-size: 11px; color: var(--neon-cyan); }
+  .ext-desc { font-size: 13px; color: var(--text-soft); line-height: 1.5; }
+  .ext-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid rgba(168, 85, 247, 0.12); padding-top: 12px; }
+  .badge-cat { font-size: 11px; font-family: var(--font-mono); padding: 3px 9px; border-radius: var(--radius-full); background: rgba(147, 51, 234, 0.18); color: var(--accent-light); border: 1px solid rgba(168, 85, 247, 0.35); }
+  .toggle { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; cursor: pointer; background: rgba(100, 116, 139, 0.35); border: 1px solid var(--border-card); border-radius: var(--radius-full); transition: 0.2s var(--ease); }
+  .slider::before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s var(--ease); }
+  .toggle input:checked + .slider { background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan)); border-color: var(--neon-cyan); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); }
+  .panel { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius); margin-bottom: 24px; backdrop-filter: blur(18px); overflow: hidden; }
+  .panel-header { padding: 16px 22px; background: rgba(14, 7, 28, 0.65); border-bottom: 1px solid var(--border-card); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .panel-header h2 { font-size: 15.5px; font-weight: 700; }
+  .mcp-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 22px; border-bottom: 1px solid rgba(168, 85, 247, 0.1); }
+  .mcp-row:last-child { border-bottom: none; }
+  .mcp-tool-name { font-family: var(--font-mono); font-size: 13px; color: var(--neon-cyan); font-weight: 600; margin-bottom: 3px; }
+  .mcp-tool-desc { font-size: 12.5px; color: var(--text-muted); }
+  .inspector { padding: 14px 22px; background: rgba(10, 5, 20, 0.85); border-top: 1px solid var(--border-card); font-family: var(--font-mono); font-size: 12px; color: var(--text-soft); white-space: pre-wrap; word-break: break-word; }
+  .omnihub-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 18px 22px; }
+  .handoff-card { background: rgba(14, 7, 28, 0.65); border: 1px solid var(--border-card); border-radius: var(--radius-sm); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
+  .handoff-card h3 { font-size: 14px; font-weight: 700; }
+  .handoff-card p { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(5, 3, 12, 0.78); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: #121424; border: 1px solid var(--border-card-hover); border-radius: var(--radius); padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); }
+  .modal h3 { font-size: 17px; margin-bottom: 10px; }
+  .modal p { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+  .modal input { width: 100%; margin-bottom: 16px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: var(--radius-sm); background: rgba(18, 20, 36, 0.96); border: 1px solid var(--neon-cyan); color: var(--text-white); font-size: 13px; opacity: 0; transform: translateY(12px); pointer-events: none; transition: all 0.2s var(--ease); z-index: 99; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  @media (max-width: 900px) {
+    nav { width: 72px; padding: 18px 8px; }
+    .nav-logo .logo-text, nav a span { display: none; }
+    .nav-logo { justify-content: center; }
+    main { padding: 24px 20px 60px; }
+    .cards-grid, .omnihub-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 640px) {
+    body { flex-direction: column; }
+    nav { width: 100%; height: auto; position: relative; flex-direction: row; align-items: center; padding: 10px 12px; gap: 10px; border-right: none; border-bottom: 1px solid var(--border-card); overflow-x: auto; }
+    .nav-logo { padding: 0; margin: 0; border: none; }
+    .nav-links { flex-direction: row; overflow-x: auto; }
+    nav a { padding: 8px 10px; }
+    main { padding: 18px 16px 60px; }
+    .mcp-row { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+  <nav aria-label="Aeon internal navigation">
+    <div class="nav-logo" onclick="navigateTo('aeon://newtab')" role="button" tabindex="0">
+      <div class="badge">A</div>
+      <div class="logo-text">
+        <span class="brand">Aeon Browser</span>
+        <span class="sub">v0.22.0 • Extensions</span>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a onclick="navigateTo('aeon://newtab')"><span>New Tab</span></a>
+      <a onclick="navigateTo('aeon://shields')"><span>Sovereign Shields</span></a>
+      <a class="active" onclick="navigateTo('aeon://extensions')"><span>Extensions &amp; MCP</span></a>
+      <a onclick="navigateTo('aeon://passwords')"><span>Password Vault</span></a>
+      <a onclick="navigateTo('aeon://downloads')"><span>Downloads</span></a>
+      <a onclick="navigateTo('aeon://history')"><span>History</span></a>
+      <a onclick="navigateTo('aeon://bookmarks')"><span>Bookmarks</span></a>
+      <a onclick="navigateTo('aeon://intelligence')"><span>Intelligence</span></a>
+      <a onclick="navigateTo('aeon://diagnostics')"><span>Diagnostics</span></a>
+      <a onclick="navigateTo('aeon://settings')"><span>Settings</span></a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="page-header">
+      <div>
+        <h1>Extensions, WebMCP &amp; OmniHub</h1>
+        <p class="subtitle">Built-in Sovereign C++ Modules, Manifest V3 Runtime, Local WebMCP Tools &amp; DelgadoLogic Cross-App Bridge</p>
+      </div>
+      <button type="button" class="btn btn-primary" onclick="openUnpackedModal()">+ Load Unpacked</button>
+    </header>
+
+    <div class="toolbar">
+      <input type="text" id="ext-search" name="ext_search" class="search-input" aria-label="Search extensions and MCP tools" placeholder="Filter extensions or WebMCP tools... (press /)" oninput="renderCards()">
+      <div class="toolbar-actions">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-soft);cursor:pointer;">
+          <span>Developer Mode</span>
+          <span class="toggle">
+            <input type="checkbox" id="dev-mode-toggle" name="dev_mode_toggle" onchange="showToast('Developer mode ' + (this.checked ? 'enabled' : 'disabled'))">
+            <span class="slider"></span>
+          </span>
+        </label>
+        <button type="button" class="btn" onclick="refreshMcp()">Refresh MCP Pipe</button>
+      </div>
+    </div>
+
+    <div class="filter-pills" role="tablist" aria-label="Extension categories">
+      <button type="button" class="pill-btn active" onclick="setCategory('All', this)">All</button>
+      <button type="button" class="pill-btn" onclick="setCategory('Privacy', this)">Privacy</button>
+      <button type="button" class="pill-btn" onclick="setCategory('AI & MCP', this)">AI &amp; MCP</button>
+      <button type="button" class="pill-btn" onclick="setCategory('Security', this)">Security</button>
+    </div>
+
+    <section class="cards-grid" id="ext-grid" aria-label="Installed Extensions and Sovereign Modules"></section>
+
+    <section class="panel" aria-label="Local WebMCP Server Tools">
+      <div class="panel-header">
+        <h2>Local WebMCP Server &amp; Agent Pipe (<code>\\.\pipe\aeon-agent</code>)</h2>
+        <button type="button" class="btn" onclick="refreshMcp()">Discover Tools</button>
+      </div>
+      <div id="mcp-list"></div>
+      <pre class="inspector" id="mcp-inspector">Click "Test Tool" on any WebMCP schema to inspect the JSON-RPC contract.</pre>
+    </section>
+
+    <section class="panel" aria-label="OmniHub Cross-App Handoff">
+      <div class="panel-header">
+        <h2>OmniHub Cross-App Handoff (<code>\\.\pipe\delgadologic-omnihub</code>)</h2>
+      </div>
+      <div class="omnihub-grid">
+        <div class="handoff-card">
+          <div>
+            <h3>Clip Active Page to Cloud Vault</h3>
+            <p>Send structured Markdown snapshot to <code>%USERPROFILE%\DelgadoLogic Cloud\Clips</code> with auto <code>.lfc</code> versioning.</p>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="triggerHandoff('clip')">Clip to Vault</button>
+        </div>
+        <div class="handoff-card">
+          <div>
+            <h3>Sync DPAPI Playwright Session</h3>
+            <p>Export encrypted <code>auth.json</code> browser state to OmniHub for LogicFlow &amp; automation workflows.</p>
+          </div>
+          <button type="button" class="btn" onclick="triggerHandoff('session')">Sync auth.json</button>
+        </div>
+        <div class="handoff-card">
+          <div>
+            <h3>Send Context to LogicFlow</h3>
+            <p>Route downloads or scraped artifacts straight to LogicFlow HyperStore, Sentinel, or Lazarus queues.</p>
+          </div>
+          <button type="button" class="btn" onclick="triggerHandoff('hyperstore')">Send to LogicFlow</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="ext-modal" role="dialog" aria-modal="true" aria-labelledby="ext-modal-title">
+    <div class="modal">
+      <h3 id="ext-modal-title">Load Unpacked Manifest V3 Extension</h3>
+      <p>Enter the folder path containing a verified <code>manifest.json</code> package for local sandbox inspection.</p>
+      <input type="text" id="ext-manifest-path" name="ext_manifest_path" aria-label="Unpacked extension folder path" placeholder="C:\Projects\my-extension">
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeUnpackedModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitUnpacked()">Stage Extension</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Done</div>
+
+  <script>
+    const extensions = [
+      { id: 'ext_blocker', name: 'Aeon Sovereign Content Blocker', version: 'v0.22.0', category: 'Privacy', enabled: true, desc: 'Native C++ uBlock/EasyList filter engine with CNAME uncloaking and zero-copy network interception.' },
+      { id: 'ext_camoufox', name: 'Camoufox C++ Anti-Detect Engine', version: 'v0.22.0', category: 'Privacy', enabled: true, desc: 'Canvas, WebGL, AudioContext & Font entropy isolation via aeon_gecko_stealth.dll.' },
+      { id: 'ext_gemma', name: 'Local Gemma 4 & CTranslate2 Bridge', version: 'v0.22.0', category: 'AI & MCP', enabled: true, desc: 'Offline GGUF inference sharing %ProgramData%\\DelgadoLogic\\Models weights with LogicFlow.' },
+      { id: 'ext_dpapi', name: 'Windows DPAPI Vault Autofill', version: 'v0.22.0', category: 'Security', enabled: true, desc: 'Hardware-backed credential encryption with SecureZeroMemory scrubbing on clipboard clear.' }
+    ];
+
+    const fallbackTools = [
+      { name: 'aeon.summarize', description: 'Summarize active webpage text using local Gemma 4 GGUF weights.', parameters: { type: 'object', properties: { maxTokens: { type: 'number', default: 512 } } } },
+      { name: 'aeon.translate', description: 'Translate selected DOM nodes offline via CTranslate2.', parameters: { type: 'object', properties: { targetLang: { type: 'string', default: 'es' } } } },
+      { name: 'aeon.spellcheck', description: 'Check text fields locally via Hunspell dictionaries.', parameters: { type: 'object', properties: { locale: { type: 'string', default: 'en_US' } } } },
+      { name: 'aeon.form_submit', description: 'Protected DOM form fill & submission sentinel.', parameters: { type: 'object', properties: { confirmRequired: { type: 'boolean', default: true } } } },
+      { name: 'session.export', description: 'Export Playwright-compatible auth.json cookie and origin state.', parameters: { type: 'object', properties: { sessionName: { type: 'string', default: 'aeon_live' } } } },
+      { name: 'handoff.omnihub', description: 'Dispatch file, clip, or session over JSON-RPC 2.0 to \\\\.\\pipe\\delgadologic-omnihub.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['vault', 'hyperstore', 'sentinel', 'lazarus', 'session', 'clip'] } } } }
+    ];
+
+    let activeCategory = 'All';
+
+    function navigateTo(url) {
+      if (window.aeonBridge && typeof window.aeonBridge.navigate === 'function') window.aeonBridge.navigate(url);
+      else window.location.href = url;
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(window.__extToastTimer);
+      window.__extToastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    function setCategory(cat, btn) {
+      activeCategory = cat;
+      document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderCards();
+    }
+
+    function renderCards() {
+      const q = (document.getElementById('ext-search').value || '').trim().toLowerCase();
+      const filtered = extensions.filter(ex => {
+        const catOk = activeCategory === 'All' || ex.category === activeCategory;
+        const textOk = !q || ex.name.toLowerCase().includes(q) || ex.desc.toLowerCase().includes(q);
+        return catOk && textOk;
+      });
+      document.getElementById('ext-grid').innerHTML = filtered.map(ex => `
+        <article class="ext-card">
+          <div>
+            <div class="ext-top">
+              <div>
+                <div class="ext-name">${ex.name}</div>
+                <div class="ext-meta">${ex.version} • Built-in Native Runtime</div>
+              </div>
+              <label class="toggle" aria-label="Toggle ${ex.name}">
+                <input type="checkbox" id="${ex.id}" name="${ex.id}" ${ex.enabled ? 'checked' : ''} onchange="toggleExt('${ex.id}', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p class="ext-desc" style="margin-top:10px;">${ex.desc}</p>
+          </div>
+          <div class="ext-foot">
+            <span class="badge-cat">${ex.category}</span>
+            <button type="button" class="btn" style="padding:6px 12px;font-size:12px;" onclick="showToast('${ex.name} permissions verified locally')">Permissions</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function toggleExt(id, checked) {
+      const item = extensions.find(x => x.id === id);
+      if (item) item.enabled = checked;
+      showToast(`${item ? item.name : id} ${checked ? 'enabled' : 'paused'}`);
+    }
+
+    function refreshMcp() {
+      let tools = fallbackTools;
+      try {
+        if (window.aeonBridge && typeof window.aeonBridge.webmcp_discover === 'function') {
+          const parsed = JSON.parse(window.aeonBridge.webmcp_discover());
+          if (parsed && Array.isArray(parsed.tools) && parsed.tools.length) tools = parsed.tools;
+        }
+      } catch (_) {}
+      document.getElementById('mcp-list').innerHTML = tools.map((t, idx) => `
+        <div class="mcp-row">
+          <div>
+            <div class="mcp-tool-name">${t.name}</div>
+            <div class="mcp-tool-desc">${t.description}</div>
+          </div>
+          <button type="button" class="btn" onclick='inspectTool(${idx})'>Test Tool</button>
+        </div>
+      `).join('');
+      window.__mcpTools = tools;
+    }
+
+    function inspectTool(idx) {
+      const tool = (window.__mcpTools || fallbackTools)[idx];
+      document.getElementById('mcp-inspector').textContent = JSON.stringify({ pipe: '\\\\.\\pipe\\aeon-agent', tool }, null, 2);
+    }
+
+    function triggerHandoff(mode) {
+      const target = mode === 'clip' ? 'handoff.clip' : mode === 'session' ? 'handoff.session' : 'handoff.file (hyperstore)';
+      document.getElementById('mcp-inspector').textContent = JSON.stringify({
+        jsonrpc: '2.0',
+        pipe: '\\\\.\\pipe\\delgadologic-omnihub',
+        method: target.split(' ')[0],
+        status: window.aeonBridge ? 'dispatched_to_pipe' : 'preview_mode_ready'
+      }, null, 2);
+      showToast(`OmniHub ${target} dispatched`);
+    }
+
+    function openUnpackedModal() { document.getElementById('ext-modal').classList.add('open'); }
+    function closeUnpackedModal() { document.getElementById('ext-modal').classList.remove('open'); }
+    function submitUnpacked() {
+      const p = (document.getElementById('ext-manifest-path').value || '').trim();
+      if (!p) return;
+      extensions.push({ id: 'ext_custom_' + Date.now(), name: p.split('\\').pop() || 'Unpacked Extension', version: 'dev', category: 'AI & MCP', enabled: true, desc: `Unpacked manifest staged from ${p}` });
+      closeUnpackedModal();
+      renderCards();
+      showToast('Staged unpacked Manifest V3 package');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault();
+        document.getElementById('ext-search')?.focus();
+      } else if (e.key === 'Escape') {
+        closeUnpackedModal();
+      }
+    });
+
+    renderCards();
+    refreshMcp();
+  </script>
+</body>
+</html>

@@ -20,7 +20,7 @@ namespace HistoryEngine {
         char     title[256];
         char     folder[128];   // "Bookmarks" = root
         uint64_t added_time;    // Unix milliseconds
-        uint64_t id;            // SQLite rowid
+        uint64_t id;            // SQLite rowid / autoincrement primary key
         char     favicon_b64[4096];
         uint32_t sort_order;
     };
@@ -42,11 +42,19 @@ namespace HistoryEngine {
     // Retrieve recent history (returns vector, limit 0 = default 100)
     std::vector<HistoryEntry> GetRecent(int limit = 100);
 
-    // Full-text search
+    // Full-text & substring search across URL and title
+    std::vector<HistoryEntry> Search(const char* query, int limit = 50);
     std::vector<HistoryEntry> Search(const char* query);
 
     // Delete a single entry by URL
     void DeleteEntry(const char* url);
+
+    // Batch deletion of multiple URLs
+    void DeleteUrls(const std::vector<std::string>& urls);
+    void DeleteEntries(const std::vector<std::string>& urls);
+
+    // Clear history entries within a timestamp range (start_time to end_time in Unix ms)
+    void ClearRange(uint64_t start_time, uint64_t end_time);
 
     // Clear all history
     void WipeAll();
@@ -54,11 +62,19 @@ namespace HistoryEngine {
     bool IsPrivate();
 
     // ── Bookmark API ──────────────────────────────────────────────────────────
-    bool AddBookmark(const char* url, const char* title, const char* folder);
+    bool AddBookmark(const char* url, const char* title, const char* folder = "Bookmarks");
+    bool UpdateBookmark(uint64_t id, const char* url, const char* title, const char* folder = "Bookmarks");
     void DeleteBookmark(uint64_t id);
     void DeleteBookmark(const char* url);   // overload for URL-based delete
     std::vector<Bookmark> GetBookmarks();
+    std::vector<Bookmark> GetBookmarks(const char* folder);
     bool IsBookmarked(const char* url);
+
+    // Bookmark Import / Export helpers
+    std::string ExportBookmarksJson();
+    std::string ExportBookmarksHtml();
+    int ImportBookmarksJson(const std::string& json);
+    int ImportBookmarksHtml(const std::string& html);
 
     // ── Array-based wrappers for C callers ───────────────────────────────────
     inline int GetBookmarks(Bookmark* out, int maxCount) {

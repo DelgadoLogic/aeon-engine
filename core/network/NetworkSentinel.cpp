@@ -285,8 +285,64 @@ static NetworkType ClassifyNetwork(const CaptivePortalResult& portal,
     return NetworkType::Open; // Open internet
 }
 
+// ─── ByeDPI TCP Splitter Evasion (User-Mode SOCKS5 Proxy) ─────────────────
+bool LaunchByeDPI(const char* socksAddr, const char* extraFlags) {
+    char exeDir[MAX_PATH];
+    GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
+    char* last = strrchr(exeDir, '\\');
+    if (last) *last = '\0';
+
+    char byedpiPath[MAX_PATH];
+    _snprintf_s(byedpiPath, sizeof(byedpiPath), _TRUNCATE,
+        "%s\\Network\\byedpi.exe", exeDir);
+
+    if (GetFileAttributesA(byedpiPath) == INVALID_FILE_ATTRIBUTES) {
+        _snprintf_s(byedpiPath, sizeof(byedpiPath), _TRUNCATE,
+            "%s\\Network\\ciadpi.exe", exeDir);
+        if (GetFileAttributesA(byedpiPath) == INVALID_FILE_ATTRIBUTES) {
+            fprintf(stderr, "[Sentinel] Neither byedpi.exe nor ciadpi.exe found.\n");
+            return false;
+        }
+    }
+
+    const char* ip = "127.0.0.1";
+    int port = 1080;
+    if (socksAddr && *socksAddr) {
+        if (const char* colon = strchr(socksAddr, ':')) {
+            port = atoi(colon + 1);
+        }
+    }
+
+    // Default ByeDPI desync flags: split TLS ClientHello + fake SNI packet + out-of-order data
+    const char* defaultFlags = "--split 1+s --disoob 1 --auto=torst --tlsrec 1+s";
+    const char* flags = (extraFlags && *extraFlags) ? extraFlags : defaultFlags;
+
+    char args[512] = {};
+    _snprintf_s(args, sizeof(args), _TRUNCATE,
+        "\"%s\" -i %s -p %d %s", byedpiPath, ip, port, flags);
+
+    STARTUPINFOA si = {}; si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW; si.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION pi = {};
+    if (!CreateProcessA(nullptr, args, nullptr, nullptr, FALSE,
+        CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+        fprintf(stderr, "[Sentinel] Failed to launch ByeDPI: %lu\n", GetLastError());
+        return false;
+    }
+    CloseHandle(pi.hThread);
+    if (g_state.dpi_process) {
+        TerminateProcess(g_state.dpi_process, 0);
+        CloseHandle(g_state.dpi_process);
+    }
+    g_state.dpi_process = pi.hProcess;
+    g_state.bypass_active = true;
+    fprintf(stdout, "[Sentinel] ByeDPI SOCKS5 desync active on %s:%d (PID %lu, flags: %s)\n",
+        ip, port, pi.dwProcessId, flags);
+    return true;
+}
+
 // ─── DPI evasion: apply packet tricks via GoodbyeDPI child process ────────
-static bool LaunchGoodbyeDPI(DpiMode mode) {
+bool LaunchGoodbyeDPI(DpiMode mode) {
     char exeDir[MAX_PATH];
     GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
     char* last = strrchr(exeDir, '\\');
@@ -355,7 +411,12 @@ static bool LaunchGoodbyeDPI(DpiMode mode) {
         return false;
     }
     CloseHandle(pi.hThread);
+    if (g_state.dpi_process) {
+        TerminateProcess(g_state.dpi_process, 0);
+        CloseHandle(g_state.dpi_process);
+    }
     g_state.dpi_process = pi.hProcess;
+    g_state.bypass_active = true;
     fprintf(stdout, "[Sentinel] DPI bypass active (mode %d, PID %lu)\n",
         (int)mode, pi.dwProcessId);
     return true;
@@ -424,11 +485,14 @@ static bool DetectSSLInspection() {
                 fprintf(stdout,
                     "[Sentinel] Corporate MITM proxy is intercepting HTTPS traffic.\n");
             }
-            LocalFree(certInfo.lpszSubjectInfo);
-            LocalFree(certInfo.lpszIssuerInfo);
-            LocalFree(certInfo.lpszProtocolName);
-            LocalFree(certInfo.lpszSignatureAlgName);
-            LocalFree(certInfo.lpszEncryptionAlgName);
+            if (certInfo.lpszSubjectInfo) {
+                LocalFree(certInfo.lpszSubjectInfo);
+                certInfo.lpszSubjectInfo = nullptr;
+            }
+            if (certInfo.lpszIssuerInfo) {
+                LocalFree(certInfo.lpszIssuerInfo);
+                certInfo.lpszIssuerInfo = nullptr;
+            }
         }
     }
     if (hRequest) WinHttpCloseHandle(hRequest);

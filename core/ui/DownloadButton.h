@@ -31,4 +31,7 @@ void SetVisible(bool visible);
 // Reposition (called on toolbar resize)
 void Move(int x, int y, int size);
 
+// Rescale cached fonts & metrics on PerMonitorV2 DPI change
+void OnDpiChanged(int newDpi);
+
 } // namespace DownloadButton

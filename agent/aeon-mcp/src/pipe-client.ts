@@ -32,7 +32,7 @@ export function pipeSend(command: PipeCommand): Promise<Record<string, unknown>>
     let responseData = "";
     let settled = false;
 
-    const timeout = setTimeout(() => {
+    const responseTimeout = setTimeout(() => {
       if (!settled) {
         settled = true;
         client.destroy();
@@ -40,7 +40,18 @@ export function pipeSend(command: PipeCommand): Promise<Record<string, unknown>>
       }
     }, RESPONSE_TIMEOUT);
 
+    const connectTimeout = setTimeout(() => {
+      if (!settled && !client.connecting) return;
+      if (!settled) {
+        settled = true;
+        clearTimeout(responseTimeout);
+        client.destroy();
+        reject(new Error(`Pipe connect timeout after ${CONNECT_TIMEOUT}ms. Is Aeon Browser running?`));
+      }
+    }, CONNECT_TIMEOUT);
+
     client.on("connect", () => {
+      clearTimeout(connectTimeout);
       const payload = JSON.stringify(command) + "\n";
       client.write(payload);
     });
@@ -51,7 +62,8 @@ export function pipeSend(command: PipeCommand): Promise<Record<string, unknown>>
       // Check for complete JSON response (newline-delimited)
       const newlineIdx = responseData.indexOf("\n");
       if (newlineIdx !== -1) {
-        clearTimeout(timeout);
+        clearTimeout(responseTimeout);
+        clearTimeout(connectTimeout);
         settled = true;
         const jsonStr = responseData.slice(0, newlineIdx).trim();
         client.destroy();
@@ -66,7 +78,8 @@ export function pipeSend(command: PipeCommand): Promise<Record<string, unknown>>
 
     client.on("error", (err) => {
       if (!settled) {
-        clearTimeout(timeout);
+        clearTimeout(responseTimeout);
+        clearTimeout(connectTimeout);
         settled = true;
         reject(new Error(`Pipe connection failed: ${err.message}. Is Aeon Browser running?`));
       }
@@ -74,7 +87,8 @@ export function pipeSend(command: PipeCommand): Promise<Record<string, unknown>>
 
     client.on("close", () => {
       if (!settled) {
-        clearTimeout(timeout);
+        clearTimeout(responseTimeout);
+        clearTimeout(connectTimeout);
         settled = true;
 
         // Try to parse whatever we got
@@ -89,16 +103,6 @@ export function pipeSend(command: PipeCommand): Promise<Record<string, unknown>>
         }
       }
     });
-
-    // Connection timeout
-    setTimeout(() => {
-      if (!settled && !client.connecting) return;
-      if (!settled) {
-        settled = true;
-        client.destroy();
-        reject(new Error(`Pipe connect timeout after ${CONNECT_TIMEOUT}ms. Is Aeon Browser running?`));
-      }
-    }, CONNECT_TIMEOUT);
   });
 }
 
@@ -125,4 +129,40 @@ export function pipeHealthCheck(): Promise<boolean> {
       resolve(false);
     });
   });
+}
+
+export function summarizePage(tabId?: number, maxBullets?: number): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "ai.summarize", tab_id: tabId ?? -1, max_bullets: maxBullets ?? 5 });
+}
+
+export function navigateIntent(intent: string, tabId?: number): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "ai.navigate_intent", intent, tab_id: tabId ?? -1 });
+}
+
+export function getWebMCPTools(tabId?: number): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "webmcp.tools", tab_id: tabId ?? -1 });
+}
+
+export function stagehandObserve(tabId?: number): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "stagehand.observe", tab_id: tabId ?? -1 });
+}
+
+export function stagehandAct(action: string, ref?: number, text?: string): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "stagehand.act", action, ref: ref ?? -1, text: text ?? "" });
+}
+
+export function stagehandExtract(instruction: string): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "stagehand.extract", instruction });
+}
+
+export function stagehandAgent(goal: string): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "stagehand.agent", goal });
+}
+
+export function gemmaProcess(prompt: string, imageBase64?: string): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "gemma.process", prompt, image_base64: imageBase64 ?? "" });
+}
+
+export function multionWorkflow(goal: string, authJson?: string): Promise<Record<string, unknown>> {
+  return pipeSend({ cmd: "multion.workflow", goal, auth_json: authJson ?? "" });
 }

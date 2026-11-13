@@ -8,6 +8,7 @@
 // =============================================================================
 
 #include "aeon_journey_analytics.h"
+#include "../engines/aeon_ai.h"
 
 #include <algorithm>
 #include <cmath>
@@ -744,6 +745,22 @@ AeonJourneyIntent AeonJourneyAnalytics::DetectIntent(
     const char* url, const char* title, const char* referrer) const
 {
     std::lock_guard<std::mutex> lock(m_impl->mtx);
+
+    // Call AeonAI local GGUF intent detector
+    std::string ai_intent = AeonAIInstance().DetectIntentLLM(
+        url ? url : "", title ? title : "", referrer ? referrer : "");
+    if (!ai_intent.empty()) {
+        if (ai_intent == "Shopping") return AeonJourneyIntent::Shopping;
+        if (ai_intent == "Research") return AeonJourneyIntent::Research;
+        if (ai_intent == "FinancialTx") return AeonJourneyIntent::FinancialTx;
+        if (ai_intent == "GovernmentSvc") return AeonJourneyIntent::GovernmentSvc;
+        if (ai_intent == "HealthInfo") return AeonJourneyIntent::HealthInfo;
+        if (ai_intent == "Education") return AeonJourneyIntent::Education;
+        if (ai_intent == "Entertainment") return AeonJourneyIntent::Entertainment;
+        if (ai_intent == "Communication") return AeonJourneyIntent::Communication;
+        if (ai_intent == "Navigation") return AeonJourneyIntent::Navigation;
+        if (ai_intent == "Productivity") return AeonJourneyIntent::Productivity;
+    }
 
     // Combine all available text
     std::string combined;

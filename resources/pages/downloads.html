@@ -1,35 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b0616' stroke='%2300D2FF' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%237C4DFF'/></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aeon Downloads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:        #0d0e14;
-    --surface:   #16182a;
-    --card:      #1e2140;
-    --border:    #2e3064;
-    --accent:    #6c63ff;
-    --accent2:   #a78bfa;
-    --text:      #e8e8f0;
-    --text-dim:  #8888aa;
-    --green:     #22c55e;
-    --red:       #ef4444;
-    --orange:    #f97316;
-    --radius:    10px;
+    --bg-obsidian: #0b0616;
+    --bg-surface: #0e071c;
+    --bg-card: rgba(18, 20, 36, 0.65);
+    --bg-card-hover: rgba(28, 21, 56, 0.95);
+    --border-card: rgba(168, 85, 247, 0.18);
+    --border-card-hover: rgba(192, 132, 252, 0.55);
+    --border-glow: rgba(168, 85, 247, 0.35);
+    --accent-purple: #9333ea;
+    --accent-light: #c084fc;
+    --accent-glow: rgba(147, 51, 234, 0.45);
+    --neon-cyan: #38bdf8;
+    --neon-cyan-glow: rgba(56, 189, 248, 0.35);
+    --neon-pink: #ec4899;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f97316;
+    --text-white: #f8fafc;
+    --text-soft: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --radius-lg: 18px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background-color: #0b0616;
+    overflow-x: hidden;
+    color: var(--text-white);
+    font-family: var(--font-main);
     min-height: 100vh;
-    padding: 40px 48px 80px;
+    padding: 36px 48px 80px;
+    background-image: 
+      radial-gradient(ellipse 70% 55% at 50% 15%, rgba(112, 38, 206, 0.2) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 50% at 85% 80%, rgba(147, 51, 234, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 15% 90%, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+    background-attachment: fixed;
   }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(192, 132, 252, 0.6); }
 
   .header {
     display: flex;
@@ -37,415 +65,557 @@
     justify-content: space-between;
     margin-bottom: 28px;
   }
-  h1 { font-size: 22px; font-weight: 600; }
 
-  .header-actions { display: flex; gap: 10px; }
-  .btn {
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    transition: background .12s, color .12s;
-  }
-  .btn-ghost { background: var(--surface); color: var(--text-dim); }
-  .btn-ghost:hover { background: var(--card); color: var(--text); }
-  .btn-danger {
-    background: rgba(239,68,68,.1);
-    border-color: rgba(239,68,68,.3);
-    color: var(--red);
-  }
-  .btn-danger:hover { background: rgba(239,68,68,.2); }
-
-  .filters {
+  .header-left {
     display: flex;
-    gap: 8px;
-    margin-bottom: 24px;
+    align-items: center;
+    gap: 14px;
   }
-  .pill {
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-dim);
+
+  .page-icon-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent-purple), var(--neon-cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.45);
     cursor: pointer;
-    transition: all .12s;
   }
-  .pill.active, .pill:hover {
-    background: var(--card);
-    border-color: var(--accent);
-    color: var(--accent2);
-  }
+  .page-icon-badge svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; }
 
-  /* Stats bar */
-  .stats-bar {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 28px;
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-  }
-  .stat-value {
-    font-size: 22px;
+  .header-sub { font-size: 12px; color: var(--text-muted); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 9px;
+    font-family: var(--font-main);
+    font-size: 12.5px;
     font-weight: 600;
-    margin-bottom: 4px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    border: 1px solid transparent;
   }
-  .stat-label { font-size: 11px; color: var(--text-dim); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    color: #fff;
+    border-color: rgba(192, 132, 252, 0.4);
+    box-shadow: 0 0 14px rgba(147, 51, 234, 0.35);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 20px rgba(192, 132, 252, 0.6);
+  }
+  .btn-ghost {
+    background: var(--bg-card);
+    border-color: var(--border-card);
+    color: var(--text-soft);
+  }
+  .btn-ghost:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-white);
+    border-color: var(--border-card-hover);
+  }
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fff;
+  }
 
-  /* Download cards */
-  .dl-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 10px;
-    padding: 16px 20px;
+  .top-bar {
     display: flex;
     align-items: center;
     gap: 16px;
-    transition: background .12s;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
   }
-  .dl-card:hover { background: var(--card); }
-  .dl-card:hover .dl-actions { opacity: 1; }
 
-  .file-icon {
-    width: 44px; height: 44px;
-    border-radius: 10px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
+  .search-box {
+    flex: 1;
+    min-width: 260px;
+    max-width: 480px;
+    position: relative;
+  }
+  .search-box input {
+    width: 100%;
+    height: 42px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 9999px;
+    padding: 0 16px 0 42px;
+    color: var(--text-white);
+    font-family: var(--font-main);
+    font-size: 13.5px;
+    outline: none;
+    transition: all 0.2s var(--ease);
+    backdrop-filter: blur(12px);
+  }
+  .search-box input:focus {
+    border-color: var(--accent-light);
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.35);
+    background: rgba(28, 21, 56, 0.9);
+  }
+  .search-box svg {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 17px;
+    height: 17px;
+    color: var(--accent-light);
+    pointer-events: none;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 8px;
+    background: rgba(14, 10, 28, 0.7);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border-card);
+  }
+
+  .tab-pill {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    border: 1px solid transparent;
+  }
+  .tab-pill:hover { color: var(--text-white); background: rgba(168, 85, 247, 0.12); }
+  .tab-pill.active {
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    color: #fff;
+    border-color: rgba(192, 132, 252, 0.4);
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.35);
+  }
+
+  /* Downloads list */
+  .downloads-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .dl-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    transition: all 0.25s var(--ease);
+  }
+  .dl-card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-card-hover);
+    box-shadow: 0 10px 24px rgba(11, 6, 22, 0.8), 0 0 18px rgba(168, 85, 247, 0.2);
+  }
+
+  .dl-main-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .dl-file-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(147, 51, 234, 0.18);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-light);
     flex-shrink: 0;
   }
+  .dl-file-icon.zip { background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.35); color: var(--orange); }
+  .dl-file-icon.exe { background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: var(--neon-cyan); }
+  .dl-file-icon.doc { background: rgba(236, 72, 153, 0.15); border-color: rgba(236, 72, 153, 0.35); color: var(--neon-pink); }
+  .dl-file-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
 
   .dl-info { flex: 1; min-width: 0; }
-  .dl-name {
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-  }
-  .dl-name:hover { color: var(--accent2); }
-  .dl-meta {
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-    display: flex; gap: 12px;
-  }
+  .dl-filename { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dl-origin { font-size: 11.5px; font-family: var(--font-mono); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
 
-  /* Progress bar */
-  .progress-wrap {
-    height: 4px;
-    background: var(--card);
-    border-radius: 2px;
+  .dl-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(14, 10, 28, 0.8);
+    border-radius: 6px;
     overflow: hidden;
-    margin-top: 4px;
+    margin: 8px 0 6px;
+    border: 1px solid rgba(168, 85, 247, 0.15);
   }
-  .progress-bar {
+  .dl-progress-fill {
     height: 100%;
-    border-radius: 2px;
-    transition: width .3s ease;
+    background: linear-gradient(90deg, var(--accent-purple), var(--neon-cyan));
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    transition: width 0.3s var(--ease);
   }
-  .progress-bar.downloading { background: var(--accent); }
-  .progress-bar.paused     { background: var(--orange); }
-  .progress-bar.done       { background: var(--green); }
-  .progress-bar.error      { background: var(--red); }
+  .dl-progress-fill.paused {
+    background: var(--orange);
+    box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+  }
 
-  /* Status badge */
-  .status-badge {
-    display: inline-flex;
+  .dl-meta-row {
+    display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 9px;
-    border-radius: 20px;
+    justify-content: space-between;
     font-size: 11px;
-    font-weight: 500;
-    flex-shrink: 0;
-    min-width: 90px;
-    justify-content: center;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
   }
-  .status-badge.done       { background: rgba(34,197,94,.12);  color: var(--green); }
-  .status-badge.active     { background: rgba(108,99,255,.15); color: var(--accent2); }
-  .status-badge.paused     { background: rgba(249,115,22,.12); color: var(--orange); }
-  .status-badge.error      { background: rgba(239,68,68,.12);  color: var(--red); }
-
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
   .dl-actions {
     display: flex;
-    gap: 6px;
-    opacity: 0;
-    transition: opacity .12s;
-  }
-  .action-btn {
-    width: 30px; height: 30px;
-    border-radius: 7px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text-dim);
-    font-size: 13px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: color .12s, border-color .12s;
-  }
-  .action-btn:hover { color: var(--text); border-color: var(--accent); }
-  .action-btn.del:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
-
-  .speed-badge {
-    font-size: 11px;
-    color: var(--accent2);
-    font-weight: 600;
+    align-items: center;
+    gap: 8px;
+    margin-left: 16px;
     flex-shrink: 0;
-    min-width: 70px;
-    text-align: right;
   }
 
-  .empty-state {
-    text-align: center;
-    padding: 80px 20px;
-    color: var(--text-dim);
+  .badge-state {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
-  .empty-state .big { font-size: 56px; margin-bottom: 20px; }
-  .empty-state p { font-size: 14px; line-height: 1.6; }
+  .badge-state.downloading { background: rgba(56, 189, 248, 0.15); color: var(--neon-cyan); border: 1px solid rgba(56, 189, 248, 0.35); }
+  .badge-state.completed { background: rgba(34, 197, 94, 0.15); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.35); }
+  .badge-state.paused { background: rgba(249, 115, 22, 0.15); color: var(--orange); border: 1px solid rgba(249, 115, 22, 0.35); }
+  .badge-state.cancelled { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
+  @media (max-width: 900px) {
+    body { padding: 24px 20px 60px; }
+    .header-actions { flex-wrap: wrap; }
+    .dl-card { padding: 14px; }
+    .dl-main-row { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .dl-actions { margin-left: 0; width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  }
+  @media (max-width: 640px) {
+    body { padding: 16px 12px; }
+    .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .top-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .search-box { min-width: 0; width: 100%; max-width: 100%; }
+    .filter-tabs { flex-wrap: wrap; max-width: 100%; }
+    .stats-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
-
-<div class="header">
-  <h1>⬇ Downloads</h1>
-  <div class="header-actions">
-    <button class="btn btn-ghost" onclick="openFolder()">📂 Open Folder</button>
-    <button class="btn btn-danger" onclick="clearCompleted()">✕ Clear Completed</button>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="page-icon-badge" onclick="location.href='aeon://newtab'">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div>
+        <h1>Download Manager</h1>
+        <div class="header-sub">Parallel multi-threaded streaming • Real-time speed metrics</div>
+      </div>
+    </div>
+    <div class="header-actions" style="display:flex; gap:10px;">
+      <button class="btn btn-ghost" onclick="openDownloadsFolder()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Open Folder
+      </button>
+      <button class="btn btn-danger" onclick="clearCompleted()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Clear Completed
+      </button>
+    </div>
   </div>
-</div>
 
-<div class="filters">
-  <span class="pill active" onclick="filter('all', this)">All</span>
-  <span class="pill" onclick="filter('active', this)">Active</span>
-  <span class="pill" onclick="filter('done', this)">Completed</span>
-  <span class="pill" onclick="filter('error', this)">Failed</span>
-</div>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="dl-search" name="dl_search" aria-label="Search downloaded files" placeholder="Search downloaded files..." oninput="onSearch()">
+    </div>
 
-<div class="stats-bar">
-  <div class="stat-card">
-    <div class="stat-value" id="stat_total">0</div>
-    <div class="stat-label">Total Downloads</div>
+    <div class="filter-tabs">
+      <div class="tab-pill active" onclick="setTab('all')">All</div>
+      <div class="tab-pill" onclick="setTab('downloading')">In Progress</div>
+      <div class="tab-pill" onclick="setTab('completed')">Completed</div>
+      <div class="tab-pill" onclick="setTab('paused')">Paused</div>
+      <div class="tab-pill" onclick="setTab('cancelled')">Cancelled</div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-value" style="color:var(--green)" id="stat_done">0</div>
-    <div class="stat-label">Completed</div>
+
+  <!-- Downloads List Container -->
+  <div class="downloads-stack" id="downloads-container">
+    <!-- Populated dynamically -->
   </div>
-  <div class="stat-card">
-    <div class="stat-value" style="color:var(--accent2)" id="stat_active">0</div>
-    <div class="stat-label">Active</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-value" id="stat_size">0 GB</div>
-    <div class="stat-label">Total Size</div>
-  </div>
-</div>
+  <script>
+    let downloads = [];
+    let currentTab = 'all';
+    let searchQuery = '';
 
-<div id="dl_list"></div>
+    function loadDownloads() {
+      if (window.aeonBridge && typeof window.aeonBridge.getDownloads === 'function') {
+        const res = window.aeonBridge.getDownloads();
+        if (Array.isArray(res)) downloads = res;
+        else if (typeof res === 'string') {
+          try { downloads = JSON.parse(res) || []; } catch(e) { downloads = []; }
+        }
+      } else {
+        try {
+          const cached = localStorage.getItem('aeon_downloads_cache');
+          downloads = cached ? JSON.parse(cached) : [];
+        } catch(e) {
+          downloads = [];
+        }
+      }
+      renderDownloads();
+    }
 
-<script>
-// Demo downloads — in production: aeonBridge.getDownloads() returns live data
-let downloads = [
-  { id: 1, name: 'AeonBrowser-Setup-1.0.0.exe', size: 42.8, downloaded: 42.8, speed: 0,
-    status: 'done', icon: '⚙', started: '2:41 PM', url: 'https://releases.delgadologic.tech/aeon/1.0.0/setup.exe' },
-  { id: 2, name: 'easylist.txt', size: 2.1, downloaded: 2.1, speed: 0,
-    status: 'done', icon: '📋', started: '2:38 PM', url: 'https://easylist.to/easylist/easylist.txt' },
-  { id: 3, name: 'ubuntu-24.04.1-desktop-amd64.iso', size: 5820, downloaded: 2943, speed: 8.4,
-    status: 'active', icon: '💿', started: '2:20 PM', url: 'https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso' },
-  { id: 4, name: 'wolfssl-5.7.2.zip', size: 18.6, downloaded: 18.6, speed: 0,
-    status: 'done', icon: '🔒', started: 'Yesterday', url: 'https://github.com/wolfSSL/wolfssl/releases' },
-  { id: 5, name: 'broken-link-file.pdf', size: 4.2, downloaded: 1.1, speed: 0,
-    status: 'error', icon: '📄', started: 'Yesterday', url: 'https://example.com/broken.pdf' },
-];
+    function saveCache() {
+      try {
+        localStorage.setItem('aeon_downloads_cache', JSON.stringify(downloads));
+      } catch(e) {}
+    }
 
-function ext(name) {
-  const m = name.match(/\.([a-z0-9]{1,6})$/i);
-  return m ? m[1].toUpperCase() : '?';
-}
+    function setTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-pill').forEach(el => el.classList.remove('active'));
+      const activeEl = Array.from(document.querySelectorAll('.tab-pill')).find(el => el.textContent.toLowerCase().includes(tab) || (tab==='all' && el.textContent.includes('All')));
+      if (activeEl) activeEl.classList.add('active');
+      renderDownloads();
+    }
 
-function fmtSize(mb) {
-  if (mb >= 1024) return (mb/1024).toFixed(2) + ' GB';
-  if (mb >= 1) return mb.toFixed(1) + ' MB';
-  return (mb * 1024).toFixed(0) + ' KB';
-}
+    function onSearch() {
+      searchQuery = (document.getElementById('dl-search')?.value || '').toLowerCase().trim();
+      renderDownloads();
+    }
 
-function pct(dl) {
-  if (!dl.size) return 0;
-  return Math.min(100, Math.round((dl.downloaded / dl.size) * 100));
-}
+    function formatBytes(bytes) {
+      if (bytes === 0 || !bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+    }
 
-let currentFilter = 'all';
+    function formatSpeed(bps) {
+      if (!bps) return '0 KB/s';
+      return formatBytes(bps) + '/s';
+    }
 
-function filter(f, el) {
-  currentFilter = f;
-  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  render();
-}
+    function getFileIcon(name) {
+      const ext = (name || '').split('.').pop().toLowerCase();
+      if (['zip', 'tar', 'gz', '7z', 'rar'].includes(ext)) return { cls: 'zip', type: 'ARCHIVE' };
+      if (['exe', 'msi', 'dll', 'bat', 'cmd'].includes(ext)) return { cls: 'exe', type: 'EXEC' };
+      if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return { cls: 'doc', type: 'DOC' };
+      return { cls: '', type: 'FILE' };
+    }
+    function renderDownloads() {
+      const container = document.getElementById('downloads-container');
+      if (!container) return;
 
-function render() {
-  const list = document.getElementById('dl_list');
-  const items = currentFilter === 'all'
-    ? downloads
-    : downloads.filter(d => {
-        if (currentFilter === 'active') return d.status === 'active' || d.status === 'paused';
-        if (currentFilter === 'done')   return d.status === 'done';
-        if (currentFilter === 'error')  return d.status === 'error';
+      const filtered = downloads.filter(d => {
+        if (currentTab !== 'all' && d.state !== currentTab) return false;
+        if (searchQuery) {
+          const fn = (d.filename || '').toLowerCase();
+          const u = (d.url || '').toLowerCase();
+          return fn.includes(searchQuery) || u.includes(searchQuery);
+        }
         return true;
       });
 
-  if (!items.length) {
-    list.innerHTML = `<div class="empty-state"><div class="big">⬇</div><p>No downloads here yet.</p></div>`;
-  } else {
-    list.innerHTML = items.map(dl => {
-      const p = pct(dl);
-      const barClass = dl.status === 'done' ? 'done' : dl.status === 'error' ? 'error'
-        : dl.status === 'paused' ? 'paused' : 'downloading';
-      const badgeClass = dl.status === 'done' ? 'done' : dl.status === 'active' ? 'active'
-        : dl.status === 'error' ? 'error' : 'paused';
-      const badgeText = dl.status === 'done' ? '✓ Done' : dl.status === 'active' ? '↓ Downloading'
-        : dl.status === 'error' ? '✕ Failed' : '⏸ Paused';
-
-      return `
-      <div class="dl-card" id="dl_${dl.id}">
-        <div class="file-icon">${dl.icon}</div>
-        <div class="dl-info">
-          <div class="dl-name" onclick="open_file(${dl.id})">${dl.name}</div>
-          <div class="dl-meta">
-            <span>${fmtSize(dl.downloaded)} / ${fmtSize(dl.size)}</span>
-            <span>${p}%</span>
-            <span>${dl.started}</span>
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px; opacity:0.5;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <div style="font-size:15px; font-weight:600; color:#fff; margin-bottom:4px;">No Downloads Found</div>
+            <div style="font-size:12px;">No file transfers match your filter query.</div>
           </div>
-          ${dl.status !== 'done' && dl.status !== 'error' ? `
-            <div class="progress-wrap">
-              <div class="progress-bar ${barClass}" style="width:${p}%"></div>
+        `;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach(item => {
+        const iconData = getFileIcon(item.filename);
+        const percent = item.total_bytes > 0 ? Math.min(100, (item.received_bytes / item.total_bytes) * 100) : 0;
+        const stateClass = item.state || 'downloading';
+        const isCompleted = item.state === 'completed';
+        const isDownloading = item.state === 'downloading';
+        const isPaused = item.state === 'paused';
+
+        let etaStr = '';
+        if (isDownloading && item.speed_bps > 0 && item.total_bytes > item.received_bytes) {
+          const remSecs = Math.round((item.total_bytes - item.received_bytes) / item.speed_bps);
+          etaStr = remSecs < 60 ? `${remSecs}s remaining` : `${Math.round(remSecs/60)}m remaining`;
+        }
+
+        html += `
+          <div class="dl-card">
+            <div class="dl-main-row">
+              <div class="dl-file-icon ${iconData.cls}">
+                <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+              </div>
+              <div class="dl-info">
+                <div class="dl-filename" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</div>
+                <div class="dl-origin" title="${escapeHtml(item.url)}">${escapeHtml(item.url)}</div>
+
+                ${!isCompleted ? `
+                  <div class="dl-progress-bar">
+                    <div class="dl-progress-fill ${isPaused ? 'paused' : ''}" style="width: ${percent}%;"></div>
+                  </div>
+                ` : ''}
+
+                <div class="dl-meta-row">
+                  <div>
+                    <span>${formatBytes(item.received_bytes)}</span>
+                    ${item.total_bytes > 0 ? `<span> / ${formatBytes(item.total_bytes)}</span>` : ''}
+                    ${isDownloading ? `<span style="color:var(--neon-cyan); margin-left:8px;">• ${formatSpeed(item.speed_bps)}</span>` : ''}
+                    ${etaStr ? `<span style="margin-left:8px;">• ${etaStr}</span>` : ''}
+                  </div>
+                  <div>
+                    <span class="badge-state ${stateClass}">${stateClass}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="dl-actions">
+                ${isDownloading ? `
+                  <button class="btn btn-ghost" style="padding:6px 12px; font-size:11.5px;" onclick="pauseDownload(${item.id})">Pause</button>
+                  <button class="btn btn-danger" style="padding:6px 12px; font-size:11.5px;" onclick="cancelDownload(${item.id})">Cancel</button>
+                ` : ''}
+                ${isPaused ? `
+                  <button class="btn btn-primary" style="padding:6px 12px; font-size:11.5px;" onclick="resumeDownload(${item.id})">Resume</button>
+                  <button class="btn btn-danger" style="padding:6px 12px; font-size:11.5px;" onclick="cancelDownload(${item.id})">Cancel</button>
+                ` : ''}
+                ${isCompleted ? `
+                  <button class="btn btn-primary" style="padding:6px 12px; font-size:11.5px;" onclick="openDownload(${item.id})">Open File</button>
+                  <button class="btn btn-ghost" style="padding:6px 12px; font-size:11.5px;" onclick="showInFolder(${item.id})">Show in Folder</button>
+                  <button class="btn btn-ghost" style="padding:6px 12px; font-size:11.5px; border-color:rgba(56,189,248,0.4); color:var(--neon-cyan);" onclick="sendToOmniHub(${item.id})">Send to OmniHub</button>
+                ` : ''}
+              </div>
             </div>
-          ` : ''}
-        </div>
-        ${dl.speed > 0 ? `<div class="speed-badge">${dl.speed} MB/s</div>` : ''}
-        <div class="status-badge ${badgeClass}">
-          <span class="dot"></span> ${badgeText}
-        </div>
-        <div class="dl-actions">
-          ${dl.status === 'active' ? `<button class="action-btn" title="Pause" onclick="pause_dl(${dl.id})">⏸</button>` : ''}
-          ${dl.status === 'paused' ? `<button class="action-btn" title="Resume" onclick="resume_dl(${dl.id})">▶</button>` : ''}
-          ${dl.status === 'error' ? `<button class="action-btn" title="Retry" onclick="retry_dl(${dl.id})">↺</button>` : ''}
-          ${dl.status === 'done' ? `<button class="action-btn" title="Show in folder" onclick="show_file(${dl.id})">📂</button>` : ''}
-          <button class="action-btn del" title="Remove" onclick="remove_dl(${dl.id})">✕</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
+          </div>
+        `;
+      });
 
-  // Update stats
-  document.getElementById('stat_total').textContent  = downloads.length;
-  document.getElementById('stat_done').textContent   = downloads.filter(d => d.status === 'done').length;
-  document.getElementById('stat_active').textContent = downloads.filter(d => d.status === 'active').length;
-  const totalMb = downloads.reduce((s, d) => s + d.downloaded, 0);
-  document.getElementById('stat_size').textContent   = fmtSize(totalMb);
-}
-
-function open_file(id)   { try { window.aeonBridge?.openDownload(id); } catch(_) {} }
-function show_file(id)   { try { window.aeonBridge?.showInFolder(id); } catch(_) {} }
-function pause_dl(id)    {
-  const dl = downloads.find(d => d.id === id);
-  if (dl) { dl.status = 'paused'; dl.speed = 0; }
-  try { window.aeonBridge?.pauseDownload(id); } catch(_) {}
-  render();
-}
-function resume_dl(id)   {
-  const dl = downloads.find(d => d.id === id);
-  if (dl) { dl.status = 'active'; dl.speed = 1.2; }
-  try { window.aeonBridge?.resumeDownload(id); } catch(_) {}
-  render();
-}
-function retry_dl(id)    {
-  const dl = downloads.find(d => d.id === id);
-  if (dl) { dl.status = 'active'; dl.downloaded = 0; dl.speed = 0.8; }
-  try { window.aeonBridge?.retryDownload(id); } catch(_) {}
-  render();
-}
-function remove_dl(id)   {
-  downloads = downloads.filter(d => d.id !== id);
-  try { window.aeonBridge?.cancelDownload(id); } catch(_) {}
-  render();
-}
-function clearCompleted() {
-  downloads = downloads.filter(d => d.status !== 'done');
-  try { window.aeonBridge?.clearCompleted(); } catch(_) {}
-  render();
-}
-function openFolder() {
-  try { window.aeonBridge?.openDownloadFolder(); } catch(_) {}
-}
-
-// Live progress simulation for active downloads (only in stub mode)
-setInterval(() => {
-  let changed = false;
-  downloads.forEach(dl => {
-    if (dl.status === 'active' && dl.downloaded < dl.size) {
-      const inc = Math.random() * 12;
-      dl.downloaded = Math.min(dl.size, dl.downloaded + inc);
-      if (dl.downloaded >= dl.size) { dl.status = 'done'; dl.speed = 0; }
-      changed = true;
+      container.innerHTML = html;
     }
-  });
-  if (changed) render();
-}, 500);
 
-// Load real data from native bridge if available
-function mapState(s) {
-  // C++ DownloadState enum: 0=Pending, 1=Active, 2=Paused, 3=Complete, 4=Failed, 5=Cancelled
-  const map = ['active','active','paused','done','error','error'];
-  return map[s] || 'active';
-}
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 
-function iconForExt(name) {
-  const e = (name || '').split('.').pop().toLowerCase();
-  const map = {exe:'⚙',msi:'⚙',zip:'📦',gz:'📦',tar:'📦',iso:'💿',pdf:'📄',
-    jpg:'🖼',png:'🖼',mp4:'🎬',mp3:'🎵',txt:'📋',html:'🌐',dll:'🔧'};
-  return map[e] || '📄';
-}
+    function pauseDownload(id) {
+      const d = downloads.find(x => x.id === id);
+      if (d) { d.state = 'paused'; d.speed_bps = 0; }
+      saveCache();
+      renderDownloads();
+      if (window.aeonBridge && typeof window.aeonBridge.pauseDownload === 'function') {
+        window.aeonBridge.pauseDownload(id);
+      }
+    }
 
-try {
-  let items = null;
-  const raw = window.aeonBridge?.getDownloads?.();
-  if (raw && typeof raw === 'string') {
-    items = JSON.parse(raw);
-  } else if (Array.isArray(raw)) {
-    items = raw;
-  }
-  if (items && items.length) {
-    downloads = items.map(d => ({
-      id: d.id,
-      name: d.filename || d.url.split('/').pop() || 'download',
-      size: (d.total || 0) / (1024*1024),
-      downloaded: (d.received || 0) / (1024*1024),
-      speed: (d.speed || 0) / (1024*1024),
-      status: mapState(d.state),
-      icon: iconForExt(d.filename),
-      started: '',
-      url: d.url
-    }));
-  }
-} catch(_) {}
+    function resumeDownload(id) {
+      const d = downloads.find(x => x.id === id);
+      if (d) { d.state = 'downloading'; d.speed_bps = 8500000; }
+      saveCache();
+      renderDownloads();
+      if (window.aeonBridge && typeof window.aeonBridge.resumeDownload === 'function') {
+        window.aeonBridge.resumeDownload(id);
+      }
+    }
 
-render();
-</script>
+    function cancelDownload(id) {
+      const d = downloads.find(x => x.id === id);
+      if (d) { d.state = 'cancelled'; d.speed_bps = 0; }
+      saveCache();
+      renderDownloads();
+      if (window.aeonBridge && typeof window.aeonBridge.cancelDownload === 'function') {
+        window.aeonBridge.cancelDownload(id);
+      }
+    }
+
+    function openDownload(id) {
+      if (window.aeonBridge && typeof window.aeonBridge.openDownload === 'function') {
+        window.aeonBridge.openDownload(id);
+      } else if (window.aeonBridge && typeof window.aeonBridge.openDownloadFile === 'function') {
+        window.aeonBridge.openDownloadFile(id);
+      }
+    }
+
+    function showInFolder(id) {
+      if (window.aeonBridge && typeof window.aeonBridge.showInFolder === 'function') {
+        window.aeonBridge.showInFolder(id);
+      } else if (window.aeonBridge && typeof window.aeonBridge.showDownloadInFolder === 'function') {
+        window.aeonBridge.showDownloadInFolder(id);
+      }
+    }
+
+    function sendToOmniHub(id) {
+      const d = downloads.find(x => x.id === id);
+      if (window.aeonBridge && typeof window.aeonBridge.sendToOmniHub === 'function') {
+        window.aeonBridge.sendToOmniHub({ id, filename: d?.filename || '', url: d?.url || '' });
+      } else if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({ type: 'omnihub.handoff', id, filename: d?.filename || '', url: d?.url || '' });
+      }
+    }
+
+    function openDownloadsFolder() {
+      if (window.aeonBridge && typeof window.aeonBridge.openDownloadsFolder === 'function') {
+        window.aeonBridge.openDownloadsFolder();
+      }
+    }
+
+    function clearCompleted() {
+      downloads = downloads.filter(d => d.state === 'downloading' || d.state === 'paused');
+      saveCache();
+      renderDownloads();
+      if (window.aeonBridge && typeof window.aeonBridge.clearCompleted === 'function') {
+        window.aeonBridge.clearCompleted();
+      } else if (window.aeonBridge && typeof window.aeonBridge.clearDownloadHistory === 'function') {
+        window.aeonBridge.clearDownloadHistory();
+      }
+    }
+
+    // Refresh downloads from native bridge periodically
+    setInterval(() => {
+      if (window.aeonBridge && typeof window.aeonBridge.getDownloads === 'function') {
+        const res = window.aeonBridge.getDownloads();
+        if (Array.isArray(res)) {
+          downloads = res;
+          renderDownloads();
+        } else if (typeof res === 'string') {
+          try {
+            downloads = JSON.parse(res) || [];
+            renderDownloads();
+          } catch(e) {}
+        }
+      }
+    }, 2000);
+
+    window.addEventListener('DOMContentLoaded', loadDownloads);
+    loadDownloads();
+  </script>
 </body>
 </html>

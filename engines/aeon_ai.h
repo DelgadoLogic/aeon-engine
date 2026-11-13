@@ -28,20 +28,32 @@
 
 #pragma once
 
-#include "aeon_component.h"
+#include "../core/aeon_component.h"
 #include <functional>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+    #ifdef AEON_AI_EXPORTS
+        #define AEON_AI_API __declspec(dllexport)
+    #else
+        #define AEON_AI_API __declspec(dllimport)
+    #endif
+#else
+    #define AEON_AI_API
+#endif
 
 // ---------------------------------------------------------------------------
 // AeonAIModelTier
 // ---------------------------------------------------------------------------
 enum class AeonAIModelTier : uint8_t {
-    Micro  = 0,   // TinyLlama Q4_0 (~600MB disk, ~256MB RAM)
-    Mini   = 1,   // Phi-3 Mini Q4_K (~2.4GB disk, ~512MB RAM)
-    Small  = 2,   // SmolLM2-1.7B Q4 (~900MB disk, ~1GB RAM)
-    Mid    = 3,   // MiniCPM-2B Q4   (~1.5GB disk, ~2GB RAM)
-    HivePeer = 4, // Offload to capable Hive node
+    Micro      = 0,   // TinyLlama Q4_0 (~600MB disk, ~256MB RAM)
+    Mini       = 1,   // Phi-3 Mini Q4_K (~2.4GB disk, ~512MB RAM)
+    Small      = 2,   // SmolLM2-1.7B Q4 (~900MB disk, ~1GB RAM)
+    Mid        = 3,   // MiniCPM-2B Q4   (~1.5GB disk, ~2GB RAM)
+    HivePeer   = 4,   // Offload to capable Hive node
+    Gemma4_2B  = 5,   // gemma4:e2b (Apache 2.0 2B parameters)
+    Gemma4_12B = 6,   // gemma4:12b (Apache 2.0 12B parameters)
 };
 
 // ---------------------------------------------------------------------------
@@ -88,7 +100,7 @@ using AeonAIVoiceCallback = std::function<void(
 // ---------------------------------------------------------------------------
 class AeonAIImpl;
 
-class AeonAI final : public AeonComponentBase {
+class AEON_AI_API AeonAI final : public AeonComponentBase {
 public:
     AeonAI();
     ~AeonAI() override;
@@ -115,8 +127,11 @@ public:
     // Unload current model (frees RAM)
     void UnloadModel();
 
-    // Returns currently loaded model info (nullptr if none)
-    const AeonAIModel* GetLoadedModel() const;
+    // Returns currently loaded model info (by value)
+    AeonAIModel GetLoadedModel() const;
+
+    // Returns number of loaded model tensors (0 if unloaded / lightweight mode)
+    uint64_t GetLoadedTensorCount() const;
 
     // ── Inference API ─────────────────────────────────────────────────────
 
@@ -142,6 +157,27 @@ public:
         AeonAIStreamCallback callback,
         int                  max_tokens = 512
     );
+
+    // Topic classification via Gemma 4 / Local AI GGUF engine
+    std::string ClassifyTopicLLM(const std::string& url, const std::string& title);
+
+    // Intent detection via Gemma 4 / Local AI GGUF engine
+    std::string DetectIntentLLM(const std::string& url, const std::string& title, const std::string& referrer);
+
+    // Predictive prefetching candidates
+    std::vector<std::string> PredictPrefetchURLs(const std::string& current_url, const std::string& journey_context);
+
+    // Synchronous webpage summarization returning structured JSON
+    std::string SummarizeText(const std::string& page_text, int max_bullets = 5);
+
+    // Intent prompt parser returning target URL and classification
+    std::string ParseIntent(const std::string& intent_prompt);
+
+    // Gemma 4 local model text/vision processing
+    std::string ProcessGemma(const std::string& input_prompt, const std::string& image_base64 = "");
+
+    // MultiOn-grade autonomous workflow motor cortex execution
+    std::string RunMultiOnWorkflow(const std::string& goal, const std::string& auth_json_path = "");
 
     // Cancel current generation
     void CancelGeneration();
@@ -202,4 +238,4 @@ private:
 };
 
 // ── Global singleton ──────────────────────────────────────────────────────────
-AeonAI& AeonAIInstance();
+AEON_AI_API AeonAI& AeonAIInstance();

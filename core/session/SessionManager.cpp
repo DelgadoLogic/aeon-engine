@@ -1,85 +1,111 @@
-// AeonBrowser — SessionManager.cpp
+﻿// AeonBrowser -- SessionManager.cpp
 // DelgadoLogic | Lead Systems Architect
 //
-// PURPOSE: Persists open tab URLs, scroll positions, and form state to a
-// JSON session file. On crash or clean exit, the next launch restores the
+// PURPOSE: Persists open tab URLs, scroll positions, form state, and tab groups
+// to a JSON session file. On crash or clean exit, the next launch restores the
 // previous session silently, removing the #1 user frustration from crashes.
 //
 // FORMAT: %APPDATA%\DelgadoLogic\Aeon\session.json
 // {
 //   "tabs": [
-//     { "url": "https://...", "scroll_y": 1240, "title": "..." },
+//     { "url": "https://...", "scroll_y": 1240, "title": "...", "groupId": 1 },
 //     ...
+//   ],
+//   "groups": [
+//     { "id": 1, "name": "Work", "color": 16265107, "color_hex": "#9333ea", "collapsed": false }
 //   ],
 //   "active_tab": 0,
 //   "timestamp": 1711285200
 // }
-//
-// IT TROUBLESHOOTING:
-//   - "Crash loop restoring session": Delete session.json in above path.
-//   - "Session not restored": Check AEON_DISABLE_SESSION_RESTORE registry key.
-//   - "Wrong tabs restored": session.json may be corrupted. We validate JSON
-//     on load — if invalid, we silently discard and start fresh.
 
 #include "SessionManager.h"
-#include "../ui/BrowserChrome.h"
+#include "../engine/AeonEngine_Interface.h"
+#include "../ui/TabGroupManager.h"
+#include "nlohmann/json.hpp"
+#include <filesystem>
 #include <windows.h>
-#include <shlobj.h>    // SHGetFolderPath — works Win9x through Win11
+#include <shlobj.h>    // SHGetFolderPath -- works Win9x through Win11
 #include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <string>
 #include <vector>
 
+using json = nlohmann::json;
+
 namespace SessionManager {
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Session data structures
-// ─────────────────────────────────────────────────────────────────────────────
-struct SessionTab {
-    char url[2048]   = {};
-    char title[512]  = {};
-    int  scrollY     = 0;
-};
+static SessionUiHooks g_UiHooks = {};
+static AeonEngineVTable* g_Engine = nullptr;
 
-static char               g_SessionPath[MAX_PATH] = {};
-static HWND               g_MainHwnd = nullptr;
-static std::vector<SessionTab> g_Tabs;
-static int                g_ActiveTab = 0;
-static UINT_PTR           g_AutosaveTimer = 0;
-static const DWORD        AUTOSAVE_INTERVAL_MS = 30000; // 30 seconds
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Path resolution
-// ─────────────────────────────────────────────────────────────────────────────
-static void BuildSessionPath() {
-    if (g_SessionPath[0]) return; // already resolved
-
-    char appData[MAX_PATH] = {};
-    // CSIDL_APPDATA = 0x001A — works Win9x through Win11
-    if (SHGetFolderPathA(nullptr, CSIDL_APPDATA, nullptr, 0, appData)
-            != S_OK) {
-        // Fallback for very early Win9x: use install dir
-        GetModuleFileNameA(nullptr, appData, MAX_PATH);
-        char* slash = strrchr(appData, '\\');
-        if (slash) *slash = '\0';
-    }
-
-    char dir[MAX_PATH];
-    _snprintf_s(dir, sizeof(dir), _TRUNCATE,
-        "%s\\DelgadoLogic\\Aeon", appData);
-    CreateDirectoryA(dir, nullptr); // no-op if already exists
-
-    _snprintf_s(g_SessionPath, sizeof(g_SessionPath), _TRUNCATE,
-        "%s\\session.json", dir);
+void SetUiHooks(const SessionUiHooks& hooks) {
+    g_UiHooks = hooks;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JSON escaping (minimal, no external library)
-// ─────────────────────────────────────────────────────────────────────────────
+void SetEngine(AeonEngineVTable* engine) {
+    g_Engine = engine;
+}
+
+// ---------------------------------------------------------------------------
+// Internal data structures
+// ---------------------------------------------------------------------------
+struct SessionTab {
+    char     url[2048];
+    char     title[256];
+    int      scrollY;
+    uint32_t groupId;
+};
+
+static HWND                   g_MainHwnd       = nullptr;
+static UINT_PTR               g_AutosaveTimer  = 0;
+static std::vector<SessionTab> g_Tabs;
+static int                    g_ActiveTab      = 0;
+static char                   g_SessionPath[MAX_PATH] = {};
+
+static const UINT AUTOSAVE_INTERVAL_MS = 30000; // 30 seconds
+
+// ---------------------------------------------------------------------------
+// Path resolution
+// ---------------------------------------------------------------------------
+static void BuildSessionPath() {
+    if (g_SessionPath[0]) return;
+
+    char appData[MAX_PATH] = {};
+    if (SUCCEEDED(SHGetFolderPathA(nullptr, CSIDL_APPDATA, nullptr,
+                                   SHGFP_TYPE_CURRENT, appData))) {
+        _snprintf_s(g_SessionPath, sizeof(g_SessionPath), _TRUNCATE,
+            "%s\\DelgadoLogic\\Aeon\\session.json", appData);
+        // Ensure directory exists
+        char dir[MAX_PATH] = {};
+        _snprintf_s(dir, sizeof(dir), _TRUNCATE,
+            "%s\\DelgadoLogic\\Aeon", appData);
+        CreateDirectoryA(dir, nullptr);
+    } else {
+        // Fallback to local directory
+        strcpy_s(g_SessionPath, sizeof(g_SessionPath), "session.json");
+    }
+}
+
+void SetSessionPath(const char* path) {
+    if (path && *path) {
+        strncpy_s(g_SessionPath, path, sizeof(g_SessionPath) - 1);
+    } else {
+        g_SessionPath[0] = '\0';
+    }
+}
+
+const char* GetSessionPath() {
+    if (!g_SessionPath[0]) BuildSessionPath();
+    return g_SessionPath;
+}
+
+// ---------------------------------------------------------------------------
+// JSON helpers (lightweight manual formatting for save, robust for load)
+// ---------------------------------------------------------------------------
 static std::string EscapeJson(const char* s) {
+    if (!s) return "";
     std::string r;
-    if (!s) return r;
+    r.reserve(strlen(s) * 2);
     for (const char* p = s; *p; p++) {
         switch (*p) {
             case '"':  r += "\\\""; break;
@@ -93,69 +119,119 @@ static std::string EscapeJson(const char* s) {
     return r;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Snapshot tabs from BrowserChrome state
-// ─────────────────────────────────────────────────────────────────────────────
+static COLORREF ParseHexColor(const std::string& hex) {
+    if (hex.empty()) return BrowserChrome::GROUP_COLOR_PURPLE;
+    const char* p = hex.c_str();
+    if (*p == '#') p++;
+    unsigned int val = 0;
+    if (sscanf_s(p, "%x", &val) == 1) {
+        if (hex.length() <= 7) {
+            BYTE r = (val >> 16) & 0xFF;
+            BYTE g = (val >> 8) & 0xFF;
+            BYTE b = val & 0xFF;
+            return RGB(r, g, b);
+        }
+    }
+    return BrowserChrome::GROUP_COLOR_PURPLE;
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot tabs from BrowserChrome state via hooks
+// ---------------------------------------------------------------------------
 static void SnapshotTabs() {
     if (!g_MainHwnd) return;
 
     g_Tabs.clear();
-    int count = BrowserChrome::GetTabCount(g_MainHwnd);
-    g_ActiveTab = BrowserChrome::GetActiveTabIndex(g_MainHwnd);
+    int count = g_UiHooks.GetTabCount ? g_UiHooks.GetTabCount(g_MainHwnd) : 0;
+    g_ActiveTab = g_UiHooks.GetActiveTabIndex ? g_UiHooks.GetActiveTabIndex(g_MainHwnd) : 0;
+
+    auto& groupMgr = BrowserChrome::TabGroupManager::GetInstance();
 
     for (int i = 0; i < count; i++) {
         SessionTab st = {};
         unsigned int tabId = 0;
         bool active = false;
-        BrowserChrome::GetTabInfo(g_MainHwnd, i, &tabId,
-            st.url, sizeof(st.url),
-            st.title, sizeof(st.title),
-            &active);
+        if (g_UiHooks.GetTabInfo) {
+            g_UiHooks.GetTabInfo(g_MainHwnd, i, &tabId,
+                st.url, sizeof(st.url),
+                st.title, sizeof(st.title),
+                &active);
+        }
         // Skip internal pages from session (except newtab)
         if (strncmp(st.url, "aeon://", 7) == 0 &&
             strcmp(st.url, "aeon://newtab") != 0) {
             continue;
         }
+        if (tabId != 0) {
+            st.groupId = groupMgr.GetTabGroupId(tabId);
+        }
         g_Tabs.push_back(st);
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Write session to disk
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 static void WriteToDisk() {
     if (!g_SessionPath[0]) BuildSessionPath();
 
+    char tmpPath[MAX_PATH];
+    _snprintf_s(tmpPath, sizeof(tmpPath), _TRUNCATE, "%s.tmp", g_SessionPath);
+
     FILE* f = nullptr;
-    fopen_s(&f, g_SessionPath, "w");
+    fopen_s(&f, tmpPath, "w");
     if (!f) {
         fprintf(stdout, "[Session] ERROR: Cannot write session file: %s\n",
-            g_SessionPath);
+            tmpPath);
         return;
     }
 
     fprintf(f, "{\n  \"tabs\": [\n");
     for (size_t i = 0; i < g_Tabs.size(); i++) {
-        fprintf(f, "    {\"url\":\"%s\",\"title\":\"%s\",\"scroll_y\":%d}",
+        fprintf(f, "    {\"url\":\"%s\",\"title\":\"%s\",\"scroll_y\":%d,\"groupId\":%u}",
             EscapeJson(g_Tabs[i].url).c_str(),
             EscapeJson(g_Tabs[i].title).c_str(),
-            g_Tabs[i].scrollY);
+            g_Tabs[i].scrollY,
+            g_Tabs[i].groupId);
         if (i + 1 < g_Tabs.size()) fprintf(f, ",");
         fprintf(f, "\n");
     }
     fprintf(f, "  ],\n");
+
+    auto allGroups = BrowserChrome::TabGroupManager::GetInstance().GetAllGroups();
+    fprintf(f, "  \"groups\": [\n");
+    for (size_t i = 0; i < allGroups.size(); i++) {
+        const auto& grp = allGroups[i];
+        char hexColor[16];
+        _snprintf_s(hexColor, sizeof(hexColor), _TRUNCATE, "#%02x%02x%02x",
+            GetRValue(grp.color), GetGValue(grp.color), GetBValue(grp.color));
+        fprintf(f, "    {\"id\":%u,\"name\":\"%s\",\"color\":%u,\"color_hex\":\"%s\",\"collapsed\":%s}",
+            grp.id,
+            EscapeJson(grp.name.c_str()).c_str(),
+            (unsigned int)grp.color,
+            hexColor,
+            grp.collapsed ? "true" : "false");
+        if (i + 1 < allGroups.size()) fprintf(f, ",");
+        fprintf(f, "\n");
+    }
+    fprintf(f, "  ],\n");
+
     fprintf(f, "  \"active_tab\": %d,\n", g_ActiveTab);
     fprintf(f, "  \"timestamp\": %llu\n", (unsigned long long)time(nullptr));
     fprintf(f, "}\n");
 
+    fflush(f);
     fclose(f);
-    fprintf(stdout, "[Session] Saved %zu tabs to %s\n",
-        g_Tabs.size(), g_SessionPath);
+
+    MoveFileExA(tmpPath, g_SessionPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+
+    fprintf(stdout, "[Session] Saved %zu tabs and %zu groups atomically to %s\n",
+        g_Tabs.size(), allGroups.size(), g_SessionPath);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Minimal JSON parser for session.json
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Robust JSON parser for session.json via nlohmann::json
+// ---------------------------------------------------------------------------
 static bool ParseSessionFile(std::vector<SessionTab>& outTabs, int& outActiveTab) {
     if (!g_SessionPath[0]) BuildSessionPath();
 
@@ -177,85 +253,95 @@ static bool ParseSessionFile(std::vector<SessionTab>& outTabs, int& outActiveTab
     fread(&content[0], 1, (size_t)sz, f);
     fclose(f);
 
-    // Parse tabs array — find "url" and "title" fields
-    // This is a purpose-built parser, not a general JSON parser
     outTabs.clear();
     outActiveTab = 0;
 
-    // Find "active_tab" value
-    size_t atPos = content.find("\"active_tab\"");
-    if (atPos != std::string::npos) {
-        size_t colon = content.find(':', atPos);
-        if (colon != std::string::npos) {
-            outActiveTab = atoi(content.c_str() + colon + 1);
+    try {
+        auto j = json::parse(content);
+        if (!j.is_object()) return false;
+
+        if (j.contains("active_tab") && j["active_tab"].is_number()) {
+            outActiveTab = j["active_tab"].get<int>();
         }
-    }
 
-    // Find each tab object { "url":"...", "title":"..." }
-    size_t pos = content.find("\"tabs\"");
-    if (pos == std::string::npos) return false;
+        // Deserialize saved tab groups and restore into TabGroupManager
+        if (j.contains("groups") && j["groups"].is_array()) {
+            auto& groupMgr = BrowserChrome::TabGroupManager::GetInstance();
+            for (const auto& item : j["groups"]) {
+                if (!item.is_object()) continue;
+                uint32_t gid = 0;
+                if (item.contains("id") && item["id"].is_number()) {
+                    gid = item["id"].get<uint32_t>();
+                }
+                if (gid == 0) continue;
 
-    pos = content.find('[', pos);
-    if (pos == std::string::npos) return false;
+                std::string name;
+                if (item.contains("name") && item["name"].is_string()) {
+                    name = item["name"].get<std::string>();
+                }
 
-    // Walk through tab objects
-    while (true) {
-        size_t objStart = content.find('{', pos);
-        if (objStart == std::string::npos) break;
+                COLORREF color = BrowserChrome::GROUP_COLOR_PURPLE;
+                if (item.contains("color")) {
+                    if (item["color"].is_number()) {
+                        color = (COLORREF)item["color"].get<uint32_t>();
+                    } else if (item["color"].is_string()) {
+                        color = ParseHexColor(item["color"].get<std::string>());
+                    }
+                }
+                if (item.contains("color_hex") && item["color_hex"].is_string()) {
+                    color = ParseHexColor(item["color_hex"].get<std::string>());
+                }
 
-        size_t objEnd = content.find('}', objStart);
-        if (objEnd == std::string::npos) break;
+                bool collapsed = false;
+                if (item.contains("collapsed") && item["collapsed"].is_boolean()) {
+                    collapsed = item["collapsed"].get<bool>();
+                }
 
-        std::string obj = content.substr(objStart, objEnd - objStart + 1);
-
-        SessionTab st = {};
-
-        // Extract "url":"..."
-        size_t urlKey = obj.find("\"url\"");
-        if (urlKey != std::string::npos) {
-            size_t q1 = obj.find('"', urlKey + 5);
-            size_t q2 = (q1 != std::string::npos) ? obj.find('"', q1 + 1) : std::string::npos;
-            if (q1 != std::string::npos && q2 != std::string::npos) {
-                std::string val = obj.substr(q1 + 1, q2 - q1 - 1);
-                strncpy_s(st.url, val.c_str(), sizeof(st.url) - 1);
+                groupMgr.RestoreGroup(gid, name, color, collapsed);
             }
         }
 
-        // Extract "title":"..."
-        size_t titleKey = obj.find("\"title\"");
-        if (titleKey != std::string::npos) {
-            size_t q1 = obj.find('"', titleKey + 7);
-            size_t q2 = (q1 != std::string::npos) ? obj.find('"', q1 + 1) : std::string::npos;
-            if (q1 != std::string::npos && q2 != std::string::npos) {
-                std::string val = obj.substr(q1 + 1, q2 - q1 - 1);
-                strncpy_s(st.title, val.c_str(), sizeof(st.title) - 1);
+        if (j.contains("tabs") && j["tabs"].is_array()) {
+            for (const auto& item : j["tabs"]) {
+                if (item.is_object()) {
+                    SessionTab st = {};
+                    if (item.contains("url") && item["url"].is_string()) {
+                        std::string u = item["url"].get<std::string>();
+                        // Ensure internal pages (except aeon://newtab) are skipped cleanly
+                        if (u.rfind("aeon://", 0) == 0 && u != "aeon://newtab") {
+                            continue;
+                        }
+                        strncpy_s(st.url, u.c_str(), sizeof(st.url) - 1);
+                    }
+                    if (item.contains("title") && item["title"].is_string()) {
+                        std::string t = item["title"].get<std::string>();
+                        strncpy_s(st.title, t.c_str(), sizeof(st.title) - 1);
+                    }
+                    if (item.contains("scroll_y") && item["scroll_y"].is_number()) {
+                        st.scrollY = item["scroll_y"].get<int>();
+                    }
+                    if (item.contains("groupId") && item["groupId"].is_number()) {
+                        st.groupId = item["groupId"].get<uint32_t>();
+                    } else if (item.contains("group_id") && item["group_id"].is_number()) {
+                        st.groupId = item["group_id"].get<uint32_t>();
+                    }
+                    if (st.url[0]) {
+                        outTabs.push_back(st);
+                    }
+                }
             }
         }
-
-        // Extract "scroll_y":N
-        size_t scrollKey = obj.find("\"scroll_y\"");
-        if (scrollKey != std::string::npos) {
-            size_t colon = obj.find(':', scrollKey);
-            if (colon != std::string::npos) {
-                st.scrollY = atoi(obj.c_str() + colon + 1);
-            }
-        }
-
-        // Only add if URL is non-empty
-        if (st.url[0]) {
-            outTabs.push_back(st);
-        }
-
-        pos = objEnd + 1;
+    } catch (...) {
+        return false;
     }
 
     fprintf(stdout, "[Session] Parsed %zu tabs from session file\n", outTabs.size());
     return !outTabs.empty();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Public API
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 void Initialize(const SystemProfile& p) {
     BuildSessionPath();
     (void)p;
@@ -281,16 +367,18 @@ void OnAutosaveTimer() {
 }
 
 void SaveTab(const char* url, int scrollY, const char* title) {
-    // Individual tab save — used for incremental updates
+    // Individual tab save -- used for incremental updates
     SessionTab st = {};
     if (url) strncpy_s(st.url, url, sizeof(st.url) - 1);
     if (title) strncpy_s(st.title, title, sizeof(st.title) - 1);
     st.scrollY = scrollY;
+    st.groupId = 0;
 
     // Update if exists, add if not
     for (auto& t : g_Tabs) {
         if (strcmp(t.url, st.url) == 0) {
-            t = st;
+            t.scrollY = scrollY;
+            if (title) strncpy_s(t.title, title, sizeof(t.title) - 1);
             return;
         }
     }
@@ -319,30 +407,186 @@ bool RestorePreviousSession() {
     }
 
     if (!g_MainHwnd) {
-        fprintf(stdout, "[Session] WARNING: No main window — cannot restore tabs.\n");
+        fprintf(stdout, "[Session] WARNING: No main window -- cannot restore tabs.\n");
         return false;
     }
 
     fprintf(stdout, "[Session] Restoring %zu tabs (active: %d)\n",
         tabs.size(), activeTab);
 
+    // Identify placeholder initial tab (e.g. single aeon://newtab or about:blank)
+    unsigned int placeholderTabId = 0;
+    if (g_UiHooks.GetTabCount && g_UiHooks.GetTabCount(g_MainHwnd) == 1 && g_UiHooks.GetTabInfo) {
+        unsigned int tid = 0;
+        char u[2048] = {};
+        char t[256] = {};
+        bool act = false;
+        if (g_UiHooks.GetTabInfo(g_MainHwnd, 0, &tid, u, sizeof(u), t, sizeof(t), &act)) {
+            if (strcmp(u, "aeon://newtab") == 0 || strcmp(u, "about:blank") == 0 || u[0] == '\0') {
+                placeholderTabId = tid;
+            }
+        }
+    }
+
     unsigned int activeId = 0;
+    auto& groupMgr = BrowserChrome::TabGroupManager::GetInstance();
     for (size_t i = 0; i < tabs.size(); i++) {
-        unsigned int tabId = BrowserChrome::CreateTab(g_MainHwnd, tabs[i].url);
+        unsigned int tabId = g_UiHooks.CreateTab ? g_UiHooks.CreateTab(g_MainHwnd, tabs[i].url) : 0;
         if (tabId && (int)i == activeTab) {
             activeId = tabId;
         }
-        fprintf(stdout, "[Session]   Tab %zu: %s\n", i, tabs[i].url);
+        if (tabId && tabs[i].groupId > 0) {
+            groupMgr.AddTabToGroup(tabId, tabs[i].groupId);
+            if (g_UiHooks.AddTabToGroup) {
+                g_UiHooks.AddTabToGroup(g_MainHwnd, (int)i, tabs[i].groupId);
+            }
+        }
+        fprintf(stdout, "[Session]   Tab %zu: %s (Group: %u)\n", i, tabs[i].url, tabs[i].groupId);
+    }
+
+    // Clean up initial placeholder tab if restored tabs were created
+    if (placeholderTabId && !tabs.empty() && g_UiHooks.CloseTabById) {
+        g_UiHooks.CloseTabById(g_MainHwnd, placeholderTabId);
     }
 
     // Focus the previously active tab
-    if (activeId) {
-        BrowserChrome::FocusTabById(g_MainHwnd, activeId);
+    if (activeId && g_UiHooks.FocusTabById) {
+        g_UiHooks.FocusTabById(g_MainHwnd, activeId);
     }
 
     // Delete session file after successful restore to avoid crash loops
     DeleteFileA(g_SessionPath);
 
+    return true;
+}
+
+static std::string ResolveAuthJsonPath(const char* json_path) {
+    if (json_path && *json_path) {
+        return std::string(json_path);
+    }
+    char exeDir[MAX_PATH] = {};
+    GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
+    if (char* s = strrchr(exeDir, '\\')) *s = '\0';
+    char defaultPath[MAX_PATH];
+    _snprintf_s(defaultPath, sizeof(defaultPath), _TRUNCATE, "%s\\userDataDir\\auth.json", exeDir);
+    return std::string(defaultPath);
+}
+
+bool ExportSessionState(const char* json_path, int* out_cookies, int* out_origins) {
+    std::string path = ResolveAuthJsonPath(json_path);
+
+    std::filesystem::path fsPath(path);
+    if (fsPath.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(fsPath.parent_path(), ec);
+    }
+
+    AeonEngineVTable* engine = g_Engine;
+    if (engine && engine->ExportStorageState) {
+        int ret = engine->ExportStorageState(path.c_str());
+        if (ret < 0) {
+            fprintf(stderr, "[Session] ExportStorageState failed on engine\n");
+            return false;
+        }
+    } else {
+        FILE* f = nullptr;
+        fopen_s(&f, path.c_str(), "w");
+        if (f) {
+            fprintf(f, "{\n  \"cookies\": [],\n  \"origins\": []\n}\n");
+            fclose(f);
+        }
+    }
+
+    int cookieCount = 0;
+    int originCount = 0;
+
+    FILE* f = nullptr;
+    fopen_s(&f, path.c_str(), "r");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (sz > 0 && sz < 10 * 1024 * 1024) {
+            std::string content((size_t)sz, '\0');
+            fread(&content[0], 1, (size_t)sz, f);
+            try {
+                auto j = json::parse(content);
+                if (j.is_object()) {
+                    if (j.contains("cookies") && j["cookies"].is_array()) {
+                        cookieCount = static_cast<int>(j["cookies"].size());
+                    }
+                    if (j.contains("origins") && j["origins"].is_array()) {
+                        originCount = static_cast<int>(j["origins"].size());
+                    }
+                }
+            } catch (...) {}
+        }
+        fclose(f);
+    }
+
+    if (out_cookies) *out_cookies = cookieCount;
+    if (out_origins) *out_origins = originCount;
+
+    fprintf(stdout, "[Session] ExportSessionState completed: path=%s (cookies=%d, origins=%d)\n",
+        path.c_str(), cookieCount, originCount);
+    return true;
+}
+
+bool ImportSessionState(const char* json_path, int* out_cookies, int* out_origins) {
+    std::string path = ResolveAuthJsonPath(json_path);
+
+    int cookieCount = 0;
+    int originCount = 0;
+
+    FILE* f = nullptr;
+    fopen_s(&f, path.c_str(), "r");
+    if (!f) {
+        fprintf(stderr, "[Session] ImportSessionState cannot open file: %s\n", path.c_str());
+        return false;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (sz <= 0 || sz > 50 * 1024 * 1024) {
+        fclose(f);
+        return false;
+    }
+
+    std::string content((size_t)sz, '\0');
+    fread(&content[0], 1, (size_t)sz, f);
+    fclose(f);
+
+    try {
+        auto j = json::parse(content);
+        if (!j.is_object()) {
+            return false;
+        }
+        if (j.contains("cookies") && j["cookies"].is_array()) {
+            cookieCount = static_cast<int>(j["cookies"].size());
+        }
+        if (j.contains("origins") && j["origins"].is_array()) {
+            originCount = static_cast<int>(j["origins"].size());
+        }
+    } catch (...) {
+        return false;
+    }
+
+    AeonEngineVTable* engine = g_Engine;
+    if (engine && engine->ImportStorageState) {
+        int ret = engine->ImportStorageState(path.c_str());
+        if (ret < 0) {
+            fprintf(stderr, "[Session] ImportStorageState failed on engine\n");
+            return false;
+        }
+    }
+
+    if (out_cookies) *out_cookies = cookieCount;
+    if (out_origins) *out_origins = originCount;
+
+    fprintf(stdout, "[Session] ImportSessionState completed: path=%s (cookies=%d, origins=%d)\n",
+        path.c_str(), cookieCount, originCount);
     return true;
 }
 

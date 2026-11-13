@@ -34,6 +34,14 @@ pub enum HiveTopic {
     SovereignCommand  = 0x000A,
     /// Vote coordination for autonomous patches
     VoteCoordination  = 0x000B,
+    /// Direct messaging between peer nodes
+    DirectMessage     = 0x000C,
+    /// Group messaging channel
+    GroupMessage      = 0x000D,
+    /// Mailbox synchronization for offline peers
+    MailboxSync       = 0x000E,
+    /// Peer-to-peer commerce and market listings
+    MarketListing     = 0x000F,
 }
 
 impl HiveTopic {
@@ -51,6 +59,10 @@ impl HiveTopic {
             Self::PeerScore        => "aeon/score/v1",
             Self::SovereignCommand => "aeon/sovereign/v1",
             Self::VoteCoordination => "aeon/vote/v1",
+            Self::DirectMessage    => "aeon/dm/v1",
+            Self::GroupMessage     => "aeon/group/v1",
+            Self::MailboxSync      => "aeon/mailbox/v1",
+            Self::MarketListing    => "aeon/market/v1",
         }
     }
 
@@ -118,7 +130,7 @@ pub struct HiveMessage {
 impl HiveMessage {
     /// Compute the bytes that get signed: topic_id || timestamp || seq || payload
     pub fn signable_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(12 + self.payload.len());
+        let mut buf = Vec::with_capacity(20 + self.payload.len());
         buf.extend_from_slice(&(self.topic as u32).to_le_bytes());
         buf.extend_from_slice(&self.timestamp.to_le_bytes());
         buf.extend_from_slice(&self.seq.to_le_bytes());
